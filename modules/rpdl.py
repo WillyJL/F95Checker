@@ -229,6 +229,16 @@ async def assert_login():
 
 def has_authenticated_tracker(res: bytes | dict):
     if isinstance(res, bytes):
+        if res.startswith(b"{"):
+            res = json.loads(res)
+            if res.get("error") == "Token invalid.":
+                return False
+            raise msgbox.Exc(
+                "Unknown response",
+                "RPDL sent an unknown response.",
+                MsgBox.warn,
+                more=json.dumps(res, indent=4)
+            )
         tracker = bencode2.bdecode(res).get(b"announce", b"").decode()
     elif isinstance(res, dict):
         tracker = (res.get("data", {}).get("trackers") or [""])[0]

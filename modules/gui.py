@@ -73,7 +73,7 @@ from modules import (
 )
 
 tool_page         = api.f95_threads_page + "44173/"
-github_page       = "https://github.com/Willy-JL/F95Checker"
+github_page       = "https://github.com/WillyJL/F95Checker"
 developer_page    = "https://linktr.ee/WillyJL"
 
 imgui.io = None
@@ -310,7 +310,6 @@ class MainGUI():
         self.watermark_text = f"F95Checker {globals.version_name}{'' if not globals.release else ' by WillyJL'}"
 
         # Variables
-        self.hidden = False
         self.focused = True
         self.minimized = False
         self.filtering = False
@@ -326,6 +325,7 @@ class MainGUI():
         self.recalculate_ids = True
         self.current_tab: Tab = None
         self.selected_games_count = 0
+        self.dragging_tab: Tab = None
         self.game_hitbox_click = False
         self.hovered_game: Game = None
         self.filters: list[Filter] = []
@@ -801,12 +801,15 @@ class MainGUI():
                 elif path.suffix and path.suffix.lower() == ".url":
                     async_thread.run(api.import_url_shortcut(path))
 
+    @property
+    def hidden(self):
+        return not glfw.get_window_attrib(self.window, glfw.VISIBLE)
+
     def hide(self, *_, **__):
         if threading.current_thread() is not threading.main_thread():
             self.call_soon.append(self.hide)
         self.screen_pos = glfw.get_window_pos(self.window)
         glfw.hide_window(self.window)
-        self.hidden = True
         self.tray.update_status()
 
     def show(self, *_, **__):
@@ -814,13 +817,12 @@ class MainGUI():
             self.call_soon.append(self.show)
         self.bg_mode_timer = None
         self.bg_mode_notifs_timer = None
-        if not self.hidden:
-            glfw.hide_window(self.window)
+        # if not self.hidden:
+        #     glfw.hide_window(self.window)
         glfw.show_window(self.window)
         if utils.validate_geometry(*self.screen_pos, *self.prev_size):
             glfw.set_window_pos(self.window, *self.screen_pos)
         glfw.focus_window(self.window)
-        self.hidden = False
         self.tray.update_status()
 
     def scaled(self, size: int | float):
@@ -876,7 +878,7 @@ class MainGUI():
                 cursor = imgui.get_mouse_cursor()
                 any_hovered = imgui.is_any_item_hovered()
                 win_hovered = glfw.get_window_attrib(self.window, glfw.HOVERED)
-                if not self.hidden and not self.minimized and (self.focused or globals.settings.render_when_unfocused):
+                if first_frame or (not self.hidden and not self.minimized):  # Visible
 
                     # Scroll modifiers (must be before new_frame())
                     imgui.io.mouse_wheel *= globals.settings.scroll_amount
@@ -901,6 +903,7 @@ class MainGUI():
                         or (imagehelper.redraw and globals.settings.play_gifs and (self.focused or globals.settings.play_gifs_unfocused))
                         or imgui.io.mouse_wheel or self.input_chars or any(imgui.io.mouse_down) or any(imgui.io.keys_down)
                         or (prev_mouse_pos != mouse_pos and (prev_win_hovered or win_hovered))
+                        or (self.focused or globals.settings.render_when_unfocused)
                         or imagehelper.apply_queue or imagehelper.unload_queue
                         or prev_scaling != globals.settings.interface_scaling
                         or prev_minimized != self.minimized
@@ -914,8 +917,9 @@ class MainGUI():
                     )
                     if draw:
                         draw_next = max(draw_next, imgui.io.delta_time + 1.0)  # Draw for at least next half second
-                    if draw_next > 0.0:
-                        draw_next -= imgui.io.delta_time
+                    if draw_next > 0.0:  # Visible and drawing
+                        if not first_frame:
+                            draw_next -= imgui.io.delta_time
                         draw_start = time.perf_counter()
 
                         # Reactive mouse cursors
@@ -1023,11 +1027,14 @@ class MainGUI():
                     # Wait idle time
                         glfw.swap_buffers(self.window)
                         if first_frame:
-                            glfw.show_window(self.window)
+                            if not globals.settings.start_in_background:
+                                glfw.show_window(self.window)
                             first_frame = False
-                    else:
+                    else:  # Visible but not drawing
                         time.sleep(1 / 15)
-                else:
+                else:  # Not visible
+                    # Unload images if necessary
+                    imagehelper.post_draw(0)
                     # Tray bg mode and not paused
                     if self.hidden and not self.bg_mode_paused and not utils.is_refreshing():
                         if not self.bg_mode_timer:
@@ -1094,15 +1101,16 @@ class MainGUI():
         else:
             imgui.push_no_interaction()
         imgui.push_style_color(imgui.COLOR_BUTTON, *color)
+        imgui.push_style_color(imgui.COLOR_TEXT, *colors.foreground_color(color))
         imgui.push_style_var(imgui.STYLE_FRAME_BORDERSIZE, 0)
 
     def end_framed_text(self, interaction=True):
         imgui.pop_style_var()
         if interaction:
-            imgui.pop_style_color(3)
+            imgui.pop_style_color(4)
         else:
+            imgui.pop_style_color(2)
             imgui.pop_no_interaction()
-            imgui.pop_style_color()
 
     def get_type_label_width(self):
         if self.type_label_width is None:
@@ -1115,7 +1123,6 @@ class MainGUI():
     def draw_type_widget(self, type: Type, wide=True, align=False):
         quick_filter = globals.settings.quick_filters
         self.begin_framed_text(type.color, interaction=quick_filter)
-        imgui.push_style_color(imgui.COLOR_TEXT, 1.0, 1.0, 1.0, 1.0)
         if wide:
             x_padding = 4
             backup_y_padding = imgui.style.frame_padding.y
@@ -1132,7 +1139,6 @@ class MainGUI():
             flt = Filter(FilterMode.Type)
             flt.match = type
             self.filters.append(flt)
-        imgui.pop_style_color()
         self.end_framed_text(interaction=quick_filter)
 
     def draw_tag_widget(self, tag: Tag, quick_filter=True, change_highlight=True):
@@ -1162,7 +1168,6 @@ class MainGUI():
     def draw_label_widget(self, label: Label, short=False):
         quick_filter = globals.settings.quick_filters
         self.begin_framed_text(label.color, interaction=quick_filter)
-        imgui.push_style_color(imgui.COLOR_TEXT, *colors.foreground_color(label.color))
         if imgui.small_button(label.short_name if short else label.name) and quick_filter:
             flt = Filter(FilterMode.Label)
             flt.match = label
@@ -1173,18 +1178,15 @@ class MainGUI():
             self.draw_label_widget(label, short=False)
             imgui.pop_font()
             imgui.end_tooltip()
-        imgui.pop_style_color()
         self.end_framed_text(interaction=quick_filter)
 
     def draw_tab_widget(self, tab: Tab):
         color = (tab and tab.color) or globals.settings.style_accent
         self.begin_framed_text(color, interaction=False)
-        imgui.push_style_color(imgui.COLOR_TEXT, *colors.foreground_color(color))
         if (tab and tab.icon) and (tab and (tab.name or 'New Tab')):
             imgui.small_button(f"{tab.icon} {tab.name or 'New Tab'}")
         else:
             imgui.small_button(f"{Tab.first_tab_label()}")
-        imgui.pop_style_color()
         self.end_framed_text(interaction=False)
 
     def draw_status_widget(self, status: Status):
@@ -2908,17 +2910,28 @@ class MainGUI():
             self.current_tab = display_tab
             self.tick_list_columns()
             save_new_tab = False
+        elif self.dragging_tab:
+            # Keep current tab while resetting tabbar due to dragging
+            save_new_tab = False
+            select_tab = True
         else:
             save_new_tab = True
         new_tab = None
         if Tab.instances and not (globals.settings.filter_all_tabs and self.filtering):
-            if imgui.begin_tab_bar("###tabbar", flags=self.tabbar_flags):
+            if imgui.begin_tab_bar(
+                f"###tabbar_{','.join(str(tab.id) for tab in Tab.instances)}",
+                flags=self.tabbar_flags
+            ):
                 hide = globals.settings.hide_empty_tabs
                 count = len(self.show_games_ids.get(None, ()))
-                if (count or not hide) and imgui.begin_tab_item(f"{Tab.first_tab_label()} ({count})###tab_-1")[0]:
+                if (count or not hide) and imgui.begin_tab_item(
+                    f"{Tab.first_tab_label()} ({count})###tab_-1",
+                    flags=imgui.TAB_ITEM_NONE
+                )[0]:
                     new_tab = None
                     imgui.end_tab_item()
-                for tab in Tab.instances:
+                swap = None
+                for tab_i, tab in enumerate(Tab.instances):
                     count = len(self.show_games_ids.get(tab, ()))
                     if hide and not count:
                         continue
@@ -2935,6 +2948,20 @@ class MainGUI():
                         imgui.end_tab_item()
                     if tab.color:
                         imgui.pop_style_color(4)
+                    if self.dragging_tab is tab and imgui.is_mouse_released():
+                        self.dragging_tab = None
+                    elif imgui.is_item_active() or self.dragging_tab is tab:
+                        mouse_pos = imgui.get_mouse_pos()
+                        if tab_i > 0 and imgui.get_item_rect_min().x > 0 and mouse_pos.x < imgui.get_item_rect_min().x:
+                            if imgui.get_mouse_drag_delta().x < 0:
+                                self.dragging_tab = tab
+                                swap = (tab_i, tab_i - 1)
+                            imgui.reset_mouse_drag_delta()
+                        elif tab_i < len(Tab.instances) - 1 and imgui.get_item_rect_max().x > 0 and mouse_pos.x > imgui.get_item_rect_max().x:
+                            if imgui.get_mouse_drag_delta().x > 0:
+                                self.dragging_tab = tab
+                                swap = (tab_i, tab_i + 1)
+                            imgui.reset_mouse_drag_delta()
                     context_id = f"###tab_{tab.id}_context"
                     set_focus = not imgui.is_popup_open(context_id)
                     if imgui.begin_popup_context_item(context_id):
@@ -2999,6 +3026,13 @@ class MainGUI():
                                 close_callback()
                         imgui.end_popup()
                 imgui.end_tab_bar()
+                if swap:
+                    Tab.instances[swap[0]], Tab.instances[swap[1]] = Tab.instances[swap[1]], Tab.instances[swap[0]]
+                    Tab.update_positions()
+                    async def _update_tab_positions():
+                        for tab in Tab.instances:
+                            await db.update_tab(tab, "position")
+                    async_thread.run(_update_tab_positions())
         if new_tab is not self.current_tab and save_new_tab:
             for game in globals.games.values():
                 game.selected = False

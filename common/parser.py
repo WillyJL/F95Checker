@@ -73,7 +73,9 @@ def is_class(name: str):
 
 
 def datestamp(timestamp: int | float):
-    return int(dt.datetime.fromordinal(dt.datetime.fromtimestamp(timestamp).date().toordinal()).timestamp())
+    utc_time = dt.datetime.fromtimestamp(timestamp, dt.UTC)
+    utc_date = utc_time.replace(hour=12, minute=0, second=0, microsecond=0)
+    return int(utc_date.timestamp())
 
 
 def attachment(preview: str):

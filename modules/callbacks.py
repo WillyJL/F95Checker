@@ -85,7 +85,7 @@ def update_start_with_system(toggle: bool):
         )
 
 
-def _fuzzy_match_subdir(where: pathlib.Path, match: str):
+def _fuzzy_match_subdir(where: pathlib.Path, match: str, best_partial_match: bool):
     clean_charset = string.ascii_letters + string.digits + " "
     clean_dir = "".join(char for char in match.replace("&", "and") if char in clean_charset)
     clean_dir = re.sub(r" +", r" ", clean_dir).strip()
@@ -95,7 +95,10 @@ def _fuzzy_match_subdir(where: pathlib.Path, match: str):
         try:
             dirs = [node.name for node in where.iterdir() if node.is_dir()]
             clean_dir_lower = clean_dir.lower()
-            match_dirs = [d for d in dirs if clean_dir_lower in d.lower()]
+            if best_partial_match:
+                match_dirs = [d for d in dirs if clean_dir_lower in d.lower()]
+            else:
+                match_dirs = []
             if len(match_dirs) == 1:
                 where /= match_dirs[0]
             else:
@@ -136,8 +139,11 @@ def add_game_exe(game: Game, callback: typing.Callable = None):
     start_dir = globals.settings.default_exe_dir.get(globals.os)
     if start_dir:
         start_dir = pathlib.Path(start_dir)
-        for subdir in (game.type.name, game.developer, game.name.removesuffix(" Collection")):
-            start_dir = _fuzzy_match_subdir(start_dir, subdir)
+        try_subdirs = [(game.type.name, False), (game.developer, False), (game.name, True)]
+        if game.name.lower().endswith(" collection"):
+            try_subdirs.append((game.name[:-len(" collection")], True))
+        for subdir, best_partial_match in try_subdirs:
+            start_dir = _fuzzy_match_subdir(start_dir, subdir, best_partial_match)
     utils.push_popup(filepicker.FilePicker(
         title=f"Select or drop executable for {game.name}",
         start_dir=start_dir,
@@ -146,9 +152,9 @@ def add_game_exe(game: Game, callback: typing.Callable = None):
     ).tick)
 
 
-async def default_open(what: str, cwd=None):
+async def default_open(what: str, cwd: str = None):
     if globals.os is Os.Windows:
-        os.startfile(what)
+        os.startfile(what, cwd=cwd or os.getcwd())
     else:
         if globals.os is Os.Linux:
             open_util = "xdg-open"
@@ -184,7 +190,7 @@ async def _launch_exe(executable: str):
 
     if globals.os is Os.Windows:
         # Open with default app
-        await default_open(str(exe))
+        await default_open(str(exe), cwd=str(exe.parent))
     else:
         mode = exe.stat().st_mode
         exe_flag = not (mode & stat.S_IEXEC < stat.S_IEXEC)
@@ -197,8 +203,8 @@ async def _launch_exe(executable: str):
             exe_flag = True
         if (exe.parent / "renpy").is_dir():
             # Make all needed renpy libs executable
-            for file in (exe.parent / "lib").glob("**/*"):
-                if file.is_file() and not file.suffix:
+            for file in (exe.parent / "lib").glob("py?-*/**/*"):
+                if file.is_file():
                     mode = file.stat().st_mode
                     if mode & stat.S_IEXEC < stat.S_IEXEC:
                         file.chmod(mode | stat.S_IEXEC)

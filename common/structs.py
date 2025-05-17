@@ -107,15 +107,18 @@ class DaemonPipe(AbstractPipe):
         self.proc = proc
         self.daemon = DaemonProcess(proc)
 
+    async def is_alive(self):
+        await asyncio.sleep(0)
+        return self.proc.returncode is None
+
     async def get_async(self):
         assert self.proc.stdout
-        while self.proc.returncode is None and not self.proc.stdout.at_eof():
+        while await self.is_alive() and not self.proc.stdout.at_eof():
             line = await self.proc.stdout.readline()
             try:
                 return json.loads(line)
             except json.JSONDecodeError:
                 pass
-            await asyncio.sleep(0)
         raise self.DaemonPipeExit()
 
     def put(self, data: dict | list | str):
@@ -721,6 +724,7 @@ class Tab:
     name: str
     icon: str
     color: tuple[float] | None
+    position: int
     instances: typing.ClassVar = []
 
     @classmethod
@@ -743,6 +747,17 @@ class Tab:
     def remove(cls, self):
         while self in cls.instances:
             cls.instances.remove(self)
+        cls.sort_instances()
+
+    @classmethod
+    def update_positions(cls):
+        for self_i, self in enumerate(cls.instances):
+            self.position = self_i
+
+    @classmethod
+    def sort_instances(cls):
+        cls.instances.sort(key=lambda self: self.position)
+        cls.update_positions()
 
     @classmethod
     def base_icon(cls):

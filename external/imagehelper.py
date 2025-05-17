@@ -1,4 +1,4 @@
-# https://gist.github.com/Willy-JL/9c5116e5a11abd559c56f23aa1270de9
+# https://gist.github.com/WillyJL/9c5116e5a11abd559c56f23aa1270de9
 import functools
 import gc
 import os
@@ -127,7 +127,7 @@ def post_draw(draw_time: float):
     if globals.settings.unload_offscreen_images:
         hidden = globals.gui.minimized or globals.gui.hidden
         for image in ImageHelper.instances:
-            if hidden or not image.shown:
+            if image.loaded and (hidden or not image.shown):
                 unload_queue.append(image)
             else:
                 image.shown = False
@@ -716,7 +716,7 @@ class ImageHelper:
     def unload(self):
         if self.loaded:
             if self.texture_ids:
-                gl.glDeleteTextures([self.texture_ids])
+                gl.glDeleteTextures(self.texture_ids)
                 self.texture_ids.clear()
             if self.textures:
                 apply_queue.remove(self)
@@ -741,7 +741,7 @@ class ImageHelper:
                 # self.load()  # changed
                 # You can (and maybe should) run this in a thread! threading.Thread(target=self.load, daemon=True).start()
                 # Or maybe setup an image thread and queue images to load one by one?
-                # You could do this with https://gist.github.com/Willy-JL/bb410bcc761f8bf5649180f22b7f3b44 like so:
+                # You could do this with https://gist.github.com/WillyJL/bb410bcc761f8bf5649180f22b7f3b44 like so:
                 sync_thread.queue(self.load)  # changed
         else:
             if self._missing or self._error:

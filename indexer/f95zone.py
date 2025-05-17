@@ -9,6 +9,8 @@ import sys
 import aiohttp
 import aiolimiter
 
+from common import meta
+
 RATELIMIT = aiolimiter.AsyncLimiter(max_rate=1, time_period=0.5)
 TIMEOUT = aiohttp.ClientTimeout(total=30, connect=30, sock_read=30, sock_connect=30)
 LOGIN_ERROR_MESSAGES = (
@@ -36,7 +38,7 @@ TEMP_ERROR_MESSAGES = (
     b"<p>Automated backups are currently executing. During this time, the site will be unavailable</p>",
     b"<title>F95Zone :: Scheduled Maintenance</title>",
     b'<script src="https://static.f95zone.to/assets/SamF95/ErrorPage',
-    b'<div class="blockMessage"><p>Please check back in 10 mins</p></div>'
+    b'<div class="blockMessage"><p>Please check back in 10 mins</p></div>',
 )
 
 logger = logging.getLogger(__name__)
@@ -88,14 +90,14 @@ ERROR_INTERNAL_ERROR = IndexerError(
 
 
 @contextlib.asynccontextmanager
-async def lifespan(version: str):
+async def lifespan():
     global session, cookies
     session = aiohttp.ClientSession(
         cookie_jar=aiohttp.DummyCookieJar(),
         timeout=TIMEOUT,
         headers={
             "User-Agent": (
-                f"F95Indexer/{version} "
+                f"F95Indexer/{meta.version} "
                 f"Python/{sys.version.split(' ')[0]} "
                 f"aiohttp/{aiohttp.__version__}"
             ),
