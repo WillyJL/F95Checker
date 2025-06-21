@@ -24,11 +24,6 @@ aiolimiter==1.2.0
 aiofiles==24.1.0
 certifi
 
-# Archive extract
-py7zr==0.22.0
-rarfile==4.2
-zipfile-deflate64==0.2.0
-
 # BeautifulSoup
 beautifulsoup4==4.12.3
 lxml==5.3.0

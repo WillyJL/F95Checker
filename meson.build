@@ -123,6 +123,11 @@ compile_args += [
     '-DBC7E_AVAILABLE=' + bc7e.found().to_int().to_string()
 ]
 
+# c7zip (basic C wrapper for 7-Zip)
+c7zip_proj = subproject('c7zip')
+c7zip = c7zip_proj.get_variable('c7zip_dep')
+dependencies += [c7zip]
+
 # cURL
 if get_option('vendored_curl')
     curl_opts = cmake.subproject_options()
