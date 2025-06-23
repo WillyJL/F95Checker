@@ -23,8 +23,8 @@ source_dir = meson.current_source_dir()
 build_dir = meson.current_build_dir()
 include_dirs = include_directories('src')
 compile_args = [
-    '-I' + (source_dir / 'subprojects'),
-    '-I' + (build_dir / 'subprojects'),
+    '-I' + (source_dir / 'subprojects'),  # For <subproject/file.h>
+    '-I' + (build_dir / 'subprojects'),  # For <subproject/file.h> with generated code
     '-DF95CHECKER_VERSION="' + meson.project_version() + '"',
     '-Wall', '-Wextra',
     '-Wstrict-prototypes',
@@ -40,11 +40,13 @@ dependencies = []
 
 add_global_arguments(
     '-Wno-unused',
-    '-fdiagnostics-color=always',
+    '-fdiagnostics-color=always',  # Show colors through Ninja pipes
+    '-fdiagnostics-absolute-paths',  # Paths can be ctrl-clicked without being in build directory
     language: ['c', 'cpp']
 )
 add_global_link_arguments(
-    '-fdiagnostics-color=always',
+    '-fdiagnostics-color=always',  # Show colors through Ninja pipes
+    '-fdiagnostics-absolute-paths',  # Paths can be ctrl-clicked without being in build directory
     language: ['c', 'cpp']
 )
 
@@ -83,6 +85,19 @@ if get_option('python_venv')
     endforeach
 endif
 meson.override_find_program('python3-maybe-venv', files(python_exe))
+
+# Symlink current build dir for clangd to find it
+if fs.is_samepath(fs.parent(build_dir), source_dir / 'build')
+    run_command(
+        python_exe, '-c',
+        'import pathlib, sys;'+
+        'build = pathlib.Path(sys.argv[1]);'+
+        '(build.parent / "current").unlink(missing_ok=True);'+
+        '(build.parent / "current").symlink_to(build.name, target_is_directory=True);',
+        build_dir,
+        check: true,
+    )
+endif
 
 # Helper for finding source files by globbing at configure time
 glob = build_dir / 'meson-glob.py'
@@ -152,7 +167,7 @@ if get_option('vendored_curl')
             'CURL_USE_OPENSSL': false,
             'CURL_USE_WOLFSSL': true,
         })
-        curl_opts.append_compile_args('c', '-I' + (build_dir / 'subprojects/wolfssl/__CMake_build'))
+        curl_opts.append_compile_args('c', '-I' + (build_dir / 'subprojects/wolfssl/__CMake_build'))  # Use generated options.h
     elif build_machine.system() == 'darwin'
          wolfssl_opts.add_cmake_defines({
             'CURL_USE_SECTRANSP': true,
