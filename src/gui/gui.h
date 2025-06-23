@@ -25,7 +25,7 @@ typedef struct {
     } tray_state;
 
     SDL_Window* window;
-    SDL_GLContext window_gl;
+    SDL_Renderer* window_renderer;
     bool window_hidden;
     struct {
         ImVec2 prev_size;

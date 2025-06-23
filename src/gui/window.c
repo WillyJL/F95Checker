@@ -1,19 +1,13 @@
 #include "window.h"
 
-#include <dcimgui/dcimgui_impl_opengl3.h>
 #include <dcimgui/dcimgui_impl_sdl3.h>
-#include <glad/gl.h>
+#include <dcimgui/dcimgui_impl_sdlrenderer3.h>
 
 #include <globals.h>
 
 bool gui_window_init(Gui* gui) {
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-    const SDL_WindowFlags window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
-                                         SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    // FIXME: handle DPI correctly
+    const SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN;
     // FIXME: load and save window size from imgui.ini
     // FIXME: use data path for imgui.ini
     gui->window = SDL_CreateWindow("F95Checker WIP C Rewrite", 1280, 720, window_flags);
@@ -24,18 +18,14 @@ bool gui_window_init(Gui* gui) {
     SDL_SetWindowMinimumSize(gui->window, 720, 400);
     SDL_SetWindowIcon(gui->window, gui->icons.icon);
 
-    gui->window_gl = SDL_GL_CreateContext(gui->window);
-    SDL_GL_MakeCurrent(gui->window, gui->window_gl);
-    SDL_GL_SetSwapInterval(1);
-
-    const int32_t version = gladLoadGL(SDL_GL_GetProcAddress);
-    if(version == 0) {
-        custom_perror("gladLoadGL()", "failed to initialize OpenGL context");
-        SDL_GL_DestroyContext(gui->window_gl);
+    // FIXME: add setting to select software rendering
+    gui->window_renderer = SDL_CreateRenderer(gui->window, NULL);
+    if(gui->window_renderer == NULL) {
+        gui_perror("SDL_CreateRenderer()");
         SDL_DestroyWindow(gui->window);
-        SDL_Quit();
         return false;
     }
+    SDL_SetRenderVSync(gui->window_renderer, settings->vsync_ratio);
 
     IMGUI_CHECKVERSION();
     ImGui_CreateContext(NULL);
@@ -44,8 +34,8 @@ bool gui_window_init(Gui* gui) {
     gui->window_state.prev_size = (ImVec2){0.0f, 0.0f};
     gui->window_state.scroll_energy = (ImVec2){0.0f, 0.0f};
 
-    ImGui_ImplSDL3_InitForOpenGL(gui->window, gui->window_gl);
-    ImGui_ImplOpenGL3_Init();
+    ImGui_ImplSDL3_InitForSDLRenderer(gui->window, gui->window_renderer);
+    ImGui_ImplSDLRenderer3_Init(gui->window_renderer);
 
     return true;
 }
@@ -108,7 +98,7 @@ void gui_window_new_frame(Gui* gui) {
         ImGui_SetMouseCursor(ImGuiMouseCursor_Hand);
     }
 
-    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui_NewFrame();
 
@@ -135,16 +125,15 @@ void gui_window_render(Gui* gui) {
     ImGui_End();
 
     ImGui_Render();
-    glViewport(0, 0, (int32_t)gui->io->DisplaySize.x, (int32_t)gui->io->DisplaySize.y);
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui_GetDrawData());
-    SDL_GL_SwapWindow(gui->window);
+    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui_GetDrawData(), gui->window_renderer);
+    SDL_RenderPresent(gui->window_renderer);
 }
 
 void gui_window_free(Gui* gui) {
-    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui_DestroyContext(NULL);
 
-    SDL_GL_DestroyContext(gui->window_gl);
+    SDL_DestroyRenderer(gui->window_renderer);
     SDL_DestroyWindow(gui->window);
 }

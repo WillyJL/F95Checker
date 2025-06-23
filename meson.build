@@ -56,7 +56,6 @@ assert(
 # Python (needed for codegen)
 python_exe = python.find_installation('python3').full_path()
 python_requirements_files = [
-    'subprojects/glad/requirements.txt',
     'subprojects/icons/requirements.txt',
     'subprojects/dcimgui/dear_bindings/requirements.txt',
 ]
@@ -186,11 +185,6 @@ fonts_proj = subproject('fonts')
 fonts = fonts_proj.get_variable('fonts_dep')
 dependencies += [fonts]
 
-# GLAD (OpenGL loader)
-glad_proj = subproject('glad')
-glad = glad_proj.get_variable('glad_dep')
-dependencies += [glad]
-
 # Icons (generate embedded C sources)
 icons_proj = subproject('icons')
 icons = icons_proj.get_variable('icons_dep')
@@ -223,7 +217,7 @@ if get_option('vendored_sdl3')
         'SDL_HAPTIC': false,
         'SDL_INSTALL': false,
         'SDL_POWER': false,
-        'SDL_RENDER': false,
+        'SDL_RENDER': true,
         'SDL_SENSOR': false,
         'SDL_STATIC': true,
         'SDL_TEST_LIBRARY': false,
