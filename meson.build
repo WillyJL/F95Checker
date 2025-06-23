@@ -27,8 +27,10 @@ compile_args = [
     '-I' + (build_dir / 'subprojects'),  # For <subproject/file.h> with generated code
     '-DF95CHECKER_VERSION="' + meson.project_version() + '"',
     '-Wall', '-Wextra',
+    '-Wconversion', '-Wno-sign-conversion', '-Wno-implicit-int-conversion',
+    '-Wdouble-promotion',
+    '-Wredundant-parens',
     '-Wstrict-prototypes',
-    '-Wredundant-decls',
     '-Wundef',
     '-Wunused',
 ]

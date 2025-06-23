@@ -29,9 +29,9 @@ static void db_parse_game(Db* db, sqlite3_stmt* stmt, Game* game) {
     game->last_full_check = sqlite3_column_int64(stmt, col++);
     m_string_set(game->last_check_version, sqlite3_column_text(stmt, col++));
     game->last_launched = sqlite3_column_int64(stmt, col++);
-    game->score = sqlite3_column_double(stmt, col++);
+    game->score = sqlite3_column_float(stmt, col++);
     game->votes = sqlite3_column_int(stmt, col++);
-    game->rating = sqlite3_column_double(stmt, col++);
+    game->rating = sqlite3_column_float(stmt, col++);
     m_string_set(game->finished, sqlite3_column_text(stmt, col++));
     m_string_set(game->installed, sqlite3_column_text(stmt, col++));
 
@@ -300,13 +300,13 @@ void db_do_save_game(Db* db, Game* game, GamesColumn column) {
         res = sqlite3_bind_int64(stmt, 1, game->last_launched);
         break;
     case GamesColumn_score:
-        res = sqlite3_bind_double(stmt, 1, game->score);
+        res = sqlite3_bind_float(stmt, 1, game->score);
         break;
     case GamesColumn_votes:
         res = sqlite3_bind_int(stmt, 1, game->votes);
         break;
     case GamesColumn_rating:
-        res = sqlite3_bind_double(stmt, 1, game->rating);
+        res = sqlite3_bind_float(stmt, 1, game->rating);
         break;
     case GamesColumn_finished:
         res = sqlite3_bind_mstring(stmt, 1, game->finished);

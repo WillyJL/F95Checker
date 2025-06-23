@@ -28,7 +28,7 @@ static void db_parse_settings(Db* db, sqlite3_stmt* stmt, Settings* settings) {
     }
     col++;
 
-    settings->cell_image_ratio = sqlite3_column_double(stmt, col++);
+    settings->cell_image_ratio = sqlite3_column_float(stmt, col++);
     settings->check_notifs = sqlite3_column_int(stmt, col++);
     settings->compact_timeline = sqlite3_column_int(stmt, col++);
     settings->confirm_on_remove = sqlite3_column_int(stmt, col++);
@@ -95,7 +95,7 @@ static void db_parse_settings(Db* db, sqlite3_stmt* stmt, Settings* settings) {
     settings->ignore_semaphore_timeouts = sqlite3_column_int(stmt, col++);
     settings->independent_tab_views = sqlite3_column_int(stmt, col++);
     settings->insecure_ssl = sqlite3_column_int(stmt, col++);
-    settings->interface_scaling = sqlite3_column_double(stmt, col++);
+    settings->interface_scaling = sqlite3_column_float(stmt, col++);
     settings->last_successful_refresh = sqlite3_column_int64(stmt, col++);
 
     json_object* manual_sort_list_json = sqlite3_column_json(stmt, col++);
@@ -129,9 +129,9 @@ static void db_parse_settings(Db* db, sqlite3_stmt* stmt, Settings* settings) {
     m_string_set(settings->rpdl_password, sqlite3_column_text(stmt, col++));
     m_string_set(settings->rpdl_token, sqlite3_column_text(stmt, col++));
     m_string_set(settings->rpdl_username, sqlite3_column_text(stmt, col++));
-    settings->scroll_amount = sqlite3_column_double(stmt, col++);
+    settings->scroll_amount = sqlite3_column_float(stmt, col++);
     settings->scroll_smooth = sqlite3_column_int(stmt, col++);
-    settings->scroll_smooth_speed = sqlite3_column_double(stmt, col++);
+    settings->scroll_smooth_speed = sqlite3_column_float(stmt, col++);
     settings->select_executable_after_add = sqlite3_column_int(stmt, col++);
     settings->show_remove_btn = sqlite3_column_int(stmt, col++);
     settings->software_webview = sqlite3_column_int(stmt, col++);
@@ -167,7 +167,7 @@ static void db_parse_settings(Db* db, sqlite3_stmt* stmt, Settings* settings) {
     settings->weighted_score = sqlite3_column_int(stmt, col++);
     settings->zoom_area = sqlite3_column_int(stmt, col++);
     settings->zoom_enabled = sqlite3_column_int(stmt, col++);
-    settings->zoom_times = sqlite3_column_double(stmt, col++);
+    settings->zoom_times = sqlite3_column_float(stmt, col++);
 }
 
 void db_do_load_settings(Db* db, Settings* settings) {
@@ -248,7 +248,7 @@ void db_do_save_setting(Db* db, Settings* settings, SettingsColumn column) {
         res = sqlite3_bind_int64(stmt, 1, settings->browser->hash);
         break;
     case SettingsColumn_cell_image_ratio:
-        res = sqlite3_bind_double(stmt, 1, settings->cell_image_ratio);
+        res = sqlite3_bind_float(stmt, 1, settings->cell_image_ratio);
         break;
     case SettingsColumn_check_notifs:
         res = sqlite3_bind_int(stmt, 1, settings->check_notifs);
@@ -351,7 +351,7 @@ void db_do_save_setting(Db* db, Settings* settings, SettingsColumn column) {
         res = sqlite3_bind_int(stmt, 1, settings->insecure_ssl);
         break;
     case SettingsColumn_interface_scaling:
-        res = sqlite3_bind_double(stmt, 1, settings->interface_scaling);
+        res = sqlite3_bind_float(stmt, 1, settings->interface_scaling);
         break;
     case SettingsColumn_last_successful_refresh:
         res = sqlite3_bind_int64(stmt, 1, settings->last_successful_refresh);
@@ -429,13 +429,13 @@ void db_do_save_setting(Db* db, Settings* settings, SettingsColumn column) {
         res = sqlite3_bind_mstring(stmt, 1, settings->rpdl_username);
         break;
     case SettingsColumn_scroll_amount:
-        res = sqlite3_bind_double(stmt, 1, settings->scroll_amount);
+        res = sqlite3_bind_float(stmt, 1, settings->scroll_amount);
         break;
     case SettingsColumn_scroll_smooth:
         res = sqlite3_bind_int(stmt, 1, settings->scroll_smooth);
         break;
     case SettingsColumn_scroll_smooth_speed:
-        res = sqlite3_bind_double(stmt, 1, settings->scroll_smooth_speed);
+        res = sqlite3_bind_float(stmt, 1, settings->scroll_smooth_speed);
         break;
     case SettingsColumn_select_executable_after_add:
         res = sqlite3_bind_int(stmt, 1, settings->select_executable_after_add);
@@ -515,7 +515,7 @@ void db_do_save_setting(Db* db, Settings* settings, SettingsColumn column) {
         res = sqlite3_bind_int(stmt, 1, settings->zoom_enabled);
         break;
     case SettingsColumn_zoom_times:
-        res = sqlite3_bind_double(stmt, 1, settings->zoom_times);
+        res = sqlite3_bind_float(stmt, 1, settings->zoom_times);
         break;
     }
     db_assert(db, res, SQLITE_OK, "sqlite3_bind_*()");

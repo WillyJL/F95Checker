@@ -31,7 +31,7 @@ bool gui_window_init(Gui* gui) {
     ImGui_CreateContext(NULL);
     gui->io = ImGui_GetIO();
     gui->style = ImGui_GetStyle();
-    gui->window_state.prev_size = (ImVec2){0.0f, 0.0f};
+    gui->window_state.prev_size = (Vec2){0, 0};
     gui->window_state.scroll_energy = (ImVec2){0.0f, 0.0f};
 
     ImGui_ImplSDL3_InitForSDLRenderer(gui->window, gui->window_renderer);
@@ -103,12 +103,14 @@ void gui_window_new_frame(Gui* gui) {
     ImGui_NewFrame();
 
     ImGui_SetNextWindowPos((ImVec2){0.0f, 0.0f}, ImGuiCond_Once);
-    int32_t width, height;
-    SDL_GetWindowSize(gui->window, &width, &height);
-    const ImVec2 window_size = {width, height};
+    Vec2 window_size;
+    SDL_GetWindowSize(gui->window, &window_size.x, &window_size.y);
     if(window_size.x != gui->window_state.prev_size.x ||
        window_size.y != gui->window_state.prev_size.y) {
-        ImGui_SetNextWindowSize(window_size, ImGuiCond_Always);
+        ImGui_SetNextWindowSize(
+            (ImVec2){(flt32_t)window_size.x, (flt32_t)window_size.y},
+            ImGuiCond_Always);
+        gui->window_state.prev_size = window_size;
     }
 
     ImGui_PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);

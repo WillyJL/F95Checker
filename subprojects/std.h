@@ -44,18 +44,36 @@
 
 static_assert(
     sizeof(float) * CHAR_BIT == 32,
-    "float is not 32 bit on this architecture, fix the f32 typedef.");
+    "float is not 32 bit on this architecture, fix the flt32_t typedef.");
 typedef float flt32_t;
 
 static_assert(
     sizeof(double) * CHAR_BIT == 64,
-    "float is not 32 bit on this architecture, fix the f32 typedef.");
+    "double is not 64 bit on this architecture, fix the flt64_t typedef.");
 typedef double flt64_t;
 
 static_assert(
     sizeof(long double) * CHAR_BIT == 128,
-    "float is not 32 bit on this architecture, fix the f32 typedef.");
+    "long double is not 128 bit on this architecture, fix the flt128_t typedef.");
 typedef long double flt128_t;
+
+typedef struct {
+    int32_t x;
+    int32_t y;
+} Vec2;
+
+typedef struct {
+    int32_t x;
+    int32_t y;
+    int32_t z;
+} Vec3;
+
+typedef struct {
+    int32_t x;
+    int32_t y;
+    int32_t z;
+    int32_t w;
+} Vec4;
 
 #define CLOCKS_TO_USEC(clocks) (clocks * 1'000'000 / CLOCKS_PER_SEC)
 

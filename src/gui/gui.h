@@ -28,7 +28,7 @@ typedef struct {
     SDL_Renderer* window_renderer;
     bool window_hidden;
     struct {
-        ImVec2 prev_size;
+        Vec2 prev_size;
         ImVec2 scroll_energy;
     } window_state;
 

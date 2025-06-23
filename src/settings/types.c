@@ -15,10 +15,10 @@ SMARTENUM_DEFINE(_ProxyType, ProxyType)
 
 SMARTENUM_DEFINE(_TagHighlight, TagHighlight)
 const TagHighlightInfo tag_highlight[TagHighlight_COUNT] = {
-    [TagHighlight_None] = {.color = {{0.3, 0.3, 0.3, 1.0}}},
-    [TagHighlight_Positive] = {.color = {{0.0, 0.6, 0.0, 1.0}}},
-    [TagHighlight_Negative] = {.color = {{0.6, 0.0, 0.0, 1.0}}},
-    [TagHighlight_Critical] = {.color = {{0.0, 0.0, 0.0, 1.0}}},
+    [TagHighlight_None] = {.color = {{0.3f, 0.3f, 0.3f, 1.0f}}},
+    [TagHighlight_Positive] = {.color = {{0.0f, 0.6f, 0.0f, 1.0f}}},
+    [TagHighlight_Negative] = {.color = {{0.6f, 0.0f, 0.0f, 1.0f}}},
+    [TagHighlight_Critical] = {.color = {{0.0f, 0.0f, 0.0f, 1.0f}}},
 };
 
 SMARTENUM_DEFINE(_TexCompress, TexCompress)

@@ -12,7 +12,7 @@ void gui_ui_draw(Gui* gui) {
 
     ImGui_Text("Version: " F95CHECKER_VERSION " WIP");
 
-    ImGui_Text("FPS: %.1f", gui->io->Framerate);
+    ImGui_Text("FPS: %.1f", (flt64_t)gui->io->Framerate);
 
     ImGui_Spacing();
 
