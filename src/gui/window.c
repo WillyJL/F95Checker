@@ -1,5 +1,7 @@
 #include "window.h"
 
+#include "fonts.h"
+
 #include <dcimgui/dcimgui_impl_sdl3.h>
 #include <dcimgui/dcimgui_impl_sdlrenderer3.h>
 
@@ -33,6 +35,8 @@ bool gui_window_init(Gui* gui) {
     gui->style = ImGui_GetStyle();
     gui->window_state.prev_size = (Vec2){0, 0};
     gui->window_state.scroll_energy = (ImVec2){0.0f, 0.0f};
+
+    gui_fonts_init(gui);
 
     ImGui_ImplSDL3_InitForSDLRenderer(gui->window, gui->window_renderer);
     ImGui_ImplSDLRenderer3_Init(gui->window_renderer);
@@ -134,6 +138,7 @@ void gui_window_render(Gui* gui) {
 void gui_window_free(Gui* gui) {
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
+    gui_fonts_free(gui);
     ImGui_DestroyContext(NULL);
 
     SDL_DestroyRenderer(gui->window_renderer);

@@ -1,7 +1,6 @@
 #include "gui.h"
 
 #include "backend.h"
-#include "fonts.h"
 #include "icons.h"
 #include "tray.h"
 #include "ui.h"
@@ -46,8 +45,6 @@ Gui* gui_init(void) {
     gui->style->ItemSpacing.x = gui->style->ItemSpacing.y;
     gui->style->Colors[ImGuiCol_ModalWindowDimBg] = (ImVec4){0.0f, 0.0f, 0.0f, 0.5f};
 
-    gui_fonts_init(gui);
-
     return gui;
 }
 
@@ -66,7 +63,6 @@ void gui_tick(Gui* gui) {
 }
 
 void gui_free(Gui* gui) {
-    gui_fonts_free(gui);
     gui_window_free(gui);
     gui_tray_free(gui);
     gui_icons_free(gui);
