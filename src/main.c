@@ -16,10 +16,10 @@ CookieDict cookies;
 LabelList labels;
 TabList tabs;
 
-int32_t main(int32_t argc, char** argv) {
+i32 main(i32 argc, char** argv) {
     UNUSED(argc);
     UNUSED(argv);
-    int32_t ret = 0;
+    i32 ret = 0;
 
     browser_list_init(browsers);
     browser_discover_installed(browsers);

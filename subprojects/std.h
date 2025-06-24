@@ -44,18 +44,28 @@
 
 static_assert(
     sizeof(float) * CHAR_BIT == 32,
-    "float is not 32 bit on this architecture, fix the flt32_t typedef.");
-typedef float flt32_t;
+    "float is not 32 bit on this architecture, fix the f32 typedef.");
+typedef float f32;
 
 static_assert(
     sizeof(double) * CHAR_BIT == 64,
-    "double is not 64 bit on this architecture, fix the flt64_t typedef.");
-typedef double flt64_t;
+    "double is not 64 bit on this architecture, fix the f64 typedef.");
+typedef double f64;
 
 static_assert(
     sizeof(long double) * CHAR_BIT == 128,
-    "long double is not 128 bit on this architecture, fix the flt128_t typedef.");
-typedef long double flt128_t;
+    "long double is not 128 bit on this architecture, fix the f128 typedef.");
+typedef long double f128;
+
+typedef int8_t i8;
+typedef int16_t i16;
+typedef int32_t i32;
+typedef int64_t i64;
+
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
 
 typedef struct {
     int32_t x;

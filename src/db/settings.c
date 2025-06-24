@@ -171,7 +171,7 @@ static void db_parse_settings(Db* db, sqlite3_stmt* stmt, Settings* settings) {
 }
 
 void db_do_load_settings(Db* db, Settings* settings) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 
@@ -206,7 +206,7 @@ void db_do_load_settings(Db* db, Settings* settings) {
 }
 
 void db_do_save_setting(Db* db, Settings* settings, SettingsColumn column) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 

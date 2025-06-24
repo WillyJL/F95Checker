@@ -2,7 +2,7 @@
 
 #include <std.h>
 
-typedef int64_t BrowserHash;
+typedef i64 BrowserHash;
 
 typedef enum {
     BrowserReservedHashIntegrated = (BrowserHash)0,

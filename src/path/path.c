@@ -92,7 +92,7 @@ bool path_is_empty(Path* path) {
 
 bool path_is_file(Path* path) {
     struct stat st;
-    int32_t res = stat(path_cstr(path), &st);
+    i32 res = stat(path_cstr(path), &st);
     if(res != 0) {
         assert(res == -1);
         if(errno != ENOENT) {
@@ -105,7 +105,7 @@ bool path_is_file(Path* path) {
 
 bool path_is_dir(Path* path) {
     struct stat st;
-    int32_t res = stat(path_cstr(path), &st);
+    i32 res = stat(path_cstr(path), &st);
     if(res != 0) {
         assert(res == -1);
         if(errno != ENOENT) {
@@ -134,7 +134,7 @@ bool path_mkdir(Path* path, bool recursive) {
     path_free(parent);
 
     if(ret) {
-        int32_t res = mkdir(path_cstr(path), 0755);
+        i32 res = mkdir(path_cstr(path), 0755);
         if(res != 0) {
             assert(res == -1);
             perror(path_cstr(path));
@@ -179,7 +179,7 @@ bool path_read_text(Path* path, m_string_ptr string) {
 
 bool path_read_bytes(Path* path, m_bstring_ptr bytes) {
     struct stat st;
-    int32_t res = stat(path_cstr(path), &st);
+    i32 res = stat(path_cstr(path), &st);
     if(res != 0) {
         assert(res == -1);
         perror(path_cstr(path));

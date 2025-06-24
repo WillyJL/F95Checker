@@ -211,7 +211,7 @@ static void db_parse_game(Db* db, sqlite3_stmt* stmt, Game* game) {
 }
 
 void db_do_load_games(Db* db, GameDict_ptr games) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 
@@ -243,7 +243,7 @@ void db_do_load_games(Db* db, GameDict_ptr games) {
 }
 
 void db_do_save_game(Db* db, Game* game, GamesColumn column) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 
@@ -470,7 +470,7 @@ Game* db_do_create_game(Db* db, GameDict_ptr games, GameId id) {
         assert(id < 0);
     }
 
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 
@@ -527,7 +527,7 @@ void db_do_delete_game(Db* db, Game* game, GameDict_ptr games) {
     assert(removed);
     UNUSED(removed);
 
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 

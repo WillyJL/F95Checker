@@ -8,7 +8,7 @@
 
 static BrowserHash browser_name_hash(const char* name) {
     // Why did I think this was a good idea 3 years ago?
-    uint8_t md5[WC_MD5_DIGEST_SIZE];
+    u8 md5[WC_MD5_DIGEST_SIZE];
     wc_Md5Hash((void*)name, strlen(name), md5);
     BrowserHash hash = 0;
     for(size_t i = 0; i < 6; i++) {

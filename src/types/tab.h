@@ -7,7 +7,7 @@
 
 #define TAB_DFLT_ICON mdi_heart_box
 
-typedef int32_t TabId;
+typedef i32 TabId;
 
 M_TUPLE_EX_DEF(
     tab,
@@ -16,8 +16,8 @@ M_TUPLE_EX_DEF(
     (name, m_string_t),
     (icon, m_string_t),
     (color, ImColor),
-    (position, int32_t))
-#define M_OPL_Tab() M_TUPLE_EX_OPL(tab, TabId, m_string_t, m_string_t, ImColor, int32_t)
+    (position, i32))
+#define M_OPL_Tab() M_TUPLE_EX_OPL(tab, TabId, m_string_t, m_string_t, ImColor, i32)
 
 M_LIST_DUAL_PUSH_EX_DEF(tab_list, TabList, Tab)
 #define M_OPL_TabList() M_LIST_DUAL_PUSH_EX_OPL(tab_list, Tab)

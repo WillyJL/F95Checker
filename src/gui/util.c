@@ -1,6 +1,6 @@
 #include "util.h"
 
-int32_t gui_util_input_text_resize_callback(ImGuiInputTextCallbackData* data) {
+i32 gui_util_input_text_resize_callback(ImGuiInputTextCallbackData* data) {
     m_string_ptr str = data->UserData;
     if(data->EventFlag & ImGuiInputTextFlags_CallbackResize) {
         m_str1ng_set_size(str, strlen(data->Buf));

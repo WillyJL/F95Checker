@@ -5,7 +5,7 @@
 #include <globals.h>
 
 void label_list_update_positions(LabelList_ptr labels) {
-    int32_t i = -1;
+    i32 i = -1;
     for each(Label_ptr, label, LabelList, labels) {
         if(label->position != ++i) {
             label->position = i;

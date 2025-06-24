@@ -5,7 +5,7 @@
 DB_TABLE_DEFINE(_COOKIES, cookies, CookiesColumn)
 
 void db_do_load_cookies(Db* db, CookieDict_ptr cookies) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 
@@ -43,7 +43,7 @@ void db_do_load_cookies(Db* db, CookieDict_ptr cookies) {
 }
 
 void db_do_save_cookies(Db* db, CookieDict_ptr cookies) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 

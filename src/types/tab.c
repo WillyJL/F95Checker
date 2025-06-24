@@ -5,7 +5,7 @@
 #include <globals.h>
 
 void tab_list_update_positions(TabList_ptr tabs) {
-    int32_t i = -1;
+    i32 i = -1;
     for each(Tab_ptr, tab, TabList, tabs) {
         if(tab->position != ++i) {
             tab->position = i;

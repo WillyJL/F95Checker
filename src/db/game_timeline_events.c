@@ -27,7 +27,7 @@ static void
 }
 
 void db_do_load_game_timeline_events(Db* db, GameDict_ptr games) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 
@@ -93,7 +93,7 @@ GameTimelineEvent_ptr db_do_create_game_timeline_event(
     Game* game,
     GameTimelineEventType type,
     m_string_list_ptr arguments) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 
@@ -148,7 +148,7 @@ GameTimelineEvent_ptr db_do_create_game_timeline_event(
 }
 
 void db_do_delete_game_timeline_events(Db* db, GameId game_id) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 

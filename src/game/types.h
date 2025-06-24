@@ -33,12 +33,11 @@ M_TUPLE_EX_DEF(
     game_review,
     GameReview,
     (user, m_string_t),
-    (score, uint8_t),
+    (score, u8),
     (message, m_string_t),
-    (likes, uint32_t),
+    (likes, u32),
     (timestamp, Timestamp))
-#define M_OPL_GameReview() \
-    M_TUPLE_EX_OPL(game_review, m_string_t, uint8_t, m_string_t, uint32_t, Timestamp)
+#define M_OPL_GameReview() M_TUPLE_EX_OPL(game_review, m_string_t, u8, m_string_t, u32, Timestamp)
 
 M_LIST_DUAL_PUSH_EX_DEF(game_review_list, GameReviewList, GameReview)
 #define M_OPL_GameReviewList() M_LIST_DUAL_PUSH_EX_OPL(game_review_list, GameReview)
@@ -237,7 +236,7 @@ SMARTENUM_DECLARE(_GameTimelineEventType, GameTimelineEventType)
 typedef struct {
     const char* display;
     const char* icon;
-    uint8_t args_min;
+    u8 args_min;
     const char* template;
 } GameTimelineEventTypeInfo;
 extern const GameTimelineEventTypeInfo game_timeline_event_type[1 + GameTimelineEventType_COUNT];

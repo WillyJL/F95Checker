@@ -12,7 +12,7 @@ void gui_ui_draw(Gui* gui) {
 
     ImGui_Text("Version: " F95CHECKER_VERSION " WIP");
 
-    ImGui_Text("FPS: %.1f", (flt64_t)gui->io->Framerate);
+    ImGui_Text("FPS: %.1f", (f64)gui->io->Framerate);
 
     ImGui_Spacing();
 
@@ -52,7 +52,7 @@ void gui_ui_draw(Gui* gui) {
     ImGui_SetNextItemWidth(200.0f);
     ImGui_ColorEdit3(
         "###style_accent",
-        (flt32_t*)&settings->style_accent.Value,
+        (f32*)&settings->style_accent.Value,
         ImGuiColorEditFlags_None);
     if(ImGui_IsItemDeactivatedAfterEdit()) {
         db_save_setting(db, settings, SettingsColumn_style_accent);

@@ -15,7 +15,7 @@ static void db_parse_label(Db* db, sqlite3_stmt* stmt, Label_ptr label) {
 }
 
 void db_do_load_labels(Db* db, LabelList_ptr labels) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 
@@ -48,7 +48,7 @@ void db_do_load_labels(Db* db, LabelList_ptr labels) {
 }
 
 void db_do_save_label(Db* db, Label_ptr label, LabelsColumn column) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 
@@ -90,7 +90,7 @@ void db_do_save_label(Db* db, Label_ptr label, LabelsColumn column) {
 }
 
 Label_ptr db_do_create_label(Db* db, LabelList_ptr labels) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 
@@ -133,7 +133,7 @@ void db_do_delete_label(Db* db, Label_ptr label, LabelList_ptr labels) {
     assert(removed);
     UNUSED(removed);
 
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 

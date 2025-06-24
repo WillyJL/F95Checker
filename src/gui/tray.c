@@ -137,22 +137,22 @@ static void gui_tray_update_next_refresh(Gui* gui) {
     } else if(next_refresh == now) {
         m_string_cat(next_refresh_str, "Soon");
     } else {
-        uint32_t seconds = next_refresh - now;
-        const uint32_t SECOND = 1;
-        const uint32_t MINUTE = 60 * SECOND;
-        const uint32_t HOUR = 60 * MINUTE;
-        const uint32_t DAY = 24 * HOUR;
+        u32 seconds = next_refresh - now;
+        const u32 SECOND = 1;
+        const u32 MINUTE = 60 * SECOND;
+        const u32 HOUR = 60 * MINUTE;
+        const u32 DAY = 24 * HOUR;
         m_string_cat(next_refresh_str, "in ");
         if(seconds < MINUTE) {
             m_string_cat_printf(next_refresh_str, "%d second%s", seconds, seconds == 1 ? "" : "s");
         } else if(seconds < HOUR) {
-            uint32_t minutes = seconds / MINUTE;
+            u32 minutes = seconds / MINUTE;
             m_string_cat_printf(next_refresh_str, "%d minute%s", minutes, minutes == 1 ? "" : "s");
         } else if(seconds < DAY) {
-            uint32_t hours = seconds / HOUR;
+            u32 hours = seconds / HOUR;
             m_string_cat_printf(next_refresh_str, "%d hour%s", hours, hours == 1 ? "" : "s");
         } else {
-            uint32_t days = seconds / DAY;
+            u32 days = seconds / DAY;
             m_string_cat_printf(next_refresh_str, "%d days%s", days, days == 1 ? "" : "s");
         }
     }

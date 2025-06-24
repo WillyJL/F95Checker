@@ -8,7 +8,7 @@
 
 #include <std.h>
 
-typedef int32_t GameId;
+typedef i32 GameId;
 #define M_OPL_GameId() M_INT_EX_OPL(INT32)
 
 M_ARRAY_EX_DEF(game_id_array, GameIdArray, GameId)
@@ -30,9 +30,9 @@ typedef struct {
     Timestamp last_full_check;
     m_string_t last_check_version;
     Datestamp last_launched;
-    flt32_t score;
-    uint32_t votes;
-    flt32_t rating;
+    f32 score;
+    u32 votes;
+    f32 rating;
     m_string_t finished;
     m_string_t installed;
     bool updated;
@@ -49,7 +49,7 @@ typedef struct {
     m_string_t image_url;
     m_string_list_t previews_urls;
     GameDownloadList downloads;
-    uint32_t reviews_total;
+    u32 reviews_total;
     GameReviewList reviews;
     GameTimelineEventList timeline_events;
 

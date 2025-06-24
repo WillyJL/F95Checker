@@ -150,9 +150,7 @@ void gui_window_new_frame(Gui* gui) {
     SDL_GetWindowSize(gui->window, &window_size.x, &window_size.y);
     if(window_size.x != gui->window_state.prev_size.x ||
        window_size.y != gui->window_state.prev_size.y) {
-        ImGui_SetNextWindowSize(
-            (ImVec2){(flt32_t)window_size.x, (flt32_t)window_size.y},
-            ImGuiCond_Always);
+        ImGui_SetNextWindowSize((ImVec2){(f32)window_size.x, (f32)window_size.y}, ImGuiCond_Always);
         gui->window_state.prev_size = window_size;
     }
 

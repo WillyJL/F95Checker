@@ -23,7 +23,7 @@ static void db_parse_tab(Db* db, sqlite3_stmt* stmt, Tab_ptr tab) {
 }
 
 void db_do_load_tabs(Db* db, TabList_ptr tabs) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 
@@ -56,7 +56,7 @@ void db_do_load_tabs(Db* db, TabList_ptr tabs) {
 }
 
 void db_do_save_tab(Db* db, Tab_ptr tab, TabsColumn column) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 
@@ -105,7 +105,7 @@ void db_do_save_tab(Db* db, Tab_ptr tab, TabsColumn column) {
 }
 
 Tab_ptr db_do_create_tab(Db* db, TabList_ptr tabs) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 
@@ -148,7 +148,7 @@ void db_do_delete_tab(Db* db, Tab_ptr tab, TabList_ptr tabs) {
     assert(removed);
     UNUSED(removed);
 
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
 

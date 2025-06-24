@@ -12,7 +12,7 @@ static void db_thread(void* ctx);
 
 Db* db_init(void) {
     Db* db = malloc(sizeof(Db));
-    int32_t res;
+    i32 res;
 
     res = sqlite3_initialize();
     if(res != SQLITE_OK) {
@@ -95,7 +95,7 @@ void db_backup(Db* db) {
 }
 
 static void db_do_backup(Db* db) {
-    int32_t res;
+    i32 res;
 
     res = sqlite3_wal_checkpoint_v2(db->conn, db->name, SQLITE_CHECKPOINT_TRUNCATE, NULL, NULL);
     db_assert(db, res, SQLITE_OK, "sqlite3_wal_checkpoint_v2()");
@@ -158,7 +158,7 @@ static void db_migration_prelude(Db* db, const char* format, ...) {
 }
 
 void db_create_table(Db* db, const DbTable* table) {
-    int32_t res;
+    i32 res;
     m_string_t sql;
     m_string_init(sql);
     sqlite3_stmt* stmt;
@@ -338,31 +338,31 @@ void db_create_table(Db* db, const DbTable* table) {
     m_string_clear(sql);
 }
 
-ImColor sqlite3_column_imcolor(sqlite3_stmt* stmt, int32_t col) {
+ImColor sqlite3_column_imcolor(sqlite3_stmt* stmt, i32 col) {
     const char* hex_color = sqlite3_column_text(stmt, col);
-    uint8_t r, g, b;
-    int32_t res = sscanf(hex_color, "#%02hhx%02hhx%02hhx", &r, &g, &b);
+    u8 r, g, b;
+    i32 res = sscanf(hex_color, "#%02hhx%02hhx%02hhx", &r, &g, &b);
     if(res != 3) {
         r = g = b = 255;
     }
     ImColor im_color = {{
-        .x = (flt32_t)r / 255,
-        .y = (flt32_t)g / 255,
-        .z = (flt32_t)b / 255,
+        .x = (f32)r / 255,
+        .y = (f32)g / 255,
+        .z = (f32)b / 255,
         .w = 1.0,
     }};
     return im_color;
 }
 
-int32_t sqlite3_bind_imcolor(sqlite3_stmt* stmt, int32_t param, ImColor im_color) {
+i32 sqlite3_bind_imcolor(sqlite3_stmt* stmt, i32 param, ImColor im_color) {
     char hex_color[8];
-    int32_t res = snprintf(
+    i32 res = snprintf(
         hex_color,
         sizeof(hex_color),
         "#%02hhx%02hhx%02hhx",
-        (uint8_t)(im_color.Value.x * 255),
-        (uint8_t)(im_color.Value.y * 255),
-        (uint8_t)(im_color.Value.z * 255));
+        (u8)(im_color.Value.x * 255),
+        (u8)(im_color.Value.y * 255),
+        (u8)(im_color.Value.z * 255));
     if(res != sizeof(hex_color) - 1) {
         strlcpy(hex_color, "#FFFFFF", sizeof(hex_color));
     }
