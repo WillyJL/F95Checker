@@ -3,16 +3,20 @@
 #include "fonts.h"
 
 #include <dcimgui/dcimgui_impl_sdl3.h>
-#include <dcimgui/dcimgui_impl_sdlrenderer3.h>
+#include <dcimgui/dcimgui_impl_sdlgpu3.h>
 
 #include <globals.h>
 
 bool gui_window_init(Gui* gui) {
     // FIXME: handle DPI correctly
-    const SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN;
+    // TODO: see if still needs to draw one frame hidden on other platforms, linux wayland doesnt
     // FIXME: load and save window size from imgui.ini
     // FIXME: use data path for imgui.ini
-    gui->window = SDL_CreateWindow("F95Checker WIP C Rewrite", 1280, 720, window_flags);
+    gui->window = SDL_CreateWindow(
+        "F95Checker WIP C Rewrite",
+        1280,
+        720,
+        SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     if(gui->window == NULL) {
         gui_perror("SDL_CreateWindow()");
         return false;
@@ -20,14 +24,28 @@ bool gui_window_init(Gui* gui) {
     SDL_SetWindowMinimumSize(gui->window, 720, 400);
     SDL_SetWindowIcon(gui->window, gui->icons.icon);
 
-    // FIXME: add setting to select software rendering
-    gui->window_renderer = SDL_CreateRenderer(gui->window, NULL);
-    if(gui->window_renderer == NULL) {
-        gui_perror("SDL_CreateRenderer()");
+    gui->window_gpu = SDL_CreateGPUDevice(
+        SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_METALLIB,
+        true, // FIXME: should this be disabled in release builds?
+        NULL);
+    if(gui->window_gpu == NULL) {
+        gui_perror("SDL_CreateGPUDevice()");
         SDL_DestroyWindow(gui->window);
         return false;
     }
-    SDL_SetRenderVSync(gui->window_renderer, settings->vsync_ratio);
+
+    if(!SDL_ClaimWindowForGPUDevice(gui->window_gpu, gui->window)) {
+        gui_perror("SDL_ClaimWindowForGPUDevice()");
+        SDL_DestroyGPUDevice(gui->window_gpu);
+        SDL_DestroyWindow(gui->window);
+        return false;
+    }
+    // FIXME: is it possible to disable vsync/mailbox for settings->vsync_ratio?
+    SDL_SetGPUSwapchainParameters(
+        gui->window_gpu,
+        gui->window,
+        SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
+        SDL_GPU_PRESENTMODE_MAILBOX);
 
     IMGUI_CHECKVERSION();
     ImGui_CreateContext(NULL);
@@ -38,8 +56,12 @@ bool gui_window_init(Gui* gui) {
 
     gui_fonts_init(gui);
 
-    ImGui_ImplSDL3_InitForSDLRenderer(gui->window, gui->window_renderer);
-    ImGui_ImplSDLRenderer3_Init(gui->window_renderer);
+    ImGui_ImplSDL3_InitForSDLGPU(gui->window);
+    ImGui_ImplSDLGPU3_InitInfo init_info = {};
+    init_info.Device = gui->window_gpu;
+    init_info.ColorTargetFormat = SDL_GetGPUSwapchainTextureFormat(gui->window_gpu, gui->window);
+    init_info.MSAASamples = SDL_GPU_SAMPLECOUNT_1;
+    ImGui_ImplSDLGPU3_Init(&init_info);
 
     return true;
 }
@@ -119,7 +141,7 @@ void gui_window_new_frame(Gui* gui) {
         ImGui_SetMouseCursor(ImGuiMouseCursor_Hand);
     }
 
-    ImGui_ImplSDLRenderer3_NewFrame();
+    ImGui_ImplSDLGPU3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui_NewFrame();
 
@@ -148,16 +170,42 @@ void gui_window_render(Gui* gui) {
     ImGui_End();
 
     ImGui_Render();
-    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui_GetDrawData(), gui->window_renderer);
-    SDL_RenderPresent(gui->window_renderer);
+    ImDrawData* draw_data = ImGui_GetDrawData();
+
+    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(gui->window_gpu);
+    SDL_GPUTexture* swapchain_texture = NULL;
+    SDL_AcquireGPUSwapchainTexture(command_buffer, gui->window, &swapchain_texture, NULL, NULL);
+
+    if(swapchain_texture != NULL) {
+        Imgui_ImplSDLGPU3_PrepareDrawData(draw_data, command_buffer);
+
+        SDL_GPUColorTargetInfo color_target_infos = {};
+        color_target_infos.texture = swapchain_texture;
+        color_target_infos.load_op = SDL_GPU_LOADOP_DONT_CARE;
+        color_target_infos.store_op = SDL_GPU_STOREOP_STORE;
+        color_target_infos.mip_level = 0;
+        color_target_infos.layer_or_depth_plane = 0;
+        color_target_infos.cycle = false;
+        SDL_GPURenderPass* render_pass =
+            SDL_BeginGPURenderPass(command_buffer, &color_target_infos, 1, NULL);
+
+        ImGui_ImplSDLGPU3_RenderDrawData(draw_data, command_buffer, render_pass);
+
+        SDL_EndGPURenderPass(render_pass);
+
+        SDL_SubmitGPUCommandBuffer(command_buffer);
+    } else {
+        SDL_CancelGPUCommandBuffer(command_buffer);
+    }
 }
 
 void gui_window_free(Gui* gui) {
-    ImGui_ImplSDLRenderer3_Shutdown();
+    ImGui_ImplSDLGPU3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     gui_fonts_free(gui);
     ImGui_DestroyContext(NULL);
 
-    SDL_DestroyRenderer(gui->window_renderer);
+    SDL_ReleaseWindowFromGPUDevice(gui->window_gpu, gui->window);
+    SDL_DestroyGPUDevice(gui->window_gpu);
     SDL_DestroyWindow(gui->window);
 }

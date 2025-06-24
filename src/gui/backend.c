@@ -14,7 +14,7 @@ bool gui_backend_init(Gui* gui) {
 #endif
 
     // Prefer Wayland when available
-    SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "wayland");
+    // SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "wayland");
 
     if(!SDL_Init(SDL_INIT_VIDEO)) {
         gui_perror("SDL_Init()");

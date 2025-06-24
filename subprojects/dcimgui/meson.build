@@ -10,7 +10,7 @@ compile_args = [
     '-DIMGUI_USER_CONFIG="dcimconfig.h"',
 ]
 
-backends = ['sdl3', 'sdlrenderer3']
+backends = ['sdl3', 'sdlgpu3']
 sources = []
 headgen = []
 imgui_sources = []

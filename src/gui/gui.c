@@ -58,6 +58,11 @@ void gui_tick(Gui* gui) {
     if(gui->should_close) {
         return;
     }
+    if(gui->window_hidden || gui->window_minimized) {
+        // FIXME: proper way of skipping drawing
+        SDL_WaitEventTimeout(NULL, 10);
+        return;
+    }
     gui_window_new_frame(gui);
     gui_ui_draw(gui);
     gui_window_render(gui);

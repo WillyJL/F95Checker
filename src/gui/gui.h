@@ -25,7 +25,7 @@ typedef struct {
     } tray_state;
 
     SDL_Window* window;
-    SDL_Renderer* window_renderer;
+    SDL_GPUDevice* window_gpu;
     bool window_hidden;
     bool window_minimized;
     struct {
