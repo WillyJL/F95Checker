@@ -12,6 +12,7 @@ Gui* gui_init(void) {
     Gui* gui = malloc(sizeof(Gui));
     gui->should_close = false;
     gui->window_hidden = settings->start_in_background;
+    gui->window_minimized = false;
 
     if(!gui_backend_init(gui)) {
         free(gui);

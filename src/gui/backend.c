@@ -53,9 +53,8 @@ void gui_backend_process_events(Gui* gui) {
             event.window.windowID == SDL_GetWindowID(gui->window)) {
             gui->window_hidden = event.type == SDL_EVENT_WINDOW_HIDDEN;
             gui_tray_update(gui);
-        } else {
-            gui_window_process_event(gui, &event);
         }
+        gui_window_process_event(gui, &event);
     }
 }
 

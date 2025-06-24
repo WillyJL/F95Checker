@@ -44,6 +44,20 @@ bool gui_window_init(Gui* gui) {
     return true;
 }
 
+void gui_window_show(Gui* gui) {
+    if(gui->window_hidden) {
+        SDL_ShowWindow(gui->window);
+    }
+    if(gui->window_minimized) {
+        SDL_RestoreWindow(gui->window);
+    }
+    SDL_RaiseWindow(gui->window);
+}
+
+void gui_window_hide(Gui* gui) {
+    SDL_HideWindow(gui->window);
+}
+
 void gui_window_process_event(Gui* gui, SDL_Event* event) {
     if(event->type == SDL_EVENT_MOUSE_WHEEL &&
        event->window.windowID == SDL_GetWindowID(gui->window)) {
@@ -61,9 +75,12 @@ void gui_window_process_event(Gui* gui, SDL_Event* event) {
         }
         gui->window_state.scroll_energy.x += event->wheel.x;
         gui->window_state.scroll_energy.y += event->wheel.y;
-    } else {
-        ImGui_ImplSDL3_ProcessEvent(event);
+    } else if(
+        (event->type == SDL_EVENT_WINDOW_MINIMIZED || event->type == SDL_EVENT_WINDOW_RESTORED) &&
+        event->window.windowID == SDL_GetWindowID(gui->window)) {
+        gui->window_minimized = event->type == SDL_EVENT_WINDOW_MINIMIZED;
     }
+    ImGui_ImplSDL3_ProcessEvent(event);
 }
 
 void gui_window_new_frame(Gui* gui) {

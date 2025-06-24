@@ -1,5 +1,7 @@
 #include "tray.h"
 
+#include "window.h"
+
 #include "types/datetime.h"
 
 #include <globals.h>
@@ -8,11 +10,7 @@ static void gui_tray_callback_watermark(void* ctx, SDL_TrayEntry* invoker) {
     Gui* gui = ctx;
     UNUSED(invoker);
 
-    if(gui->window_hidden) {
-        SDL_ShowWindow(gui->window);
-    } else {
-        SDL_RaiseWindow(gui->window);
-    }
+    gui_window_show(gui);
 }
 
 static bool refreshing = false;
@@ -41,9 +39,9 @@ static void gui_tray_callback_toggle_gui(void* ctx, SDL_TrayEntry* invoker) {
     UNUSED(invoker);
 
     if(gui->window_hidden) {
-        SDL_ShowWindow(gui->window);
+        gui_window_show(gui);
     } else {
-        SDL_HideWindow(gui->window);
+        gui_window_hide(gui);
     }
 }
 
