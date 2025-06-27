@@ -22,6 +22,7 @@ Db* db_init(void) {
     }
 
     db->path = path_init_data_dir();
+    path_mkdir(db->path, true);
     path_join(db->path, DB_FILE);
     res = sqlite3_open(path_cstr(db->path), &db->conn);
 
