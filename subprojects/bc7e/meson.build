@@ -1,6 +1,6 @@
 project('bc7e', 'cpp')
 
-ispc = find_program('ispc')
+ispc = find_program('ispc', required: false)
 if not ispc.found()
     warning('ISPC not found, continuing without BC7 support!')
 else
