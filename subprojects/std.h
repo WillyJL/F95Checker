@@ -6,7 +6,6 @@
 #include <errno.h>
 #include <float.h>
 #include <inttypes.h>
-#include <json-c/json.h>
 #include <limits.h>
 // #include <math.h>
 #include <mlib/m-array.h>

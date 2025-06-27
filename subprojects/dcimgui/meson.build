@@ -7,6 +7,7 @@ source_dir = meson.current_source_dir()
 build_dir = meson.current_build_dir()
 include_dirs = include_directories('.', 'imgui', 'imgui/backends')
 compile_args = [
+    '-I' + (source_dir / '../sdl3/include'),  # For <SDL3/SDL_gpu.h>
     '-DIMGUI_USER_CONFIG="dcimconfig.h"',
 ]
 
