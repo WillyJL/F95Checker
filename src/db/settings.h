@@ -82,7 +82,7 @@
     COLUMN($, tex_compress_replace, .type = "INTEGER", .dflt = "0")                              \
     COLUMN($, timestamp_format, .type = "TEXT", .dflt = "'%d/%m/%Y %H:%M'")                      \
     COLUMN($, unload_offscreen_images, .type = "INTEGER", .dflt = "0")                           \
-    COLUMN($, vsync_ratio, .type = "INTEGER", .dflt = "1")                                       \
+    COLUMN($, vsync, .type = "INTEGER", .dflt = "1")                                             \
     COLUMN($, weighted_score, .type = "INTEGER", .dflt = "0")                                    \
     COLUMN($, zoom_area, .type = "INTEGER", .dflt = "50")                                        \
     COLUMN($, zoom_enabled, .type = "INTEGER", .dflt = "1")                                      \
@@ -92,5 +92,6 @@
     RENAME($, start_in_tray, start_in_background)                                                \
     RENAME($, tray_notifs_interval, bg_notifs_interval)                                          \
     RENAME($, tray_refresh_interval, bg_refresh_interval)                                        \
-    RENAME($, refresh_workers, max_connections)
+    RENAME($, refresh_workers, max_connections)                                                  \
+    RENAME($, vsync_ratio, vsync)
 DB_TABLE_DECLARE(_SETTINGS, settings, SettingsColumn)

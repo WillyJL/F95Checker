@@ -40,12 +40,11 @@ bool gui_window_init(Gui* gui) {
         SDL_DestroyWindow(gui->window);
         return false;
     }
-    // FIXME: is it possible to disable vsync/mailbox for settings->vsync_ratio?
     SDL_SetGPUSwapchainParameters(
         gui->window_gpu,
         gui->window,
         SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
-        SDL_GPU_PRESENTMODE_MAILBOX);
+        settings->vsync ? SDL_GPU_PRESENTMODE_VSYNC : SDL_GPU_PRESENTMODE_MAILBOX);
 
     IMGUI_CHECKVERSION();
     ImGui_CreateContext(NULL);

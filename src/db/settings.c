@@ -163,7 +163,7 @@ static void db_parse_settings(Db* db, sqlite3_stmt* stmt, Settings* settings) {
     settings->tex_compress_replace = sqlite3_column_int(stmt, col++);
     m_string_set(settings->timestamp_format, sqlite3_column_text(stmt, col++));
     settings->unload_offscreen_images = sqlite3_column_int(stmt, col++);
-    settings->vsync_ratio = sqlite3_column_int(stmt, col++);
+    settings->vsync = sqlite3_column_int(stmt, col++);
     settings->weighted_score = sqlite3_column_int(stmt, col++);
     settings->zoom_area = sqlite3_column_int(stmt, col++);
     settings->zoom_enabled = sqlite3_column_int(stmt, col++);
@@ -502,8 +502,8 @@ void db_do_save_setting(Db* db, Settings* settings, SettingsColumn column) {
     case SettingsColumn_unload_offscreen_images:
         res = sqlite3_bind_int(stmt, 1, settings->unload_offscreen_images);
         break;
-    case SettingsColumn_vsync_ratio:
-        res = sqlite3_bind_int(stmt, 1, settings->vsync_ratio);
+    case SettingsColumn_vsync:
+        res = sqlite3_bind_int(stmt, 1, settings->vsync);
         break;
     case SettingsColumn_weighted_score:
         res = sqlite3_bind_int(stmt, 1, settings->weighted_score);

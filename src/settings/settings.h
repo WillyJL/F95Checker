@@ -97,7 +97,7 @@ typedef struct {
     bool tex_compress_replace;
     m_string_t timestamp_format;
     bool unload_offscreen_images;
-    i32 vsync_ratio;
+    bool vsync;
     bool weighted_score;
     i32 zoom_area;
     bool zoom_enabled;
