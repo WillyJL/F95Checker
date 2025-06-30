@@ -20,11 +20,13 @@ fs = import('fs')
 python = import('python')
 
 source_dir = meson.current_source_dir()
+subprojects_source_dir = source_dir / 'subprojects'
 build_dir = meson.current_build_dir()
+subprojects_build_dir = build_dir / 'subprojects'
 include_dirs = include_directories('src')
 compile_args = [
-    '-I' + (source_dir / 'subprojects'),  # For <subproject/file.h>
-    '-I' + (build_dir / 'subprojects'),  # For <subproject/file.h> with generated code
+    '-I' + subprojects_source_dir,  # For <subproject/file.h>
+    '-I' + subprojects_build_dir,  # For <subproject/file.h> with generated code
     '-DF95CHECKER_VERSION="' + meson.project_version() + '"',
     '-Wall', '-Wextra',
     '-Wconversion', '-Wno-sign-conversion', '-Wno-implicit-int-conversion',
@@ -60,8 +62,8 @@ assert(
 # Python (needed for codegen)
 python_exe = python.find_installation('python3').full_path()
 python_requirements_files = [
-    'subprojects/icons/requirements.txt',
-    'subprojects/dcimgui/dear_bindings/requirements.txt',
+    subprojects_source_dir / 'icons/requirements.txt',
+    subprojects_source_dir / 'dcimgui/dear_bindings/requirements.txt',
 ]
 if get_option('python_venv')
     if not fs.is_dir(build_dir / 'python_venv')
@@ -168,8 +170,14 @@ if get_option('vendored_curl')
         curl_opts.add_cmake_defines({
             'CURL_USE_OPENSSL': false,
             'CURL_USE_WOLFSSL': true,
+            'WOLFSSL_INCLUDE_DIR': subprojects_source_dir / 'wolfssl',
+            'WOLFSSL_LIBRARY': 'wolfssl',
         })
-        curl_opts.append_compile_args('c', '-I' + (build_dir / 'subprojects/wolfssl/__CMake_build'))  # Use generated options.h
+        curl_opts.append_compile_args(
+            'c',
+            '-I' + (subprojects_source_dir / 'wolfssl'),
+            '-I' + (subprojects_build_dir / 'wolfssl/__CMake_build'),  # Use generated options.h
+        )
     elif build_machine.system() == 'darwin'
          wolfssl_opts.add_cmake_defines({
             'CURL_USE_SECTRANSP': true,
@@ -241,7 +249,10 @@ if get_option('vendored_sdl3')
         'SDL_TESTS': false,
         'SDL_UNINSTALL': false,
     })
-    sdl3_opts.append_compile_args('c', '-Wno-documentation-unknown-command')
+    sdl3_opts.append_compile_args(
+        'c',
+        '-Wno-documentation-unknown-command',
+    )
     sdl3_proj = cmake.subproject('sdl3', options: sdl3_opts)
     alias_target('sdl3', sdl3_proj.target('SDL3-static'))
     sdl3 = sdl3_proj.dependency('SDL3-static')
