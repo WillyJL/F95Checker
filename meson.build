@@ -56,7 +56,7 @@ add_global_link_arguments(
 
 assert(
     meson.get_compiler('c').get_id() == 'clang',
-    'This project only support the Clang compiler!',
+    'This project only supports the Clang compiler!',
 )
 
 # Python (needed for codegen)
