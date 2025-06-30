@@ -91,17 +91,22 @@ endif
 meson.override_find_program('python3-maybe-venv', files(python_exe))
 
 # Symlink current build dir for clangd to find it
-if fs.is_samepath(fs.parent(build_dir), source_dir / 'build')
-    run_command(
-        python_exe, '-c',
-        'import pathlib, sys;'+
-        'build = pathlib.Path(sys.argv[1]);'+
-        '(build.parent / "current").unlink(missing_ok=True);'+
-        '(build.parent / "current").symlink_to(build.name, target_is_directory=True);',
-        build_dir,
-        check: true,
-    )
-endif
+build_subdir_check = build_dir
+foreach _ : [1, 2, 3]
+    build_subdir_check = fs.parent(build_subdir_check)
+    if fs.is_samepath(build_subdir_check, source_dir / 'build')
+        run_command(
+            python_exe, '-c',
+            'import pathlib, sys;'+
+            'build = pathlib.Path(sys.argv[1]);'+
+            'subdir = pathlib.Path(sys.argv[2]);'+
+            '(build / "current").unlink(missing_ok=True);'+
+            '(build / "current").symlink_to(subdir.relative_to(build), target_is_directory=True);',
+            source_dir / 'build', build_dir,
+            check: true,
+        )
+    endif
+endforeach
 
 # Helper for finding source files by globbing at configure time
 glob = build_dir / 'meson-glob.py'
