@@ -100,7 +100,9 @@ void gui_window_process_event(Gui* gui, SDL_Event* event) {
         }
         gui->window_state.scroll_energy.x += event->wheel.x;
         gui->window_state.scroll_energy.y += event->wheel.y;
+        return;
     }
+
     ImGui_ImplSDL3_ProcessEvent(event);
 }
 

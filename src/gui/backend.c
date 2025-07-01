@@ -39,21 +39,27 @@ void gui_backend_process_events(Gui* gui) {
         if(event.type == SDL_EVENT_QUIT) {
             // QUIT sent when terminating the process and when exiting from tray menu, exit immediately
             gui->should_close = true;
-        } else if(
-            event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
-            event.window.windowID == SDL_GetWindowID(gui->window)) {
+            return;
+        }
+
+        if(event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
+           event.window.windowID == SDL_GetWindowID(gui->window)) {
             // Window was closed, respect background mode settings
             if(settings->background_on_close) {
                 SDL_HideWindow(gui->window);
             } else {
                 gui->should_close = true;
             }
-        } else if(
-            (event.type == SDL_EVENT_WINDOW_HIDDEN || event.type == SDL_EVENT_WINDOW_SHOWN) &&
-            event.window.windowID == SDL_GetWindowID(gui->window)) {
+            return;
+        }
+
+        if((event.type == SDL_EVENT_WINDOW_HIDDEN || event.type == SDL_EVENT_WINDOW_SHOWN) &&
+           event.window.windowID == SDL_GetWindowID(gui->window)) {
             gui->background_mode = event.type == SDL_EVENT_WINDOW_HIDDEN;
             gui_tray_update(gui);
+            return;
         }
+
         gui_window_process_event(gui, &event);
     }
 }
