@@ -1,11 +1,11 @@
 #include "c7zip.h"
 
-#include <7-Zip/CPP/Common/MyInitGuid.h>
-#include <7-Zip/CPP/Common/StdOutStream.h>
+#include <7zip/CPP/Common/MyInitGuid.h>
+#include <7zip/CPP/Common/StdOutStream.h>
 
-#include <7-Zip/CPP/7zip/UI/Common/Extract.h>
-#include <7-Zip/CPP/7zip/UI/Common/LoadCodecs.h>
-#include <7-Zip/CPP/7zip/UI/Console/ExtractCallbackConsole.h>
+#include <7zip/CPP/7zip/UI/Common/Extract.h>
+#include <7zip/CPP/7zip/UI/Common/LoadCodecs.h>
+#include <7zip/CPP/7zip/UI/Console/ExtractCallbackConsole.h>
 
 CREATE_CODECS_OBJECT
 

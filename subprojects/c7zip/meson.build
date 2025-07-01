@@ -17,7 +17,7 @@ sources = ['c7zip.cpp', 'c7zip.h']
 headgen = []
 sevenzip_sources = []
 
-sevenzip_dir = source_dir / '7-Zip'
+sevenzip_dir = source_dir / '7zip'
 sevenzip_glob = []
 sevenzip_glob += run_command(glob, sevenzip_dir, 'C/*.c', check: true).stdout().split('\n')
 sevenzip_glob += run_command(glob, sevenzip_dir, 'CPP/7zip/Archive/*/*.cpp', check: true).stdout().split('\n')

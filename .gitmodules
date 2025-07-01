@@ -28,6 +28,6 @@
 [submodule "subprojects/shlex/shlex_cpp"]
 	path = subprojects/shlex/shlex_cpp
 	url = https://github.com/shogo82148/shlex.cpp.git
-[submodule "subprojects/c7zip/7-Zip"]
-	path = subprojects/c7zip/7-Zip
-	url = https://github.com/mcmilk/7-Zip.git
+[submodule "subprojects/c7zip/7zip"]
+	path = subprojects/c7zip/7zip
+	url = https://github.com/ip7z/7zip.git
