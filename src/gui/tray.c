@@ -38,7 +38,7 @@ static void gui_tray_callback_toggle_gui(void* ctx, SDL_TrayEntry* invoker) {
     Gui* gui = ctx;
     UNUSED(invoker);
 
-    if(gui->window_hidden) {
+    if(gui->background_mode) {
         gui_window_show(gui);
     } else {
         gui_window_hide(gui);
@@ -71,7 +71,7 @@ bool gui_tray_init(Gui* gui) {
         SDL_TRAYENTRY_BUTTON);
     SDL_SetTrayEntryCallback(gui->tray_items.watermark, gui_tray_callback_watermark, gui);
 
-    if(gui->window_hidden) {
+    if(gui->background_mode) {
         gui->tray_items.next_refresh = SDL_InsertTrayEntryAt(
             gui->tray_menu,
             -1,
@@ -88,7 +88,7 @@ bool gui_tray_init(Gui* gui) {
         SDL_TRAYENTRY_BUTTON);
     SDL_SetTrayEntryCallback(gui->tray_items.refresh_now, gui_tray_callback_refresh_now, gui);
 
-    if(gui->window_hidden) {
+    if(gui->background_mode) {
         gui->tray_items.toggle_pause = SDL_InsertTrayEntryAt(
             gui->tray_menu,
             -1,
@@ -102,7 +102,7 @@ bool gui_tray_init(Gui* gui) {
     gui->tray_items.toggle_gui = SDL_InsertTrayEntryAt(
         gui->tray_menu,
         -1,
-        gui->window_hidden ? "Switch to GUI" : "Switch to BG",
+        gui->background_mode ? "Switch to GUI" : "Switch to BG",
         SDL_TRAYENTRY_BUTTON);
     SDL_SetTrayEntryCallback(gui->tray_items.toggle_gui, gui_tray_callback_toggle_gui, gui);
 
@@ -110,7 +110,7 @@ bool gui_tray_init(Gui* gui) {
     SDL_SetTrayEntryCallback(gui->tray_items.quit, gui_tray_callback_quit, gui);
 
     m_string_init(gui->tray_state.next_refresh_str);
-    gui->tray_state.prev_hidden = gui->window_hidden;
+    gui->tray_state.prev_bg = gui->background_mode;
     gui->tray_state.prev_paused = false;
     gui->tray_state.prev_refreshing = false;
     gui_tray_update(gui);
@@ -164,13 +164,13 @@ static void gui_tray_update_next_refresh(Gui* gui) {
 }
 
 void gui_tray_update(Gui* gui) {
-    if(gui->tray_state.prev_hidden != gui->window_hidden) {
-        gui->tray_state.prev_hidden = gui->window_hidden;
+    if(gui->tray_state.prev_bg != gui->background_mode) {
+        gui->tray_state.prev_bg = gui->background_mode;
         SDL_SetTrayEntryLabel(
             gui->tray_items.toggle_gui,
-            gui->window_hidden ? "Switch to GUI" : "Switch to BG");
+            gui->background_mode ? "Switch to GUI" : "Switch to BG");
 
-        if(gui->window_hidden) {
+        if(gui->background_mode) {
             if(refresh_paused && !refreshing) {
                 SDL_SetTrayIcon(gui->tray, gui->icons.paused);
             }
@@ -205,7 +205,7 @@ void gui_tray_update(Gui* gui) {
 
     if(gui->tray_state.prev_paused != refresh_paused) {
         gui->tray_state.prev_paused = refresh_paused;
-        if(gui->window_hidden) {
+        if(gui->background_mode) {
             SDL_SetTrayEntryLabel(
                 gui->tray_items.toggle_pause,
                 refresh_paused ? "Unpause Auto Refresh" : "Pause Auto Refresh");
@@ -223,12 +223,12 @@ void gui_tray_update(Gui* gui) {
         // TODO: animate icon
         SDL_SetTrayIcon(
             gui->tray,
-            refreshing                             ? gui->icons.refreshing[0] :
-            (gui->window_hidden && refresh_paused) ? gui->icons.paused :
-                                                     gui->icons.logo);
+            refreshing                               ? gui->icons.refreshing[0] :
+            (gui->background_mode && refresh_paused) ? gui->icons.paused :
+                                                       gui->icons.logo);
     }
 
-    if(gui->window_hidden) {
+    if(gui->background_mode) {
         gui_tray_update_next_refresh(gui);
     }
 }

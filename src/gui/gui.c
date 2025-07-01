@@ -11,8 +11,7 @@
 Gui* gui_init(void) {
     Gui* gui = malloc(sizeof(Gui));
     gui->should_close = false;
-    gui->window_hidden = settings->start_in_background;
-    gui->window_minimized = false;
+    gui->background_mode = settings->start_in_background;
 
     if(!gui_backend_init(gui)) {
         free(gui);
@@ -58,9 +57,8 @@ void gui_tick(Gui* gui) {
     if(gui->should_close) {
         return;
     }
-    if(gui->window_hidden || gui->window_minimized) {
-        // FIXME: proper way of skipping drawing
-        SDL_WaitEventTimeout(NULL, 10);
+    if(!gui_window_should_draw(gui)) {
+        gui_backend_wait_idle_time(gui);
         return;
     }
     gui_window_new_frame(gui);

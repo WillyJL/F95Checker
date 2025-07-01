@@ -16,7 +16,7 @@ bool gui_window_init(Gui* gui) {
         "F95Checker WIP C Rewrite",
         1280,
         720,
-        SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+        SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN);
     if(gui->window == NULL) {
         gui_perror("SDL_CreateWindow()");
         return false;
@@ -40,11 +40,7 @@ bool gui_window_init(Gui* gui) {
         SDL_DestroyWindow(gui->window);
         return false;
     }
-    SDL_SetGPUSwapchainParameters(
-        gui->window_gpu,
-        gui->window,
-        SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
-        settings->vsync ? SDL_GPU_PRESENTMODE_VSYNC : SDL_GPU_PRESENTMODE_MAILBOX);
+    gui_window_set_vsync(gui, settings->vsync);
 
     IMGUI_CHECKVERSION();
     ImGui_CreateContext(NULL);
@@ -66,10 +62,10 @@ bool gui_window_init(Gui* gui) {
 }
 
 void gui_window_show(Gui* gui) {
-    if(gui->window_hidden) {
+    if(SDL_GetWindowFlags(gui->window) & SDL_WINDOW_HIDDEN) {
         SDL_ShowWindow(gui->window);
     }
-    if(gui->window_minimized) {
+    if(SDL_GetWindowFlags(gui->window) & SDL_WINDOW_MINIMIZED) {
         SDL_RestoreWindow(gui->window);
     }
     SDL_RaiseWindow(gui->window);
@@ -77,6 +73,14 @@ void gui_window_show(Gui* gui) {
 
 void gui_window_hide(Gui* gui) {
     SDL_HideWindow(gui->window);
+}
+
+void gui_window_set_vsync(Gui* gui, bool vsync) {
+    SDL_SetGPUSwapchainParameters(
+        gui->window_gpu,
+        gui->window,
+        SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
+        vsync ? SDL_GPU_PRESENTMODE_VSYNC : SDL_GPU_PRESENTMODE_MAILBOX);
 }
 
 void gui_window_process_event(Gui* gui, SDL_Event* event) {
@@ -96,12 +100,12 @@ void gui_window_process_event(Gui* gui, SDL_Event* event) {
         }
         gui->window_state.scroll_energy.x += event->wheel.x;
         gui->window_state.scroll_energy.y += event->wheel.y;
-    } else if(
-        (event->type == SDL_EVENT_WINDOW_MINIMIZED || event->type == SDL_EVENT_WINDOW_RESTORED) &&
-        event->window.windowID == SDL_GetWindowID(gui->window)) {
-        gui->window_minimized = event->type == SDL_EVENT_WINDOW_MINIMIZED;
     }
     ImGui_ImplSDL3_ProcessEvent(event);
+}
+
+bool gui_window_should_draw(Gui* gui) {
+    return (SDL_GetWindowFlags(gui->window) & (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED)) == 0;
 }
 
 void gui_window_new_frame(Gui* gui) {

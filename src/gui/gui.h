@@ -19,18 +19,16 @@ typedef struct {
     } tray_items;
     struct {
         m_string_t next_refresh_str;
-        bool prev_hidden;
+        bool prev_bg;
         bool prev_paused;
         bool prev_refreshing;
     } tray_state;
 
     SDL_Window* window;
     SDL_GPUDevice* window_gpu;
-    bool window_hidden;
-    bool window_minimized;
     struct {
-        Vec2 prev_size;
         ImVec2 scroll_energy;
+        Vec2 prev_size;
     } window_state;
 
     ImGuiIO* io;
@@ -48,6 +46,7 @@ typedef struct {
     } icons;
 
     bool should_close;
+    bool background_mode;
 } Gui;
 
 Gui* gui_init(void);

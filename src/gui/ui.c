@@ -2,6 +2,8 @@
 
 #include "util.h"
 
+#include "gui/window.h"
+
 #include <globals.h>
 
 const char* ok = mdi_check " Ok";
@@ -44,6 +46,21 @@ void gui_ui_draw(Gui* gui) {
         ImGuiSliderFlags_None);
     if(ImGui_IsItemDeactivatedAfterEdit()) {
         db_save_setting(db, settings, SettingsColumn_bg_refresh_interval);
+    }
+
+    ImGui_AlignTextToFramePadding();
+    ImGui_Text("Vsync:");
+    ImGui_SameLine();
+    if(ImGui_Checkbox("###vsync", &settings->vsync)) {
+        db_save_setting(db, settings, SettingsColumn_vsync);
+        gui_window_set_vsync(gui, settings->vsync);
+    }
+
+    ImGui_AlignTextToFramePadding();
+    ImGui_Text("BG on Close:");
+    ImGui_SameLine();
+    if(ImGui_Checkbox("###background_on_close", &settings->background_on_close)) {
+        db_save_setting(db, settings, SettingsColumn_background_on_close);
     }
 
     ImGui_AlignTextToFramePadding();

@@ -53,7 +53,7 @@ i32 main(i32 argc, char** argv) {
 
     // Draw first frame while hidden to avoid flashbang
     gui_tick(gui);
-    if(!gui->window_hidden) {
+    if(!gui->background_mode) {
         SDL_ShowWindow(gui->window);
     }
 

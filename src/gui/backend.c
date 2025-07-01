@@ -51,11 +51,17 @@ void gui_backend_process_events(Gui* gui) {
         } else if(
             (event.type == SDL_EVENT_WINDOW_HIDDEN || event.type == SDL_EVENT_WINDOW_SHOWN) &&
             event.window.windowID == SDL_GetWindowID(gui->window)) {
-            gui->window_hidden = event.type == SDL_EVENT_WINDOW_HIDDEN;
+            gui->background_mode = event.type == SDL_EVENT_WINDOW_HIDDEN;
             gui_tray_update(gui);
         }
         gui_window_process_event(gui, &event);
     }
+}
+
+void gui_backend_wait_idle_time(Gui* gui) {
+    UNUSED(gui);
+
+    SDL_WaitEventTimeout(NULL, 10);
 }
 
 void gui_backend_free(Gui* gui) {
