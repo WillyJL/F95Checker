@@ -95,16 +95,22 @@ build_subdir_check = build_dir
 foreach _ : [1, 2, 3]
     build_subdir_check = fs.parent(build_subdir_check)
     if fs.is_samepath(build_subdir_check, source_dir / 'build')
-        run_command(
-            python_exe, '-c',
-            'import pathlib, sys;'+
-            'build = pathlib.Path(sys.argv[1]);'+
-            'subdir = pathlib.Path(sys.argv[2]);'+
-            '(build / "current").unlink(missing_ok=True);'+
-            '(build / "current").symlink_to(subdir.relative_to(build), target_is_directory=True);',
-            source_dir / 'build', build_dir,
-            check: true,
+        build_subdir_symlink = custom_target(
+            'current build symlink',
+            output: ['current'],
+            command: [
+                python_exe, '-c',
+                'import pathlib, sys;'+
+                'build = pathlib.Path(sys.argv[1]);'+
+                'subdir = pathlib.Path(sys.argv[2]);'+
+                '(build / "current").unlink(missing_ok=True);'+
+                '(build / "current").symlink_to(subdir.relative_to(build), target_is_directory=True);',
+                source_dir / 'build', build_dir,
+            ],
+            build_always_stale: true,
         )
+        build_subdir_symlink_dep = declare_dependency(sources: [build_subdir_symlink])
+        dependencies += [build_subdir_symlink_dep]
     endif
 endforeach
 
@@ -303,6 +309,7 @@ f95checker = executable(
     dependencies: dependencies,
     c_args: compile_args,
     link_args: linking_args,
+    build_by_default: true,
 )
 
 custom_target(
