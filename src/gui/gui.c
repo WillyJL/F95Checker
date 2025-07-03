@@ -3,7 +3,7 @@
 #include "backend.h"
 #include "icons.h"
 #include "tray.h"
-#include "ui.h"
+#include "ui/ui.h"
 #include "window.h"
 
 #include <globals.h>
@@ -35,15 +35,7 @@ Gui* gui_init(void) {
         return NULL;
     }
 
-    gui->io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    gui->io->IniFilename = NULL;
-    gui->io->LogFilename = NULL;
-    gui->io->ConfigDragClickToInputText = true;
-    ImGui_StyleColorsDark(NULL);
-    gui->style->ScrollbarSize = 10.0f;
-    gui->style->FrameBorderSize = 1.0f;
-    gui->style->ItemSpacing.x = gui->style->ItemSpacing.y;
-    gui->style->Colors[ImGuiCol_ModalWindowDimBg] = (ImVec4){0.0f, 0.0f, 0.0f, 0.5f};
+    gui_ui_apply_styles(gui);
 
     return gui;
 }

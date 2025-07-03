@@ -253,11 +253,6 @@ class Columns:
 cols = Columns()
 
 
-@functools.cache
-def _scaled(mult: float, size: int | float):
-    return size * mult
-
-
 class MainGUI():
     def __init__(self):
         # Constants
@@ -350,8 +345,6 @@ class MainGUI():
         imgui.create_context()
         imgui.io = imgui.get_io()
         imgui.io.ini_file_name = str(globals.data_path / "imgui.ini")
-        imgui.io.config_drag_click_to_input_text = True
-        imgui.io.config_cursor_blink = False
         size = tuple()
         pos = tuple()
         try:
@@ -467,28 +460,8 @@ class MainGUI():
             )
         async_thread.done_callback = asyncexcepthook
 
-        # Load style configuration
-        imgui.style = imgui.get_style()
-        imgui.style.item_spacing = (imgui.style.item_spacing.y, imgui.style.item_spacing.y)
-        imgui.style.colors[imgui.COLOR_MODAL_WINDOW_DIM_BACKGROUND] = (0, 0, 0, 0.5)
-        imgui.style.scrollbar_size = 10
-        imgui.style.frame_border_size = 1.6
-        imgui.style.colors[imgui.COLOR_TABLE_BORDER_STRONG] = (0, 0, 0, 0)
-        self.refresh_styles()
         # No redundant vprintf
         imgui.text = imgui.text_unformatted
-        # Custom checkbox style
-        imgui._checkbox = imgui.checkbox
-        def checkbox(label: str, state: bool):
-            if state:
-                imgui.push_style_color(imgui.COLOR_FRAME_BACKGROUND_HOVERED, *imgui.style.colors[imgui.COLOR_BUTTON_HOVERED])
-                imgui.push_style_color(imgui.COLOR_FRAME_BACKGROUND, *imgui.style.colors[imgui.COLOR_BUTTON_HOVERED])
-                imgui.push_style_color(imgui.COLOR_CHECK_MARK, *imgui.style.colors[imgui.COLOR_WINDOW_BACKGROUND])
-            ret = imgui._checkbox(label, state)
-            if state:
-                imgui.pop_style_color(3)
-            return ret
-        imgui.checkbox = checkbox
         # Custom combo style
         imgui._combo = imgui.combo
         def combo(*args, **kwargs):
@@ -570,72 +543,8 @@ class MainGUI():
             imgui.pop_alpha()
             imgui.pop_no_interaction()
         imgui.pop_disabled = pop_disabled
-        def is_topmost():
-            return not imgui.is_popup_open("", imgui.POPUP_ANY_POPUP_ID)
-        imgui.is_topmost = is_topmost
 
     def refresh_styles(self):
-        _ = \
-            imgui.style.colors[imgui.COLOR_CHECK_MARK] = \
-            imgui.style.colors[imgui.COLOR_TAB_ACTIVE] = \
-            imgui.style.colors[imgui.COLOR_SLIDER_GRAB] = \
-            imgui.style.colors[imgui.COLOR_TAB_HOVERED] = \
-            imgui.style.colors[imgui.COLOR_BUTTON_ACTIVE] = \
-            imgui.style.colors[imgui.COLOR_HEADER_ACTIVE] = \
-            imgui.style.colors[imgui.COLOR_NAV_HIGHLIGHT] = \
-            imgui.style.colors[imgui.COLOR_PLOT_HISTOGRAM] = \
-            imgui.style.colors[imgui.COLOR_HEADER_HOVERED] = \
-            imgui.style.colors[imgui.COLOR_BUTTON_HOVERED] = \
-            imgui.style.colors[imgui.COLOR_SEPARATOR_ACTIVE] = \
-            imgui.style.colors[imgui.COLOR_SEPARATOR_HOVERED] = \
-            imgui.style.colors[imgui.COLOR_RESIZE_GRIP_ACTIVE] = \
-            imgui.style.colors[imgui.COLOR_RESIZE_GRIP_HOVERED] = \
-            imgui.style.colors[imgui.COLOR_TAB_UNFOCUSED_ACTIVE] = \
-            imgui.style.colors[imgui.COLOR_SCROLLBAR_GRAB_ACTIVE] = \
-            imgui.style.colors[imgui.COLOR_FRAME_BACKGROUND_ACTIVE] = \
-            imgui.style.colors[imgui.COLOR_TITLE_BACKGROUND_ACTIVE] = \
-            imgui.style.colors[imgui.COLOR_TEXT_SELECTED_BACKGROUND] = \
-        globals.settings.style_accent
-        _ = \
-            imgui.style.colors[imgui.COLOR_TAB] = \
-            imgui.style.colors[imgui.COLOR_RESIZE_GRIP] = \
-            imgui.style.colors[imgui.COLOR_TAB_UNFOCUSED] = \
-            imgui.style.colors[imgui.COLOR_FRAME_BACKGROUND_HOVERED] = \
-        (*globals.settings.style_accent[:3], 0.25)
-        _ = \
-            imgui.style.colors[imgui.COLOR_TABLE_HEADER_BACKGROUND] = \
-            imgui.style.colors[imgui.COLOR_TABLE_ROW_BACKGROUND_ALT] = \
-        globals.settings.style_alt_bg
-        _ = \
-            imgui.style.colors[imgui.COLOR_BUTTON] = \
-            imgui.style.colors[imgui.COLOR_HEADER] = \
-            imgui.style.colors[imgui.COLOR_FRAME_BACKGROUND] = \
-            imgui.style.colors[imgui.COLOR_CHILD_BACKGROUND] = \
-            imgui.style.colors[imgui.COLOR_POPUP_BACKGROUND] = \
-            imgui.style.colors[imgui.COLOR_TITLE_BACKGROUND] = \
-            imgui.style.colors[imgui.COLOR_WINDOW_BACKGROUND] = \
-            imgui.style.colors[imgui.COLOR_SLIDER_GRAB_ACTIVE] = \
-            imgui.style.colors[imgui.COLOR_SCROLLBAR_BACKGROUND] = \
-        globals.settings.style_bg
-        _ = \
-            imgui.style.colors[imgui.COLOR_BORDER] = \
-            imgui.style.colors[imgui.COLOR_SEPARATOR] = \
-        globals.settings.style_border
-        _ = \
-            imgui.style.tab_rounding  = \
-            imgui.style.grab_rounding = \
-            imgui.style.frame_rounding = \
-            imgui.style.child_rounding = \
-            imgui.style.popup_rounding = \
-            imgui.style.window_rounding = \
-            imgui.style.scrollbar_rounding = \
-        self.scaled(globals.settings.style_corner_radius)
-        _ = \
-            imgui.style.colors[imgui.COLOR_TEXT] = \
-        globals.settings.style_text
-        _ = \
-            imgui.style.colors[imgui.COLOR_TEXT_DISABLED] = \
-        globals.settings.style_text_dim
         self.qt_app.setStyleSheet(f"""
             QMenu {{
                 padding: 5px;
@@ -823,9 +732,6 @@ class MainGUI():
             glfw.set_window_pos(self.window, *self.screen_pos)
         glfw.focus_window(self.window)
         self.tray.update_status()
-
-    def scaled(self, size: int | float):
-        return _scaled(globals.settings.interface_scaling, size)
 
     def main_loop(self):
         if globals.settings.start_refresh and not self.hidden:

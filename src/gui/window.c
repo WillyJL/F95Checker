@@ -10,8 +10,6 @@
 bool gui_window_init(Gui* gui) {
     // FIXME: handle DPI correctly
     // TODO: see if still needs to draw one frame hidden on other platforms, linux wayland doesnt
-    // FIXME: load and save window size from imgui.ini
-    // FIXME: use data path for imgui.ini
     gui->window = SDL_CreateWindow(
         "F95Checker WIP C Rewrite",
         1280,
@@ -48,6 +46,10 @@ bool gui_window_init(Gui* gui) {
     gui->style = ImGui_GetStyle();
     gui->window_state.prev_size = (Vec2){0, 0};
     gui->window_state.scroll_energy = (ImVec2){0.0f, 0.0f};
+    // FIXME: load and save window size from imgui.ini
+    // FIXME: use data path for imgui.ini
+    gui->io->IniFilename = NULL;
+    gui->io->LogFilename = NULL;
 
     gui_fonts_init(gui);
 

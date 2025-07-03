@@ -168,26 +168,6 @@ def constrain_next_window():
     imgui.set_next_window_size_constraints((0, 0), (size.x * 0.9, size.y * 0.9))
 
 
-def close_weak_popup():
-    if imgui.is_topmost():
-        # This is the topmost popup
-        if imgui.io.keys_down[glfw.KEY_ESCAPE]:
-            # Escape is pressed
-            imgui.close_current_popup()
-            return True
-        elif imgui.is_mouse_clicked():
-            # Mouse was just clicked
-            pos = imgui.get_window_position()
-            size = imgui.get_window_size()
-            if size.x > 50 and size.y > 50:
-                # Valid geometry
-                if not imgui.is_mouse_hovering_rect(pos.x, pos.y, pos.x + size.x, pos.y + size.y, clip=False):
-                    # Popup is not hovered
-                    imgui.close_current_popup()
-                    return True
-    return False
-
-
 def text_context(obj: object, attr: str, setter_extra: typing.Callable = lambda _: None, editable=True, no_icons=False):
     getter = lambda: getattr(obj, attr)
     setter = lambda val: [setattr(obj, attr, val), setter_extra(val)]
