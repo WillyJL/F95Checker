@@ -15,9 +15,9 @@ M_TUPLE_EX_DEF(
     (id, TabId),
     (name, m_string_t),
     (icon, m_string_t),
-    (color, ImColor),
+    (color, ImColor4),
     (position, i32))
-#define M_OPL_Tab() M_TUPLE_EX_OPL(tab, TabId, m_string_t, m_string_t, ImColor, i32)
+#define M_OPL_Tab() M_TUPLE_EX_OPL(tab, TabId, m_string_t, m_string_t, ImColor4, i32)
 
 M_LIST_DUAL_PUSH_EX_DEF(tab_list, TabList, Tab)
 #define M_OPL_TabList() M_LIST_DUAL_PUSH_EX_OPL(tab_list, Tab)

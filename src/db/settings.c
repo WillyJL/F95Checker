@@ -137,13 +137,13 @@ static void db_parse_settings(Db* db, sqlite3_stmt* stmt, Settings* settings) {
     settings->software_webview = sqlite3_column_int(stmt, col++);
     settings->start_in_background = sqlite3_column_int(stmt, col++);
     settings->start_refresh = sqlite3_column_int(stmt, col++);
-    settings->style_accent = sqlite3_column_imcolor(stmt, col++);
-    settings->style_alt_bg = sqlite3_column_imcolor(stmt, col++);
-    settings->style_bg = sqlite3_column_imcolor(stmt, col++);
-    settings->style_border = sqlite3_column_imcolor(stmt, col++);
+    settings->style_accent = sqlite3_column_imcolor4(stmt, col++);
+    settings->style_alt_bg = sqlite3_column_imcolor4(stmt, col++);
+    settings->style_bg = sqlite3_column_imcolor4(stmt, col++);
+    settings->style_border = sqlite3_column_imcolor4(stmt, col++);
     settings->style_corner_radius = sqlite3_column_int(stmt, col++);
-    settings->style_text = sqlite3_column_imcolor(stmt, col++);
-    settings->style_text_dim = sqlite3_column_imcolor(stmt, col++);
+    settings->style_text = sqlite3_column_imcolor4(stmt, col++);
+    settings->style_text_dim = sqlite3_column_imcolor4(stmt, col++);
     settings->table_header_outside_list = sqlite3_column_int(stmt, col++);
 
     json_object* tags_highlights_json = sqlite3_column_json(stmt, col++);
@@ -453,25 +453,25 @@ void db_do_save_setting(Db* db, Settings* settings, SettingsColumn column) {
         res = sqlite3_bind_int(stmt, 1, settings->start_refresh);
         break;
     case SettingsColumn_style_accent:
-        res = sqlite3_bind_imcolor(stmt, 1, settings->style_accent);
+        res = sqlite3_bind_imcolor4(stmt, 1, settings->style_accent);
         break;
     case SettingsColumn_style_alt_bg:
-        res = sqlite3_bind_imcolor(stmt, 1, settings->style_alt_bg);
+        res = sqlite3_bind_imcolor4(stmt, 1, settings->style_alt_bg);
         break;
     case SettingsColumn_style_bg:
-        res = sqlite3_bind_imcolor(stmt, 1, settings->style_bg);
+        res = sqlite3_bind_imcolor4(stmt, 1, settings->style_bg);
         break;
     case SettingsColumn_style_border:
-        res = sqlite3_bind_imcolor(stmt, 1, settings->style_border);
+        res = sqlite3_bind_imcolor4(stmt, 1, settings->style_border);
         break;
     case SettingsColumn_style_corner_radius:
         res = sqlite3_bind_int(stmt, 1, settings->style_corner_radius);
         break;
     case SettingsColumn_style_text:
-        res = sqlite3_bind_imcolor(stmt, 1, settings->style_text);
+        res = sqlite3_bind_imcolor4(stmt, 1, settings->style_text);
         break;
     case SettingsColumn_style_text_dim:
-        res = sqlite3_bind_imcolor(stmt, 1, settings->style_text_dim);
+        res = sqlite3_bind_imcolor4(stmt, 1, settings->style_text_dim);
         break;
     case SettingsColumn_table_header_outside_list:
         res = sqlite3_bind_int(stmt, 1, settings->table_header_outside_list);

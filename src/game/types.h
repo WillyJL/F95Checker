@@ -51,7 +51,7 @@ M_LIST_DUAL_PUSH_EX_DEF(game_review_list, GameReviewList, GameReview)
     _($, Custom, 6)
 SMARTENUM_DECLARE(_GameStatus, GameStatus)
 typedef struct {
-    ImColor color;
+    ImColor4 color;
     const char* icon;
 } GameStatusInfo;
 extern const GameStatusInfo game_status[1 + GameStatus_COUNT];
@@ -287,7 +287,7 @@ M_LIST_DUAL_PUSH_EX_DEF(game_timeline_event_list, GameTimelineEventList, GameTim
     _($, Unchecked, 23)
 SMARTENUM_DECLARE(_GameType, GameType)
 typedef struct {
-    ImColor color;
+    ImColor4 color;
     GameCategory category;
 } GameTypeInfo;
 extern const GameTypeInfo game_type[1 + GameType_COUNT];

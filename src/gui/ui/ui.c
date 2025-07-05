@@ -18,25 +18,25 @@ f32 gui_ui_size(Gui* gui, f32 size) {
     return size * settings->interface_scaling;
 }
 
-ImColor gui_ui_color_alpha(Gui* gui, ImColor color, f32 alpha) {
+ImColor4 gui_ui_color_alpha(Gui* gui, ImColor4 color, f32 alpha) {
     UNUSED(gui);
 
-    ImColor color_alpha = color;
-    color_alpha.Value.w = alpha;
+    ImColor4 color_alpha = color;
+    color_alpha.w = alpha;
     return color_alpha;
 }
 
-ImColor gui_ui_color_text(Gui* gui, ImColor background_color) {
+ImColor4 gui_ui_color_text(Gui* gui, ImColor4 background_color) {
     UNUSED(gui);
 
     // https://www.w3.org/TR/2008/REC-WCAG20-20081211/#relativeluminancedef
     static const f32 gamma = 2.2f;
     static const f32 threshold = 0.2176376f; // powf(0.5f, gamma)
-    const f32 luma = 0.2126f * powf(background_color.Value.x, gamma) +
-                     0.7152f * powf(background_color.Value.y, gamma) +
-                     0.0722f * powf(background_color.Value.z, gamma);
-    return luma > threshold ? (ImColor){{0.04f, 0.04f, 0.04f, 1.0f}} :
-                              (ImColor){{1.0f, 1.0f, 1.0f, 1.0f}};
+    const f32 luma = 0.2126f * powf(background_color.x, gamma) +
+                     0.7152f * powf(background_color.y, gamma) +
+                     0.0722f * powf(background_color.z, gamma);
+    return luma > threshold ? (ImColor4){0.04f, 0.04f, 0.04f, 1.0f} :
+                              (ImColor4){1.0f, 1.0f, 1.0f, 1.0f};
 }
 
 bool gui_ui_is_topmost(Gui* gui) {
@@ -73,8 +73,8 @@ void gui_ui_apply_styles(Gui* gui) {
     gui->style->ItemSpacing.x = gui->style->ItemSpacing.y;
     gui->style->ScrollbarSize = gui_ui_size(gui, 10.0f);
     gui->style->FrameBorderSize = gui_ui_size(gui, 1.0f);
-    gui->style->Colors[ImGuiCol_ModalWindowDimBg] = (ImVec4){0.0f, 0.0f, 0.0f, 0.5f};
-    gui->style->Colors[ImGuiCol_TableBorderStrong] = (ImVec4){0.0f, 0.0f, 0.0f, 0.0f};
+    gui->style->Colors[ImGuiCol_ModalWindowDimBg] = (ImColor4){0.0f, 0.0f, 0.0f, 0.5f};
+    gui->style->Colors[ImGuiCol_TableBorderStrong] = (ImColor4){0.0f, 0.0f, 0.0f, 0.0f};
 
     // clang-format off
         gui->style->Colors[ImGuiCol_ButtonActive] =
@@ -96,7 +96,7 @@ void gui_ui_apply_styles(Gui* gui) {
         gui->style->Colors[ImGuiCol_TabUnfocusedActive] =
         gui->style->Colors[ImGuiCol_TextSelectedBg] =
         gui->style->Colors[ImGuiCol_TitleBgActive] =
-    settings->style_accent.Value;
+    settings->style_accent;
     // clang-format on
 
     // clang-format off
@@ -104,13 +104,13 @@ void gui_ui_apply_styles(Gui* gui) {
         gui->style->Colors[ImGuiCol_ResizeGrip] =
         gui->style->Colors[ImGuiCol_Tab] =
         gui->style->Colors[ImGuiCol_TabUnfocused] =
-    gui_ui_color_alpha(gui, settings->style_accent, 0.25f).Value;
+    gui_ui_color_alpha(gui, settings->style_accent, 0.25f);
     // clang-format on
 
     // clang-format off
         gui->style->Colors[ImGuiCol_TableHeaderBg] =
         gui->style->Colors[ImGuiCol_TableRowBgAlt] =
-    settings->style_alt_bg.Value;
+    settings->style_alt_bg;
     // clang-format on
 
     // clang-format off
@@ -123,13 +123,13 @@ void gui_ui_apply_styles(Gui* gui) {
         gui->style->Colors[ImGuiCol_SliderGrabActive] =
         gui->style->Colors[ImGuiCol_TitleBg] =
         gui->style->Colors[ImGuiCol_WindowBg] =
-    settings->style_bg.Value;
+    settings->style_bg;
     // clang-format on
 
     // clang-format off
         gui->style->Colors[ImGuiCol_Border] =
         gui->style->Colors[ImGuiCol_Separator] =
-    settings->style_border.Value;
+    settings->style_border;
     // clang-format on
 
     // clang-format off
@@ -145,12 +145,12 @@ void gui_ui_apply_styles(Gui* gui) {
 
     // clang-format off
         gui->style->Colors[ImGuiCol_Text] =
-    settings->style_text.Value;
+    settings->style_text;
     // clang-format on
 
     // clang-format off
         gui->style->Colors[ImGuiCol_TextDisabled] =
-    settings->style_text_dim.Value;
+    settings->style_text_dim;
     // clang-format on
 }
 
@@ -260,10 +260,7 @@ void gui_ui_draw(Gui* gui) {
     ImGui_Text("Accent color:");
     ImGui_SameLine();
     ImGui_SetNextItemWidth(200.0f);
-    ImGui_ColorEdit3(
-        "###style_accent",
-        (f32*)&settings->style_accent.Value,
-        ImGuiColorEditFlags_None);
+    ImGui_ColorEdit3("###style_accent", (f32*)&settings->style_accent, ImGuiColorEditFlags_None);
     if(ImGui_IsItemDeactivatedAfterEdit()) {
         db_save_setting(db, settings, SettingsColumn_style_accent);
     }

@@ -35,7 +35,7 @@ SMARTENUM_DECLARE(_ProxyType, ProxyType)
     _($, Critical, 3)
 SMARTENUM_DECLARE(_TagHighlight, TagHighlight)
 typedef struct {
-    ImColor color;
+    ImColor4 color;
 } TagHighlightInfo;
 extern const TagHighlightInfo tag_highlight[TagHighlight_COUNT];
 

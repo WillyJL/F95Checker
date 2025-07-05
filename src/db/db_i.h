@@ -164,7 +164,7 @@ void db_do_save_cookies(Db* db, CookieDict_ptr cookies);
 #define sqlite3_column_text(pStmt, i)  (const char*)sqlite3_column_text(pStmt, i)
 #define sqlite3_column_float(pStmt, i) (float)sqlite3_column_double(pStmt, i)
 #define sqlite3_column_json(pStmt, i)  json_tokener_parse(sqlite3_column_text(pStmt, i))
-ImColor sqlite3_column_imcolor(sqlite3_stmt* stmt, i32 col);
+ImColor4 sqlite3_column_imcolor4(sqlite3_stmt* stmt, i32 col);
 #define sqlite3_bind_float(pStmt, i, rValue) sqlite3_bind_double(pStmt, i, (double)rValue)
 #define sqlite3_bind_mstring(pStmt, i, str) \
     sqlite3_bind_text(pStmt, i, m_string_get_cstr(str), -1, SQLITE_TRANSIENT)
@@ -179,4 +179,4 @@ ImColor sqlite3_column_imcolor(sqlite3_stmt* stmt, i32 col);
         SQLITE_TRANSIENT)
 #define json_object_object_add_unique(obj, key, val) \
     json_object_object_add_ex(obj, key, val, JSON_C_OBJECT_ADD_KEY_IS_NEW)
-i32 sqlite3_bind_imcolor(sqlite3_stmt* stmt, i32 param, ImColor im_color);
+i32 sqlite3_bind_imcolor4(sqlite3_stmt* stmt, i32 param, ImColor4 im_color);

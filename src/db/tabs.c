@@ -13,9 +13,9 @@ static void db_parse_tab(Db* db, sqlite3_stmt* stmt, Tab_ptr tab) {
     m_string_set(tab->icon, sqlite3_column_text(stmt, col++));
 
     if(sqlite3_column_type(stmt, col) == SQLITE_NULL) {
-        tab->color = (ImColor){{0, 0, 0, 0}};
+        tab->color = (ImColor4){0, 0, 0, 0};
     } else {
-        tab->color = sqlite3_column_imcolor(stmt, col);
+        tab->color = sqlite3_column_imcolor4(stmt, col);
     }
     col++;
 
@@ -83,10 +83,10 @@ void db_do_save_tab(Db* db, Tab_ptr tab, TabsColumn column) {
         res = sqlite3_bind_mstring(stmt, 1, tab->icon);
         break;
     case TabsColumn_color:
-        if(tab->color.Value.w == 0) {
+        if(tab->color.w == 0) {
             res = sqlite3_bind_null(stmt, 1);
         } else {
-            res = sqlite3_bind_imcolor(stmt, 1, tab->color);
+            res = sqlite3_bind_imcolor4(stmt, 1, tab->color);
         }
         break;
     case TabsColumn_position:

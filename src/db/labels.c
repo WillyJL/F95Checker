@@ -10,7 +10,7 @@ static void db_parse_label(Db* db, sqlite3_stmt* stmt, Label_ptr label) {
 
     label->id = sqlite3_column_int(stmt, col++);
     m_string_set(label->name, sqlite3_column_text(stmt, col++));
-    label->color = sqlite3_column_imcolor(stmt, col++);
+    label->color = sqlite3_column_imcolor4(stmt, col++);
     label->position = sqlite3_column_int(stmt, col++);
 }
 
@@ -72,7 +72,7 @@ void db_do_save_label(Db* db, Label_ptr label, LabelsColumn column) {
         res = sqlite3_bind_mstring(stmt, 1, label->name);
         break;
     case LabelsColumn_color:
-        res = sqlite3_bind_imcolor(stmt, 1, label->color);
+        res = sqlite3_bind_imcolor4(stmt, 1, label->color);
         break;
     case LabelsColumn_position:
         res = sqlite3_bind_int(stmt, 1, label->position);

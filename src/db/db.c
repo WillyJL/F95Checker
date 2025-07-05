@@ -339,31 +339,31 @@ void db_create_table(Db* db, const DbTable* table) {
     m_string_clear(sql);
 }
 
-ImColor sqlite3_column_imcolor(sqlite3_stmt* stmt, i32 col) {
+ImColor4 sqlite3_column_imcolor4(sqlite3_stmt* stmt, i32 col) {
     const char* hex_color = sqlite3_column_text(stmt, col);
     u8 r, g, b;
     i32 res = sscanf(hex_color, "#%02hhx%02hhx%02hhx", &r, &g, &b);
     if(res != 3) {
         r = g = b = 255;
     }
-    ImColor im_color = {{
+    ImColor4 im_color = {
         .x = (f32)r / 255,
         .y = (f32)g / 255,
         .z = (f32)b / 255,
         .w = 1.0,
-    }};
+    };
     return im_color;
 }
 
-i32 sqlite3_bind_imcolor(sqlite3_stmt* stmt, i32 param, ImColor im_color) {
+i32 sqlite3_bind_imcolor4(sqlite3_stmt* stmt, i32 param, ImColor4 im_color) {
     char hex_color[8];
     i32 res = snprintf(
         hex_color,
         sizeof(hex_color),
         "#%02hhx%02hhx%02hhx",
-        (u8)(im_color.Value.x * 255),
-        (u8)(im_color.Value.y * 255),
-        (u8)(im_color.Value.z * 255));
+        (u8)(im_color.x * 255),
+        (u8)(im_color.y * 255),
+        (u8)(im_color.z * 255));
     if(res != sizeof(hex_color) - 1) {
         strlcpy(hex_color, "#FFFFFF", sizeof(hex_color));
     }

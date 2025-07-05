@@ -69,13 +69,11 @@ void gui_ui_tab_bar(Gui* gui) {
             }
 
             // Draw the tab
-            if(tab->color.Value.w != 0) {
-                ImGui_PushStyleColorImVec4(
-                    ImGuiCol_Tab,
-                    gui_ui_color_alpha(gui, tab->color, 0.5f).Value);
-                ImGui_PushStyleColorImVec4(ImGuiCol_TabActive, tab->color.Value);
-                ImGui_PushStyleColorImVec4(ImGuiCol_TabHovered, tab->color.Value);
-                ImGui_PushStyleColorImVec4(ImGuiCol_Text, gui_ui_color_text(gui, tab->color).Value);
+            if(tab->color.w != 0) {
+                ImGui_PushStyleColor4(ImGuiCol_Tab, gui_ui_color_alpha(gui, tab->color, 0.5f));
+                ImGui_PushStyleColor4(ImGuiCol_TabActive, tab->color);
+                ImGui_PushStyleColor4(ImGuiCol_TabHovered, tab->color);
+                ImGui_PushStyleColor4(ImGuiCol_Text, gui_ui_color_text(gui, tab->color));
             }
             m_string_printf(
                 str,
@@ -93,7 +91,7 @@ void gui_ui_tab_bar(Gui* gui) {
                 selected_tab = tab;
                 ImGui_EndTabItem();
             }
-            if(tab->color.Value.w != 0) {
+            if(tab->color.w != 0) {
                 ImGui_PopStyleColorEx(4);
             }
 
