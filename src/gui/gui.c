@@ -35,6 +35,8 @@ Gui* gui_init(void) {
         return NULL;
     }
 
+    gui_ui_init(gui);
+
     gui_ui_apply_styles(gui);
 
     return gui;
@@ -59,6 +61,7 @@ void gui_tick(Gui* gui) {
 }
 
 void gui_free(Gui* gui) {
+    gui_ui_free(gui);
     gui_window_free(gui);
     gui_tray_free(gui);
     gui_icons_free(gui);

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "types/tab.h"
+
 #include <dcimgui/dcimgui.h>
 #include <fonts/mdi.h>
 #include <SDL3/SDL.h>
@@ -33,6 +35,12 @@ typedef struct {
 
     ImGuiIO* io;
     ImGuiStyle* style;
+
+    struct {
+        Tab_ptr current_tab;
+        Tab_ptr dragging_tab;
+    } ui_state;
+
     struct {
         ImFont* base;
         ImFont* mono;

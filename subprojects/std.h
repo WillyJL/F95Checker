@@ -7,7 +7,7 @@
 #include <float.h>
 #include <inttypes.h>
 #include <limits.h>
-// #include <math.h>
+#include <math.h>
 #include <mlib/m-array.h>
 #include <mlib/m-bitset.h>
 #include <mlib/m-bstring.h>

@@ -14,7 +14,6 @@ import typing
 import weakref
 
 from external import weakerset
-from modules import colors
 
 
 class CounterContext:

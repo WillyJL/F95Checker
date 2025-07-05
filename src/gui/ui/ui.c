@@ -1,14 +1,42 @@
 #include "ui.h"
 
 #include "../window.h"
+#include "components/components.h"
 #include "widgets/widgets.h"
 
 #include <globals.h>
 
-f32 gui_ui_scaled(Gui* gui, f32 size) {
+void gui_ui_init(Gui* gui) {
+    gui->ui_state.current_tab = NULL;
+    gui->ui_state.dragging_tab = NULL;
+    // FIXME: init sorted+filtered games
+}
+
+f32 gui_ui_size(Gui* gui, f32 size) {
     UNUSED(gui);
 
     return size * settings->interface_scaling;
+}
+
+ImColor gui_ui_color_alpha(Gui* gui, ImColor color, f32 alpha) {
+    UNUSED(gui);
+
+    ImColor color_alpha = color;
+    color_alpha.Value.w = alpha;
+    return color_alpha;
+}
+
+ImColor gui_ui_color_text(Gui* gui, ImColor background_color) {
+    UNUSED(gui);
+
+    // https://www.w3.org/TR/2008/REC-WCAG20-20081211/#relativeluminancedef
+    static const f32 gamma = 2.2f;
+    static const f32 threshold = 0.2176376f; // powf(0.5f, gamma)
+    const f32 luma = 0.2126f * powf(background_color.Value.x, gamma) +
+                     0.7152f * powf(background_color.Value.y, gamma) +
+                     0.0722f * powf(background_color.Value.z, gamma);
+    return luma > threshold ? (ImColor){{0.04f, 0.04f, 0.04f, 1.0f}} :
+                              (ImColor){{1.0f, 1.0f, 1.0f, 1.0f}};
 }
 
 bool gui_ui_is_topmost(Gui* gui) {
@@ -43,8 +71,8 @@ void gui_ui_apply_styles(Gui* gui) {
     gui->io->ConfigScrollbarScrollByPage = false;
 
     gui->style->ItemSpacing.x = gui->style->ItemSpacing.y;
-    gui->style->ScrollbarSize = gui_ui_scaled(gui, 10.0f);
-    gui->style->FrameBorderSize = gui_ui_scaled(gui, 1.0f);
+    gui->style->ScrollbarSize = gui_ui_size(gui, 10.0f);
+    gui->style->FrameBorderSize = gui_ui_size(gui, 1.0f);
     gui->style->Colors[ImGuiCol_ModalWindowDimBg] = (ImVec4){0.0f, 0.0f, 0.0f, 0.5f};
     gui->style->Colors[ImGuiCol_TableBorderStrong] = (ImVec4){0.0f, 0.0f, 0.0f, 0.0f};
 
@@ -71,14 +99,12 @@ void gui_ui_apply_styles(Gui* gui) {
     settings->style_accent.Value;
     // clang-format on
 
-    ImVec4 style_accent_alpha = settings->style_accent.Value;
-    style_accent_alpha.w = 0.25;
     // clang-format off
         gui->style->Colors[ImGuiCol_FrameBgHovered] =
         gui->style->Colors[ImGuiCol_ResizeGrip] =
         gui->style->Colors[ImGuiCol_Tab] =
         gui->style->Colors[ImGuiCol_TabUnfocused] =
-    style_accent_alpha;
+    gui_ui_color_alpha(gui, settings->style_accent, 0.25f).Value;
     // clang-format on
 
     // clang-format off
@@ -114,7 +140,7 @@ void gui_ui_apply_styles(Gui* gui) {
         gui->style->ScrollbarRounding =
         gui->style->TabRounding =
         gui->style->WindowRounding =
-    gui_ui_scaled(gui, (f32)settings->style_corner_radius);
+    gui_ui_size(gui, (f32)settings->style_corner_radius);
     // clang-format on
 
     // clang-format off
@@ -129,6 +155,53 @@ void gui_ui_apply_styles(Gui* gui) {
 }
 
 void gui_ui_draw(Gui* gui) {
+    const f32 sidebar_width = gui_ui_size(gui, 250.0f);
+
+    // Main pane
+
+    ImGui_BeginChild(
+        "###main_frame",
+        (ImVec2){-sidebar_width, 0.0f},
+        ImGuiChildFlags_None,
+        ImGuiWindowFlags_None);
+
+    gui_ui_tab_bar(gui);
+
+    switch(settings->display_mode) {
+    default:
+    case DisplayMode_List:
+        gui_ui_games_list(gui);
+        break;
+    case DisplayMode_Grid:
+        gui_ui_games_grid(gui);
+        break;
+    case DisplayMode_Kanban:
+        gui_ui_games_kanban(gui);
+        break;
+    }
+
+    gui_ui_bottom_bar(gui);
+
+    ImGui_EndChild();
+
+    ImGui_SameLineEx(0.0f, gui->style->ItemSpacing.x);
+
+    // Sidebar
+
+    ImGui_BeginChild(
+        "###sidebar_frame",
+        (ImVec2){sidebar_width - gui->style->ItemSpacing.x + 1.0f, 0.0f},
+        ImGuiChildFlags_None,
+        ImGuiWindowFlags_None);
+
+    gui_ui_side_bar(gui);
+
+    ImGui_EndChild();
+
+    // FIXME: status/watermark text
+
+    return;
+
     ImGui_Text("Hello, World!");
 
     ImGui_Text("Version: " F95CHECKER_VERSION " WIP");
@@ -253,4 +326,9 @@ void gui_ui_draw(Gui* gui) {
             ImGui_TextUnformatted(m_string_get_cstr(label->name));
         }
     }
+}
+
+void gui_ui_free(Gui* gui) {
+    UNUSED(gui);
+    // FIXME: clear sorted+filtered games
 }

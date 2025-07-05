@@ -317,9 +317,7 @@ class MainGUI():
         self.add_box_valid = False
         self.bg_mode_paused = False
         self.recalculate_ids = True
-        self.current_tab: Tab = None
         self.selected_games_count = 0
-        self.dragging_tab: Tab = None
         self.game_hitbox_click = False
         self.hovered_game: Game = None
         self.filters: list[Filter] = []
@@ -765,15 +763,12 @@ class MainGUI():
                 self.prev_size = size
                 prev_cursor = cursor
                 self.qt_app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.AllEvents)
-                glfw.make_context_current(self.window)
                 if self.repeat_chars:
                     for char in self.input_chars:
                         imgui.io.add_input_character(char)
                     self.repeat_chars = False
                 self.input_chars.clear()
-                glfw.poll_events()
                 self.input_chars, self.poll_chars = self.poll_chars, self.input_chars
-                self.impl.process_inputs()
                 if self.call_soon:
                     while self.call_soon and (call_soon := self.call_soon.pop(0)):
                         call_soon()
@@ -784,23 +779,6 @@ class MainGUI():
                 any_hovered = imgui.is_any_item_hovered()
                 win_hovered = glfw.get_window_attrib(self.window, glfw.HOVERED)
                 if first_frame or (not self.hidden and not self.minimized):  # Visible
-
-                    # Scroll modifiers (must be before new_frame())
-                    imgui.io.mouse_wheel *= globals.settings.scroll_amount
-                    if globals.settings.scroll_smooth:
-
-                        if self.scroll_energy * imgui.io.mouse_wheel < 0: # fast check if signs are opposite
-                            # we want to immediately reverse rather than slowly decelerating.
-                            self.scroll_energy = 0.0
-
-                        self.scroll_energy += imgui.io.mouse_wheel
-                        if abs(self.scroll_energy) > 0.1:
-                            scroll_now = self.scroll_energy * imgui.io.delta_time * globals.settings.scroll_smooth_speed
-                            self.scroll_energy -= scroll_now
-                        else:
-                            scroll_now = 0.0
-                            self.scroll_energy = 0.0
-                        imgui.io.mouse_wheel = scroll_now
 
                     # Redraw only when needed
                     draw = (
@@ -827,48 +805,14 @@ class MainGUI():
                             draw_next -= imgui.io.delta_time
                         draw_start = time.perf_counter()
 
-                        # Reactive mouse cursors
-                        if cursor != prev_cursor or any_hovered != prev_any_hovered:
-                            shape = glfw.ARROW_CURSOR
-                            if cursor == imgui.MOUSE_CURSOR_TEXT_INPUT:
-                                shape = glfw.IBEAM_CURSOR
-                            elif any_hovered:
-                                shape = glfw.HAND_CURSOR
-                            glfw.set_cursor(self.window, glfw.create_standard_cursor(shape))
-
                         # Start drawing
                         prev_scaling = globals.settings.interface_scaling
                         imgui.new_frame()
                         self.new_styles = False
                         imagehelper.redraw = False
 
-                        # Imgui window is top left of display window, and has same size
-                        imgui.set_next_window_position(0, 0, imgui.ONCE)
-                        if size != self.prev_size and not self.minimized:
-                            imgui.set_next_window_size(*size, imgui.ALWAYS)
-
-                        # Create main window
-                        imgui.push_style_var(imgui.STYLE_WINDOW_BORDERSIZE, 0)
-                        imgui.begin("F95Checker", closable=False, flags=self.window_flags)
-                        imgui.pop_style_var()
-                        sidebar_size = self.scaled(self.sidebar_size)
-
                         # Main pane
-                        imgui.begin_child("###main_frame", width=-sidebar_size)
                         self.hovered_game = None
-                        # Tabbar
-                        self.draw_tabbar()
-                        # Games container
-                        match globals.settings.display_mode.value:
-                            case DisplayMode.list.value:
-                                self.draw_games_list()
-                            case DisplayMode.grid.value:
-                                self.draw_games_grid()
-                            case DisplayMode.kanban.value:
-                                self.draw_games_kanban()
-                        # Bottombar
-                        self.draw_bottombar()
-                        imgui.end_child()
 
                         # Prepare bottom status / watermark text (done before sidebar to get text offset from bottom of window)
                         if (count := api.images_counter.count) > 0:
@@ -892,9 +836,7 @@ class MainGUI():
                         text_y = size.y - text_size.y - _6
 
                         # Sidebar
-                        imgui.same_line(spacing=imgui.style.item_spacing.x)
-                        imgui.begin_child("###sidebar_frame", width=sidebar_size - imgui.style.item_spacing.x + 1, height=-text_size.y)
-                        self.draw_sidebar()
+                        imgui.begin_child("###sidebar_frame", height=-text_size.y)
                         imgui.end_child()
 
                         # Status / watermark text
@@ -2807,72 +2749,10 @@ class MainGUI():
         return utils.popup("Tag highlight preferences", popup_content, closable=True, outside=True, popup_uuid=popup_uuid)
 
     def draw_tabbar(self):
-        display_tab = globals.settings.display_tab
-        select_tab = self.current_tab is not display_tab
-        if not self.sorts:
-            # Fixes incorrect tab for first frame, causing un-shown images to load
-            # Sorting would happen later otherwise and tabs would be hidden due to that
-            self.current_tab = display_tab
-            self.tick_list_columns()
-            save_new_tab = False
-        elif self.dragging_tab:
-            # Keep current tab while resetting tabbar due to dragging
-            save_new_tab = False
-            select_tab = True
-        else:
-            save_new_tab = True
-        new_tab = None
         if Tab.instances and not (globals.settings.filter_all_tabs and self.filtering):
-            if imgui.begin_tab_bar(
-                f"###tabbar_{','.join(str(tab.id) for tab in Tab.instances)}",
-                flags=self.tabbar_flags
-            ):
-                hide = globals.settings.hide_empty_tabs
-                count = len(self.show_games_ids.get(None, ()))
-                if (count or not hide) and imgui.begin_tab_item(
-                    f"{Tab.first_tab_label()} ({count})###tab_-1",
-                    flags=imgui.TAB_ITEM_NONE
-                )[0]:
-                    new_tab = None
-                    imgui.end_tab_item()
-                swap = None
+            if imgui.begin_tab_bar():
                 for tab_i, tab in enumerate(Tab.instances):
-                    count = len(self.show_games_ids.get(tab, ()))
-                    if hide and not count:
-                        continue
-                    if tab.color:
-                        imgui.push_style_color(imgui.COLOR_TAB, *tab.color[:3], 0.5)
-                        imgui.push_style_color(imgui.COLOR_TAB_ACTIVE, *tab.color)
-                        imgui.push_style_color(imgui.COLOR_TAB_HOVERED, *tab.color)
-                        imgui.push_style_color(imgui.COLOR_TEXT, *colors.foreground_color(tab.color))
-                    if imgui.begin_tab_item(
-                        f"{tab.icon} {tab.name or 'New Tab'} ({count})###tab_{tab.id}",
-                        flags=imgui.TAB_ITEM_SET_SELECTED if select_tab and tab is display_tab else 0
-                    )[0]:
-                        new_tab = tab
-                        imgui.end_tab_item()
-                    if tab.color:
-                        imgui.pop_style_color(4)
-                    if self.dragging_tab is tab and imgui.is_mouse_released():
-                        self.dragging_tab = None
-                    elif imgui.is_item_active() or self.dragging_tab is tab:
-                        mouse_pos = imgui.get_mouse_pos()
-                        if tab_i > 0 and imgui.get_item_rect_min().x > 0 and mouse_pos.x < imgui.get_item_rect_min().x:
-                            if imgui.get_mouse_drag_delta().x < 0:
-                                self.dragging_tab = tab
-                                swap = (tab_i, tab_i - 1)
-                            imgui.reset_mouse_drag_delta()
-                        elif tab_i < len(Tab.instances) - 1 and imgui.get_item_rect_max().x > 0 and mouse_pos.x > imgui.get_item_rect_max().x:
-                            if imgui.get_mouse_drag_delta().x > 0:
-                                self.dragging_tab = tab
-                                swap = (tab_i, tab_i + 1)
-                            imgui.reset_mouse_drag_delta()
-                    context_id = f"###tab_{tab.id}_context"
-                    set_focus = not imgui.is_popup_open(context_id)
                     if imgui.begin_popup_context_item(context_id):
-                        imgui.set_next_item_width(imgui.get_content_region_available_width())
-                        if set_focus:
-                            imgui.set_keyboard_focus_here()
                         changed, value = imgui.input_text_with_hint(f"###tab_name_{tab.id}", "Tab name", tab.name)
                         setter_extra = functools.partial(lambda t, _=None: async_thread.run(db.update_tab(t, "name")), tab)
                         if changed:
@@ -2929,22 +2809,6 @@ class MainGUI():
                                 )
                             else:
                                 close_callback()
-                        imgui.end_popup()
-                imgui.end_tab_bar()
-                if swap:
-                    Tab.instances[swap[0]], Tab.instances[swap[1]] = Tab.instances[swap[1]], Tab.instances[swap[0]]
-                    Tab.update_positions()
-                    async def _update_tab_positions():
-                        for tab in Tab.instances:
-                            await db.update_tab(tab, "position")
-                    async_thread.run(_update_tab_positions())
-        if new_tab is not self.current_tab and save_new_tab:
-            for game in globals.games.values():
-                game.selected = False
-            self.current_tab = new_tab
-            self.recalculate_ids = True
-            globals.settings.display_tab = new_tab
-            async_thread.run(db.update_settings("display_tab"))
 
     def calculate_ids(self, table_id: str, sorts: imgui.core._ImGuiTableSortSpecs):
         manual_sort = cols.manual_sort.enabled
