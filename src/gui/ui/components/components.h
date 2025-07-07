@@ -1,6 +1,8 @@
 #pragma once
 
-#include "../ui.h" // IWYU pragma: export
+#include "../../gui.h"
+
+#include <std.h>
 
 void gui_ui_bottom_bar(Gui* gui);
 void gui_ui_games_grid(Gui* gui);

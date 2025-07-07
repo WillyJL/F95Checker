@@ -1,4 +1,4 @@
-#include "widgets.h"
+#include "../ui_i.h"
 
 bool gui_ui_checkbox(Gui* gui, const char* label, bool* value) {
     const bool patch_colors = *value;

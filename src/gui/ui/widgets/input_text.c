@@ -1,4 +1,4 @@
-#include "widgets.h"
+#include "../ui_i.h"
 
 static i32 gui_ui_input_text_resize_callback(ImGuiInputTextCallbackData* data) {
     if(data->EventFlag & ImGuiInputTextFlags_CallbackResize) {

@@ -1,8 +1,6 @@
 #include "ui.h"
 
-#include "../window.h"
-#include "components/components.h"
-#include "widgets/widgets.h"
+#include "ui_i.h"
 
 #include <globals.h>
 
@@ -246,7 +244,7 @@ void gui_ui_draw(Gui* gui) {
     ImGui_SameLine();
     if(gui_ui_checkbox(gui, "###vsync", &settings->vsync)) {
         db_save_setting(db, settings, SettingsColumn_vsync);
-        gui_window_set_vsync(gui, settings->vsync);
+        // gui_window_set_vsync(gui, settings->vsync);
     }
 
     ImGui_AlignTextToFramePadding();

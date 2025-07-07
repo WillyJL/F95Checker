@@ -1,4 +1,4 @@
-#include "components.h"
+#include "../ui_i.h"
 
 #include "../widgets/widgets.h"
 
