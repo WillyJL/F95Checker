@@ -8,6 +8,7 @@
 #define TAB_DFLT_ICON mdi_heart_box
 
 typedef i32 TabId;
+#define M_OPL_TabId() M_INT_EX_OPL(INT32)
 
 M_TUPLE_EX_DEF(
     tab,

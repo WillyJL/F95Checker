@@ -7,7 +7,10 @@
 void gui_ui_init(Gui* gui) {
     gui->ui_state.current_tab = NULL;
     gui->ui_state.dragging_tab = NULL;
-    // FIXME: init sorted+filtered games
+    game_index_init(gui->ui_state.game_index);
+    gui->ui_state.need_game_index_update = false;
+    gui->ui_state.is_filtering = false;
+    gui->ui_state.ghost_columns_enabled_count = 0;
 }
 
 f32 gui_ui_size(Gui* gui, f32 size) {
@@ -324,6 +327,5 @@ void gui_ui_draw(Gui* gui) {
 }
 
 void gui_ui_free(Gui* gui) {
-    UNUSED(gui);
-    // FIXME: clear sorted+filtered games
+    game_index_clear(gui->ui_state.game_index);
 }

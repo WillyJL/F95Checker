@@ -62,5 +62,8 @@ typedef struct {
 Game* game_init(void);
 void game_free(Game* game);
 
+M_DICT_OA_EX_DEF(game_index, GameIndex, TabId, GameIdArray)
+#define M_OPL_GameIndex() M_DICT_OA_EX_OPL(game_index, TabId, GameIdArray)
+
 M_DICT_OA_EX_DEF(game_dict, GameDict, GameId, M_OPL_GameId(), Game*, M_PTR_OPLIST)
 #define M_OPL_GameDict() M_DICT_OA_EX_OPL(game_dict, M_OPL_GameId(), M_PTR_OPLIST)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "game/game.h"
 #include "types/tab.h"
 
 #include <dcimgui/dcimgui.h>
@@ -39,6 +40,11 @@ typedef struct {
     struct {
         Tab_ptr current_tab;
         Tab_ptr dragging_tab;
+        GameIndex game_index;
+        bool need_game_index_update;
+        bool is_filtering;
+        f32 ghost_columns_enabled_count;
+        bool columns_enabled[22];
     } ui_state;
 
     struct {

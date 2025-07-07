@@ -75,211 +75,11 @@ tool_page         = api.f95_threads_page + "44173/"
 github_page       = "https://github.com/WillyJL/F95Checker"
 developer_page    = "https://linktr.ee/WillyJL"
 
-imgui.io = None
-imgui.style = None
-
-
-class Columns:
-
-    @dataclasses.dataclass(slots=True)
-    class Column:
-        cols: object
-        name: str
-        flags: int = 0
-        ghost: bool = False
-        default: bool = False
-        hideable: bool = True
-        sortable: bool = False
-        resizable: bool = True
-        enabled: bool = None
-        no_header: str = False
-        short_header: str = False
-        header: str = None
-        index: int = None
-
-        def __post_init__(self):
-            # Header
-            if self.ghost or self.no_header:
-                self.header = "##" + self.name[2:]
-            elif self.short_header:
-                self.header = self.name[:1]
-            else:
-                self.header = self.name[2:]
-            # Flags
-            if self.ghost:
-                self.flags |= (
-                    imgui.TABLE_COLUMN_NO_SORT |
-                    imgui.TABLE_COLUMN_NO_RESIZE |
-                    imgui.TABLE_COLUMN_NO_REORDER |
-                    imgui.TABLE_COLUMN_NO_HEADER_WIDTH
-                )
-            if not self.default:
-                self.flags |= imgui.TABLE_COLUMN_DEFAULT_HIDE
-            if not self.hideable:
-                self.flags |= imgui.TABLE_COLUMN_NO_HIDE
-            if not self.sortable:
-                self.flags |= imgui.TABLE_COLUMN_NO_SORT
-            if not self.resizable:
-                self.flags |= imgui.TABLE_COLUMN_NO_RESIZE
-            # Add to outer class
-            self.cols.items.append(self)
-            self.cols.count = len(self.cols.items)
-            self.index = self.cols.count - 1
-
-    def __init__(self):
-        self.items = []
-        self.count = 0
-        # Ghosts (more info in MainGUI.draw_games_list())
-        self.manual_sort = self.Column(
-            self, f"{icons.cursor_move} Manual Sort",
-            ghost=True,
-        )
-        self.version = self.Column(
-            self, f"{icons.star_shooting} Version",
-            ghost=True,
-            default=True,
-        )
-        self.finished_version = self.Column(
-            self, f"{icons.flag_checkered} Finished Version",
-            ghost=True,
-        )
-        self.installed_version = self.Column(
-            self, f"{icons.download} Installed Version",
-            ghost=True,
-        )
-        self.status = self.Column(
-            self, f"{icons.checkbox_marked_circle} Status (after name)",
-            ghost=True,
-            default=True,
-        )
-        self.separator = self.Column(
-            self, "-----------------------------------",
-            ghost=True,
-            default=True,
-            hideable=False,
-        )
-        # Regulars
-        self.play_button = self.Column(
-            self, f"{icons.play} Play Button",
-            default=True,
-            resizable=False,
-            no_header=True,
-        )
-        self.type = self.Column(
-            self, f"{icons.book_information_variant} Type",
-            default=True,
-            sortable=True,
-            resizable=False,
-        )
-        self.name = self.Column(
-            self, f"{icons.gamepad_variant} Name",
-            imgui.TABLE_COLUMN_WIDTH_STRETCH | imgui.TABLE_COLUMN_DEFAULT_SORT,
-            default=True,
-            sortable=True,
-            hideable=False,
-        )
-        self.developer = self.Column(
-            self, f"{icons.account} Developer",
-            sortable=True,
-        )
-        self.last_updated = self.Column(
-            self, f"{icons.update} Last Updated",
-            default=True,
-            sortable=True,
-            resizable=False,
-        )
-        self.last_launched = self.Column(
-            self, f"{icons.play} Last Launched",
-            sortable=True,
-            resizable=False,
-        )
-        self.added_on = self.Column(
-            self, f"{icons.plus} Added On",
-            sortable=True,
-            resizable=False,
-        )
-        self.finished = self.Column(
-            self, f"{icons.flag_checkered} Finished",
-            default=True,
-            sortable=True,
-            resizable=False,
-            short_header=True,
-        )
-        self.installed = self.Column(
-            self, f"{icons.download} Installed",
-            default=True,
-            sortable=True,
-            resizable=False,
-            short_header=True,
-        )
-        self.rating = self.Column(
-            self, f"{icons.star} Rating",
-            sortable=True,
-            resizable=False,
-        )
-        self.notes = self.Column(
-            self, f"{icons.draw_pen} Notes",
-            sortable=True,
-        )
-        self.open_thread = self.Column(
-            self, f"{icons.open_in_new} Open Thread",
-            default=True,
-            resizable=False,
-            no_header=True,
-        )
-        self.copy_link = self.Column(
-            self, f"{icons.content_copy} Copy Link",
-            resizable=False,
-            no_header=True,
-        )
-        self.open_folder = self.Column(
-            self, f"{icons.folder_open_outline} Open Folder",
-            resizable=False,
-            no_header=True,
-        )
-        self.status_standalone = self.Column(
-            self, f"{icons.checkbox_marked_circle} Status (own column)",
-            sortable=True,
-            resizable=False,
-            no_header=True,
-        )
-        self.score = self.Column(
-            self, f"{icons.message_star} Forum Score",
-            sortable=True,
-            resizable=False,
-            short_header=True,
-        )
-
-cols = Columns()
-
 
 class MainGUI():
     def __init__(self):
         # Constants
         self.sidebar_size = 234
-        self.window_flags: int = (
-            imgui.WINDOW_NO_MOVE |
-            imgui.WINDOW_NO_RESIZE |
-            imgui.WINDOW_NO_COLLAPSE |
-            imgui.WINDOW_NO_TITLE_BAR |
-            imgui.WINDOW_NO_SCROLLBAR |
-            imgui.WINDOW_NO_SCROLL_WITH_MOUSE
-        )
-        self.tabbar_flags: int = (
-            imgui.TAB_BAR_FITTING_POLICY_SCROLL
-        )
-        self.game_list_table_flags: int = (
-            imgui.TABLE_SCROLL_Y |
-            imgui.TABLE_HIDEABLE |
-            imgui.TABLE_SORTABLE |
-            imgui.TABLE_RESIZABLE |
-            imgui.TABLE_SORT_MULTI |
-            imgui.TABLE_REORDERABLE |
-            imgui.TABLE_ROW_BACKGROUND |
-            imgui.TABLE_SIZING_FIXED_FIT |
-            imgui.TABLE_NO_HOST_EXTEND_Y |
-            imgui.TABLE_NO_BORDERS_IN_BODY_UTIL_RESIZE
-        )
         self.game_grid_table_flags: int = (
             imgui.TABLE_SCROLL_Y |
             imgui.TABLE_PAD_OUTER_X |
@@ -332,16 +132,9 @@ class MainGUI():
         self.prev_filters: list[Filter] = []
         self.ghost_columns_enabled_count = 0
         self.bg_mode_notifs_timer: float = None
-        self.sorts: dict[str, list[SortSpec]] = {}
         self.show_games_ids: dict[Tab, list[int]] = {}
 
-        # Setup Qt objects
-        self.qt_app = QtWidgets.QApplication(sys.argv)
-        self.tray = TrayIcon(self)
-
         # Setup ImGui
-        imgui.create_context()
-        imgui.io = imgui.get_io()
         imgui.io.ini_file_name = str(globals.data_path / "imgui.ini")
         size = tuple()
         pos = tuple()
@@ -369,32 +162,12 @@ class MainGUI():
         if not all(type(x) is int for x in size) or not len(size) == 2:
             size = (1280, 720)
 
-        # Setup GLFW
-        if not glfw.init():
-            print("Could not initialize OpenGL context")
-            sys.exit(1)
-        glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
-        glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
-        glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
-        glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, gl.GL_TRUE)  # OS X supports only forward-compatible core profiles from 3.2
-        glfw.window_hint(glfw.VISIBLE, False)
-
-        # Create a windowed mode window and its OpenGL context
-        self.window: glfw._GLFWwindow = glfw.create_window(*size, "F95Checker", None, None)
-        if not self.window:
-            print("Could not initialize Window")
-            glfw.terminate()
-            sys.exit(1)
-        glfw.make_context_current(self.window)
-        self.impl = imgui_glfw.GlfwRenderer(self.window)
-
         # Window position and icon
         if all(type(x) is int for x in pos) and len(pos) == 2 and utils.validate_geometry(*pos, *size):
             glfw.set_window_pos(self.window, *pos)
         self.screen_pos = glfw.get_window_pos(self.window)
         if globals.settings.start_in_background:
             self.hide()
-        glfw.set_window_icon(self.window, 1, Image.open(globals.self_path / "resources/icons/icon.png"))
 
         # Window callbacks
         glfw.set_char_callback(self.window, self.char_callback)
@@ -639,17 +412,6 @@ class MainGUI():
             async_thread.run(db.update_settings("interface_scaling"))
             return self.refresh_fonts()
         self.type_label_width = None
-
-    def save_filters(self):
-        with open(globals.data_path / "filters.pkl", "wb") as file:
-            pickle.dump(self.filters, file)
-
-    def load_filters(self):
-        try:
-            with open(globals.data_path / "filters.pkl", "rb") as file:
-                self.filters = pickle.load(file)
-        except Exception:
-            self.filters = []
 
     def load_styles_from_toml(self):
         if not (path := pathlib.Path(globals.data_path / 'styles.toml')).is_file():
@@ -928,8 +690,6 @@ class MainGUI():
                 new_ini = ini
             with open(imgui.io.ini_file_name, "w") as f:
                 f.write(new_ini)
-            self.impl.shutdown()
-            glfw.terminate()
 
     def draw_hover_text(self, hover_text: str, text="(?)", force=False):
         if text:
@@ -3017,45 +2777,8 @@ class MainGUI():
             else:
                 self.scroll_percent = imgui.get_scroll_y() / scroll_max_y
 
-    def games_table_id(self):
-        tab_id = self.current_tab.id if self.current_tab else -1
-        return f"###game_list{tab_id if globals.settings.independent_tab_views else ''}"
-
     def draw_games_list(self):
-        table_id = self.games_table_id()
-        # Hack: custom toggles in table header right click menu by adding tiny empty "ghost" columns and hiding them
-        # by starting the table render before the content region.
-        ghost_column_size = (imgui.style.frame_padding.x + imgui.style.cell_padding.x * 2)
-        offset = ghost_column_size * self.ghost_columns_enabled_count
-        imgui.set_cursor_pos_x(imgui.get_cursor_pos_x() - offset)
-        if imgui.begin_table(
-            table_id,
-            column=cols.count,
-            flags=self.game_list_table_flags,
-            outer_size_height=-imgui.get_frame_height_with_spacing()  # Bottombar
-        ):
-            # Setup columns
-            self.ghost_columns_enabled_count = 0
-            can_sort = 0
-            for column in cols.items:
-                imgui.table_setup_column(column.name, column.flags | (can_sort * column.sortable))
-                # Enabled columns
-                column.enabled = bool(imgui.table_get_column_flags(column.index) & imgui.TABLE_COLUMN_IS_ENABLED)
-                # Ghosts count
-                if column.ghost and column.enabled:
-                    self.ghost_columns_enabled_count += 1
-                # Set sorting condition
-                if column is cols.manual_sort:
-                    can_sort = imgui.TABLE_COLUMN_NO_SORT * cols.manual_sort.enabled
-            imgui.table_setup_scroll_freeze(0, 1)  # Sticky column headers
-            self.calculate_ids(table_id, imgui.table_get_sort_specs())
-
-            # Column headers
-            imgui.table_next_row(imgui.TABLE_ROW_HEADERS)
-            for column in cols.items:
-                imgui.table_set_column_index(column.index)
-                imgui.table_header(column.header)
-
+        if imgui.begin_table():
             # Loop rows
             self.sync_scroll()
             frame_height = imgui.get_frame_height()
@@ -3179,48 +2902,6 @@ class MainGUI():
                 self.handle_game_hitbox_events(game, drag_drop=True)
 
             imgui.end_table()
-
-    def tick_list_columns(self):
-        # Hack: get sort and column specs for list mode in grid and kanban mode
-        table_id = self.games_table_id()
-        # Hack: custom toggles in table header right click menu by adding tiny empty "ghost" columns and hiding them
-        # by starting the table render before the content region.
-        ghost_column_size = (imgui.style.frame_padding.x + imgui.style.cell_padding.x * 2)
-        offset = ghost_column_size * self.ghost_columns_enabled_count
-        imgui.set_cursor_pos_x(imgui.get_cursor_pos_x() - offset)
-        pos_y = imgui.get_cursor_pos_y()
-        header_h = imgui.get_text_line_height_with_spacing() if globals.settings.table_header_outside_list else 1
-        if imgui.begin_table(
-            table_id,
-            column=cols.count,
-            flags=self.game_list_table_flags,
-            outer_size_height=header_h
-        ):
-            # Setup columns
-            self.ghost_columns_enabled_count = 0
-            can_sort = 0
-            for column in cols.items:
-                imgui.table_setup_column(column.name, column.flags | (can_sort * column.sortable) | imgui.TABLE_COLUMN_NO_REORDER)
-                # Enabled columns
-                column.enabled = bool(imgui.table_get_column_flags(column.index) & imgui.TABLE_COLUMN_IS_ENABLED)
-                # Ghosts count
-                if column.ghost and column.enabled:
-                    self.ghost_columns_enabled_count += 1
-                # Set sorting condition
-                if column is cols.manual_sort:
-                    can_sort = imgui.TABLE_COLUMN_NO_SORT * cols.manual_sort.enabled
-            self.calculate_ids(table_id, imgui.table_get_sort_specs())
-
-            if globals.settings.table_header_outside_list:
-                # Column headers
-                imgui.table_next_row(imgui.TABLE_ROW_HEADERS)
-                for column in cols.items:
-                    imgui.table_set_column_index(column.index)
-                    imgui.table_header(column.header)
-
-            imgui.end_table()
-        if not globals.settings.table_header_outside_list:
-            imgui.set_cursor_pos_y(pos_y + header_h)
 
     def get_game_cell_config(self):
         side_indent = imgui.style.item_spacing.x * 2

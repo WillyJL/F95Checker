@@ -1,14 +1,14 @@
 #include "../ui_i.h"
 
 #include "../widgets/widgets.h"
+#include "games_list_i.h"
 
 #include <globals.h>
 
 void gui_ui_tab_bar(Gui* gui) {
     UNUSED(gui);
     // Don't show tab bar
-    if(tab_list_empty_p(tabs) ||
-       (settings->filter_all_tabs && true)) { // FIXME: true -> is filtering
+    if(tab_list_empty_p(tabs) || (settings->filter_all_tabs && gui->ui_state.is_filtering)) {
         return;
     }
 
@@ -18,11 +18,11 @@ void gui_ui_tab_bar(Gui* gui) {
         // Avoid ImGui interfering with forced reordering while dragging
         select_display_tab = true;
         save_selected_tab = false;
-    } else if(false) { // FIXME: IDs are not calculated
-        // First draw since launching, need to calculate IDs
+    } else if(game_index_empty_p(gui->ui_state.game_index)) {
+        // First draw since launching, need to update index early
         // Also ImGui doesn't know yet what tab is selected
         gui->ui_state.current_tab = settings->display_tab;
-        // FIXME: calculate IDs
+        gui_ui_games_list_tick_columns(gui, false);
         select_display_tab = true;
         save_selected_tab = false;
     }
@@ -40,7 +40,8 @@ void gui_ui_tab_bar(Gui* gui) {
         size_t games_count;
 
         // First (Default/New) tab
-        games_count = 1; // FIXME: use calculated IDs
+        games_count = 1; // FIXME: uncomment when index is implemented and populated
+        // games_count = game_id_array_size(*game_index_get(gui->ui_state.game_index, -1));
         if(games_count != 0 || !settings->hide_empty_tabs) {
             m_string_printf(
                 str,
@@ -63,7 +64,8 @@ void gui_ui_tab_bar(Gui* gui) {
         TabList_it swap_tabs[2] = {};
         TabList_it prev_tab_it;
         for each(Tab_ptr, tab, TabList, tabs) {
-            games_count = 1; // FIXME: use calculated IDs
+            games_count = 1; // FIXME: uncomment when index is implemented and populated
+            // games_count = game_id_array_size(*game_index_get(gui->ui_state.game_index, tab->id));
             if(games_count == 0 && settings->hide_empty_tabs) {
                 continue;
             }
@@ -150,7 +152,7 @@ void gui_ui_tab_bar(Gui* gui) {
     if(save_selected_tab && selected_tab != gui->ui_state.current_tab) {
         // FIXME: deselect games
         gui->ui_state.current_tab = selected_tab;
-        // FIXME: recalculate IDs
+        gui->ui_state.need_game_index_update = true;
         settings->display_tab = selected_tab;
         db_save_setting(db, settings, SettingsColumn_display_tab);
     }
