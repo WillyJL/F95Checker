@@ -2,6 +2,8 @@
 
 #include "gui.h"
 
+#include <std.h>
+
 bool gui_window_init(Gui* gui);
 
 void gui_window_show(Gui* gui);

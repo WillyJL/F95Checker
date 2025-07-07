@@ -2,6 +2,8 @@
 
 #include "../gui.h"
 
+#include <std.h>
+
 void gui_ui_init(Gui* gui);
 
 f32 gui_ui_size(Gui* gui, f32 size);
