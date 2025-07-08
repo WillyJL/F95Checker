@@ -8,13 +8,13 @@
 
 #include <std.h>
 
+#define GAME_IMAGE_URL_MISSING "missing"
+
 typedef i32 GameId;
 #define M_OPL_GameId() M_INT_EX_OPL(INT32)
 
 M_ARRAY_EX_DEF(game_id_array, GameIdArray, GameId)
 #define M_OPL_GameIdArray() M_ARRAY_EX_OPL(game_id_array, GameId)
-
-#define GAME_IMAGE_URL_MISSING "missing"
 
 typedef struct {
     GameId id;

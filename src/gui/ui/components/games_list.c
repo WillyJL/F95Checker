@@ -180,7 +180,7 @@ static bool gui_ui_games_list_begin(Gui* gui, bool draw_header, bool can_reorder
         m_string_init_printf(
             table_id,
             "###game_list%d",
-            gui->ui_state.current_tab == NULL ? -1 : gui->ui_state.current_tab->id);
+            gui->ui_state.current_tab == NULL ? TAB_ID_NULL : gui->ui_state.current_tab->id);
     } else {
         m_string_init_set(table_id, "###game_list");
     }

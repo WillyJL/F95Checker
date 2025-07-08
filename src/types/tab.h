@@ -5,6 +5,9 @@
 
 #include <std.h>
 
+#define TAB_ID_NULL -1
+
+#define TAB_DFLT_NAME "New Tab"
 #define TAB_DFLT_ICON mdi_heart_box
 
 typedef i32 TabId;

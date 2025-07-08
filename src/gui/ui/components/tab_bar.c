@@ -44,7 +44,7 @@ void gui_ui_tab_bar(Gui* gui) {
         if(games_count != 0 || !settings->hide_empty_tabs) {
             m_string_printf(
                 str,
-                "%s (%d)###tab_-1",
+                "%s (%d)###tab_" XSTR(TAB_ID_NULL),
                 settings->default_tab_is_new ? mdi_alert_decagram " New" :
                                                mdi_heart_box " Default",
                 games_count);
