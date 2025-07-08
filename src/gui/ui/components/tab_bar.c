@@ -1,6 +1,5 @@
 #include "../ui_i.h"
 
-#include "../widgets/widgets.h"
 #include "games_list_i.h"
 
 #include <globals.h>

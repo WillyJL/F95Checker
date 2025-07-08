@@ -1,7 +1,7 @@
 #pragma once
 
-#include "components/components.h" // IWYU pragma: export
-#include "widgets/widgets.h" // IWYU pragma: export
+#include "components/_components.h" // IWYU pragma: export
+#include "widgets/_widgets.h" // IWYU pragma: export
 
 #include <std.h>
 
