@@ -1,9 +1,6 @@
 #pragma once
 
-#include "games.h"
-#include "labels.h"
-#include "settings.h"
-#include "tabs.h"
+#include "tables/_tables.h"
 
 #include "game/game.h"
 #include "settings/settings.h"

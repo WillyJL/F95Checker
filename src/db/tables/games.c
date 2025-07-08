@@ -1,6 +1,4 @@
-#include "games.h"
-
-#include "db_i.h"
+#include "../db_i.h"
 
 #include <globals.h>
 

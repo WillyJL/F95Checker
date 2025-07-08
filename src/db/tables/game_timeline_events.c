@@ -1,6 +1,4 @@
-#include "game_timeline_events.h"
-
-#include "db_i.h"
+#include "../db_i.h"
 
 DB_TABLE_DEFINE(_GAME_TIMELINE_EVENTS, timeline_events, GameTimelineEventsColumn)
 
