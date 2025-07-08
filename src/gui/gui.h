@@ -41,10 +41,11 @@ typedef struct {
         Tab_ptr current_tab;
         Tab_ptr dragging_tab;
         GameIndex game_index;
-        bool need_game_index_update;
+        bool need_game_index_rebuild;
         bool is_filtering;
         f32 ghost_columns_enabled_count;
         bool columns_enabled[22];
+        bool prev_manual_sort;
     } ui_state;
 
     struct {

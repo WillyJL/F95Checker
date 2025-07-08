@@ -174,6 +174,60 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
         },
 };
 
+static void gui_ui_games_list_rebuild_index(Gui* gui, ImGuiTableSortSpecs* sort_specs) {
+    GameIndex game_index;
+    game_index_init(game_index);
+
+    GameIdArray game_ids;
+    game_id_array_init(game_ids);
+
+    for each(GameDict_pair, pair, GameDict, games) {
+        Game* game = pair.value;
+        if(game->tab == NULL) {
+            game_id_array_push_back(game_ids, game->id);
+        }
+    }
+    game_index_set_at(game_index, TAB_ID_NULL, game_ids);
+
+    for each(Tab_ptr, tab, TabList, tabs) {
+        game_id_array_reset(game_ids);
+        for each(GameDict_pair, pair, GameDict, games) {
+            Game* game = pair.value;
+            if(game->tab != NULL && game->tab->id == tab->id) {
+                game_id_array_push_back(game_ids, game->id);
+            }
+        }
+        game_index_set_at(game_index, tab->id, game_ids);
+    }
+
+    game_id_array_clear(game_ids);
+
+    // FIXME: actually sort and filter
+    UNUSED(sort_specs);
+
+    game_index_move(gui->ui_state.game_index, game_index);
+}
+
+static void gui_ui_games_list_tick_index(Gui* gui, ImGuiTableSortSpecs* sort_specs) {
+    const bool is_manual_sort = gui->ui_state.columns_enabled[GamesListColumn_ManualSort];
+    if(gui->ui_state.prev_manual_sort != is_manual_sort) {
+        gui->ui_state.prev_manual_sort = is_manual_sort;
+        gui->ui_state.need_game_index_rebuild = true;
+    }
+
+    // FIXME: check if filters changed and mark for game index rebuild
+
+    if(sort_specs->SpecsDirty) {
+        sort_specs->SpecsDirty = false;
+        gui->ui_state.need_game_index_rebuild = true;
+    }
+
+    if(gui->ui_state.need_game_index_rebuild) {
+        gui->ui_state.need_game_index_rebuild = false;
+        gui_ui_games_list_rebuild_index(gui, sort_specs);
+    }
+}
+
 static bool gui_ui_games_list_begin(Gui* gui, bool draw_header, bool can_reorder, f32 height) {
     m_string_t table_id;
     if(settings->independent_tab_views) {
@@ -221,9 +275,6 @@ static bool gui_ui_games_list_begin(Gui* gui, bool draw_header, bool can_reorder
         }
         gui->ui_state.ghost_columns_enabled_count = ghost_columns_enabled_count;
 
-        // FIXME: update game index
-        // ImGui_TableGetSortSpecs();
-
         // Column headers
         if(draw_header) {
             ImGui_TableSetupScrollFreeze(0, 1);
@@ -233,6 +284,9 @@ static bool gui_ui_games_list_begin(Gui* gui, bool draw_header, bool can_reorder
                 ImGui_TableHeader(games_list_column[col].header);
             }
         }
+
+        // Rebuild game index if necessary
+        gui_ui_games_list_tick_index(gui, ImGui_TableGetSortSpecs());
     }
 
     m_string_clear(table_id);
@@ -242,7 +296,7 @@ static bool gui_ui_games_list_begin(Gui* gui, bool draw_header, bool can_reorder
 void gui_ui_games_list_tick_columns(Gui* gui, bool draw_header) {
     // HACK: get sort and column specs for list mode in grid and kanban mode
     const f32 prev_pos_y = ImGui_GetCursorPosY();
-    const f32 header_height = draw_header ? ImGui_GetTextLineHeightWithSpacing() : FLT_MIN;
+    const f32 header_height = draw_header ? ImGui_GetTextLineHeightWithSpacing() : -FLT_MIN;
     if(gui_ui_games_list_begin(gui, draw_header, false, header_height)) {
         ImGui_EndTable();
     }

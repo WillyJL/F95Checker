@@ -8,9 +8,10 @@ void gui_ui_init(Gui* gui) {
     gui->ui_state.current_tab = NULL;
     gui->ui_state.dragging_tab = NULL;
     game_index_init(gui->ui_state.game_index);
-    gui->ui_state.need_game_index_update = false;
+    gui->ui_state.need_game_index_rebuild = true;
     gui->ui_state.is_filtering = false;
     gui->ui_state.ghost_columns_enabled_count = 0;
+    gui->ui_state.prev_manual_sort = false;
 }
 
 f32 gui_ui_size(Gui* gui, f32 size) {

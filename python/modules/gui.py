@@ -2571,19 +2571,8 @@ class MainGUI():
                                 close_callback()
 
     def calculate_ids(self, table_id: str, sorts: imgui.core._ImGuiTableSortSpecs):
-        manual_sort = cols.manual_sort.enabled
-        if manual_sort != self.prev_manual_sort:
-            self.prev_manual_sort = manual_sort
-            self.recalculate_ids = True
         if self.prev_filters != self.filters:
             self.prev_filters = self.filters.copy()
-            self.recalculate_ids = True
-        if sorts.specs_dirty:
-            new_sorts = []
-            for sort_spec in sorts.specs:
-                new_sorts.insert(0, SortSpec(index=sort_spec.column_index, reverse=bool(sort_spec.sort_direction - 1)))
-            self.sorts[table_id] = new_sorts
-            sorts.specs_dirty = False
             self.recalculate_ids = True
         if self.recalculate_ids:
             self.recalculate_ids = False
@@ -2708,8 +2697,6 @@ class MainGUI():
             for game in globals.games.values():
                 if game.selected and game.id not in tab_games_ids:
                     game.selected = False
-        else:
-            tab_games_ids = self.show_games_ids[self.current_tab]
 
     def handle_game_hitbox_events(self, game: Game, drag_drop: bool = False):
         manual_sort = cols.manual_sort.enabled
