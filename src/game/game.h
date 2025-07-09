@@ -58,15 +58,16 @@ typedef struct {
     // list[bool] = None executables_valids;
     // bool = None executables_valid;
 } Game;
+#define M_OPL_Game_ptr() M_OPEXTEND(M_PTR_OPLIST, CMP(M_CMP_DEFAULT))
 
 Game* game_init(void);
 void game_free(Game* game);
 
-M_ARRAY_EX_DEF(game_array, GameArray, Game*, M_PTR_OPLIST)
-#define M_OPL_GameArray() M_ARRAY_EX_OPL(game_array, M_PTR_OPLIST)
+M_ARRAY_EX_DEF(game_array, GameArray, Game*, M_OPL_Game_ptr())
+#define M_OPL_GameArray() M_ARRAY_EX_OPL(game_array, M_OPL_Game_ptr())
 
 M_DICT_OA_EX_DEF(game_index, GameIndex, TabId, GameArray)
 #define M_OPL_GameIndex() M_DICT_OA_EX_OPL(game_index, M_OPL_TabId(), M_OPL_GameArray())
 
-M_DICT_OA_EX_DEF(game_dict, GameDict, GameId, M_OPL_GameId(), Game*, M_PTR_OPLIST)
-#define M_OPL_GameDict() M_DICT_OA_EX_OPL(game_dict, M_OPL_GameId(), M_PTR_OPLIST)
+M_DICT_OA_EX_DEF(game_dict, GameDict, GameId, M_OPL_GameId(), Game*, M_OPL_Game_ptr())
+#define M_OPL_GameDict() M_DICT_OA_EX_OPL(game_dict, M_OPL_GameId(), M_OPL_Game_ptr())

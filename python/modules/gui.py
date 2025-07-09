@@ -2768,18 +2768,9 @@ class MainGUI():
         if imgui.begin_table():
             # Loop rows
             self.sync_scroll()
-            frame_height = imgui.get_frame_height()
             notes_width = None
             for id in self.show_games_ids[self.current_tab]:
                 game = globals.games[id]
-                imgui.table_next_row()
-                imgui.table_set_column_index(cols.separator.index)
-                # Skip if outside view
-                if not imgui.is_rect_visible(imgui.io.display_size.x, frame_height):
-                    imgui.dummy(0, frame_height)
-                    continue
-                # Base row height with a buttom to align the following text calls to center vertically
-                imgui.button("", width=imgui.FLOAT_MIN)
                 # Loop columns
                 for column in cols.items:
                     if not column.enabled or column.ghost:

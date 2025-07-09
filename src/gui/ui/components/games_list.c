@@ -174,6 +174,11 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
         },
 };
 
+static i32 placeholder_sort(Game* const* a, Game* const* b) {
+    // FIXME: proper sorting
+    return ((*a)->id < (*b)->id) ? -1 : ((*a)->id > (*b)->id);
+}
+
 static void gui_ui_games_list_rebuild_index(Gui* gui, ImGuiTableSortSpecs* sort_specs) {
     GameIndex game_index;
     game_index_init(game_index);
@@ -187,6 +192,7 @@ static void gui_ui_games_list_rebuild_index(Gui* gui, ImGuiTableSortSpecs* sort_
             game_array_push_back(game_array, game);
         }
     }
+    game_array_special_sort(game_array, &placeholder_sort);
     game_index_set_at(game_index, TAB_ID_NULL, game_array);
 
     for each(Tab_ptr, tab, TabList, tabs) {
@@ -197,6 +203,7 @@ static void gui_ui_games_list_rebuild_index(Gui* gui, ImGuiTableSortSpecs* sort_
                 game_array_push_back(game_array, game);
             }
         }
+        game_array_special_sort(game_array, &placeholder_sort);
         game_index_set_at(game_index, tab->id, game_array);
     }
 
@@ -293,6 +300,56 @@ static bool gui_ui_games_list_begin(Gui* gui, bool draw_header, bool can_reorder
     return ret;
 }
 
+static void gui_ui_games_list_draw_row(Gui* gui, Game* game) {
+    // Base row height with a buttom to align the following text calls to center vertically
+    ImGui_TableSetColumnIndex(GamesListColumn_Separator);
+    ImGui_ButtonEx("", (ImVec2){FLT_MIN, 0});
+
+    for(GamesListColumn col = GamesListColumn_min(); col <= GamesListColumn_max(); col++) {
+        if(!gui->ui_state.columns_enabled[col]) continue;
+        ImGui_TableSetColumnIndex(col);
+
+        switch(col) {
+        default:
+            // FIXME: implement other columns
+            break;
+        case GamesListColumn_Name:
+            ImGui_TextUnformatted(m_string_get_cstr(game->name));
+            break;
+        }
+    }
+
+    // FIXME: implement row hitbox and click events
+}
+
+void gui_ui_games_list(Gui* gui) {
+    const f32 bottom_bar_height = ImGui_GetFrameHeightWithSpacing();
+    if(gui_ui_games_list_begin(gui, true, true, -bottom_bar_height)) {
+        // FIXME: sync scroll with other view modes
+
+        TabId tab_id = gui->ui_state.current_tab == NULL ? TAB_ID_NULL :
+                                                           gui->ui_state.current_tab->id;
+        GameArray_ptr game_array = *game_index_get(gui->ui_state.game_index, tab_id);
+
+        ImGuiListClipper clipper = {0};
+        ImGuiListClipper_Begin(
+            &clipper,
+            game_array_size(game_array),
+            ImGui_GetFrameHeightWithSpacing());
+
+        while(ImGuiListClipper_Step(&clipper)) {
+            for(i32 clip_i = clipper.DisplayStart;
+                clip_i < clipper.DisplayEnd && clip_i < (i32)game_array_size(game_array);
+                clip_i++) {
+                ImGui_TableNextRow();
+                gui_ui_games_list_draw_row(gui, *game_array_get(game_array, clip_i));
+            }
+        }
+
+        ImGui_EndTable();
+    }
+}
+
 void gui_ui_games_list_tick_columns(Gui* gui, bool draw_header) {
     // HACK: get sort and column specs for list mode in grid and kanban mode
     const f32 prev_pos_y = ImGui_GetCursorPosY();
@@ -302,13 +359,5 @@ void gui_ui_games_list_tick_columns(Gui* gui, bool draw_header) {
     }
     if(!draw_header) {
         ImGui_SetCursorPosY(prev_pos_y);
-    }
-}
-
-void gui_ui_games_list(Gui* gui) {
-    const f32 bottom_bar_height = ImGui_GetFrameHeightWithSpacing();
-    if(gui_ui_games_list_begin(gui, true, true, -bottom_bar_height)) {
-        // FIXME: implement list view
-        ImGui_EndTable();
     }
 }
