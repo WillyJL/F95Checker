@@ -109,7 +109,7 @@ typedef struct {
 
 // TODO: check if 100 queue is really useful
 M_BUFFER_EX_DEF(db_message_queue, DbMessageQueue, DbMessage, 100, M_BUFFER_QUEUE)
-#define M_OPL_DbMessageQueue() M_BUFFER_EX_OPL(db_message_queue, DbMessage)
+#define M_OPL_DbMessageQueue() M_BUFFER_EX_OPL(db_message_queue, M_OPL_DbMessage())
 
 struct Db {
     Path* path;

@@ -14,20 +14,23 @@
 SMARTENUM_DECLARE(_GameCategory, GameCategory)
 
 M_TUPLE_EX_DEF(game_download_link, GameDownloadLink, (label, m_string_t), (url, m_string_t))
-#define M_OPL_GameDownloadLink() M_TUPLE_EX_OPL(game_download_link, m_string_t, m_string_t)
+#define M_OPL_GameDownloadLink() \
+    M_TUPLE_EX_OPL(game_download_link, M_OPL_m_string_t(), M_OPL_m_string_t())
 
 M_LIST_DUAL_PUSH_EX_DEF(game_download_link_list, GameDownloadLinkList, GameDownloadLink)
 #define M_OPL_GameDownloadLinkList() \
-    M_LIST_DUAL_PUSH_EX_OPL(game_download_link_list, GameDownloadLink)
+    M_LIST_DUAL_PUSH_EX_OPL(game_download_link_list, M_OPL_GameDownloadLink())
 
 M_TUPLE_EX_DEF(game_download, GameDownload, (text, m_string_t), (links, GameDownloadLinkList))
-#define M_OPL_GameDownload() M_TUPLE_EX_OPL(game_download, m_string_t, GameDownloadLinkList)
+#define M_OPL_GameDownload() \
+    M_TUPLE_EX_OPL(game_download, M_OPL_m_string_t(), M_OPL_GameDownloadLinkList())
 
 M_LIST_DUAL_PUSH_EX_DEF(game_download_list, GameDownloadList, GameDownload)
-#define M_OPL_GameDownloadList() M_LIST_DUAL_PUSH_EX_OPL(game_download_list, GameDownload)
+#define M_OPL_GameDownloadList() M_LIST_DUAL_PUSH_EX_OPL(game_download_list, M_OPL_GameDownload())
 
 M_LIST_DUAL_PUSH_EX_DEF(game_executable_list, GameExecutableList, m_string_list_t)
-#define M_OPL_GameExecutableList() M_LIST_DUAL_PUSH_EX_OPL(game_executable_list, m_string_list_t)
+#define M_OPL_GameExecutableList() \
+    M_LIST_DUAL_PUSH_EX_OPL(game_executable_list, M_OPL_m_string_list_t())
 
 M_TUPLE_EX_DEF(
     game_review,
@@ -37,10 +40,17 @@ M_TUPLE_EX_DEF(
     (message, m_string_t),
     (likes, u32),
     (timestamp, Timestamp))
-#define M_OPL_GameReview() M_TUPLE_EX_OPL(game_review, m_string_t, u8, m_string_t, u32, Timestamp)
+#define M_OPL_GameReview()  \
+    M_TUPLE_EX_OPL(         \
+        game_review,        \
+        M_OPL_m_string_t(), \
+        M_OPL_u8(),         \
+        M_OPL_m_string_t(), \
+        M_OPL_u32(),        \
+        M_OPL_Timestamp())
 
 M_LIST_DUAL_PUSH_EX_DEF(game_review_list, GameReviewList, GameReview)
-#define M_OPL_GameReviewList() M_LIST_DUAL_PUSH_EX_OPL(game_review_list, GameReview)
+#define M_OPL_GameReviewList() M_LIST_DUAL_PUSH_EX_OPL(game_review_list, M_OPL_GameReview())
 
 #define _GameStatus(_, $) \
     _($, Normal, 1)       \
@@ -233,6 +243,7 @@ extern const GameTagInfo game_tag[1 + GameTag_COUNT];
     _($, RecheckExpired, 14) /* Unused */ \
     _($, RecheckUserReq, 15)
 SMARTENUM_DECLARE(_GameTimelineEventType, GameTimelineEventType)
+#define M_OPL_GameTimelineEventType() M_BASIC_OPLIST
 typedef struct {
     const char* display;
     const char* icon;
@@ -247,12 +258,16 @@ M_TUPLE_EX_DEF(
     (type, GameTimelineEventType),
     (timestamp, Timestamp),
     (arguments, m_string_list_t))
-#define M_OPL_GameTimelineEvent() \
-    M_TUPLE_EX_OPL(game_timeline_event, GameTimelineEventType, Timestamp, m_string_list_t)
+#define M_OPL_GameTimelineEvent()      \
+    M_TUPLE_EX_OPL(                    \
+        game_timeline_event,           \
+        M_OPL_GameTimelineEventType(), \
+        M_OPL_Timestamp(),             \
+        M_OPL_m_string_list_t())
 
 M_LIST_DUAL_PUSH_EX_DEF(game_timeline_event_list, GameTimelineEventList, GameTimelineEvent)
 #define M_OPL_GameTimelineEventList() \
-    M_LIST_DUAL_PUSH_EX_OPL(game_timeline_event_list, GameTimelineEvent)
+    M_LIST_DUAL_PUSH_EX_OPL(game_timeline_event_list, M_OPL_GameTimelineEvent())
 
 #define _GameType(_, $) \
     _($, ADRIFT, 2)     \

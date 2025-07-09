@@ -135,38 +135,34 @@ typedef struct {
 #define M_ARRAY_EX_DEF(name, name_t, ...)                  \
     M_ARRAY_DEF_AS(name, name_t, name_t##_it, __VA_ARGS__) \
     typedef name##_ptr name_t##_ptr;
-#define M_ARRAY_EX_OPL(name, type_t) M_ARRAY_OPLIST(name, M_GLOBAL_OPLIST_OR_DEF(type_t)())
+#define M_ARRAY_EX_OPL(name, oplist) M_ARRAY_OPLIST(name, oplist)
 
 #define M_BUFFER_EX_DEF(name, name_t, ...)     \
     M_BUFFER_DEF_AS(name, name_t, __VA_ARGS__) \
     typedef name##_ptr name_t##_ptr;
-#define M_BUFFER_EX_OPL(name, type_t) M_BUFFER_OPLIST(name, M_GLOBAL_OPLIST_OR_DEF(type_t)())
+#define M_BUFFER_EX_OPL(name, oplist) M_BUFFER_OPLIST(name, oplist)
 
 #define M_DICT_EX_DEF(name, name_t, ...)                                   \
     M_DICT_DEF2_AS(name, name_t, name_t##_it, name_t##_itref, __VA_ARGS__) \
     typedef name##_ptr name_t##_ptr;                                       \
     typedef name##_pair_ct name_t##_pair;
-#define M_DICT_EX_OPL(name, key_t, value_t) \
-    M_DICT_OPLIST(name, M_GLOBAL_OPLIST_OR_DEF(key_t)(), M_GLOBAL_OPLIST_OR_DEF(value_t)())
+#define M_DICT_EX_OPL(name, key_opl, value_opl) M_DICT_OPLIST(name, key_opl, value_opl)
 
 #define M_DICT_OA_EX_DEF(name, name_t, ...)                                   \
     M_DICT_OA_DEF2_AS(name, name_t, name_t##_it, name_t##_itref, __VA_ARGS__) \
     typedef name##_ptr name_t##_ptr;                                          \
     typedef name##_pair_ct name_t##_pair;
-#define M_DICT_OA_EX_OPL(name, key_t, value_t) \
-    M_DICT_OPLIST(name, M_GLOBAL_OPLIST_OR_DEF(key_t)(), M_GLOBAL_OPLIST_OR_DEF(value_t)())
+#define M_DICT_OA_EX_OPL(name, key_opl, value_opl) M_DICT_OPLIST(name, key_opl, value_opl)
 
 #define M_LIST_DUAL_PUSH_EX_DEF(name, name_t, ...)                  \
     M_LIST_DUAL_PUSH_DEF_AS(name, name_t, name_t##_it, __VA_ARGS__) \
     typedef name##_ptr name_t##_ptr;
-#define M_LIST_DUAL_PUSH_EX_OPL(name, type_t) M_LIST_OPLIST(name, M_GLOBAL_OPLIST_OR_DEF(type_t)())
+#define M_LIST_DUAL_PUSH_EX_OPL(name, oplist) M_LIST_OPLIST(name, oplist)
 
 #define M_TUPLE_EX_DEF(name, name_t, ...)      \
     M_TUPLE_DEF2_AS(name, name_t, __VA_ARGS__) \
     typedef name##_ptr name_t##_ptr;
-#define M_GLOBAL_OPLIST_OR_DEF_CALL(type_t) M_GLOBAL_OPLIST_OR_DEF(type_t)()
-#define M_TUPLE_EX_OPL(name, ...) \
-    M_TUPLE_OPLIST(name, M_MAP_C(M_GLOBAL_OPLIST_OR_DEF_CALL, __VA_ARGS__))
+#define M_TUPLE_EX_OPL(name, ...) M_TUPLE_OPLIST(name, __VA_ARGS__)
 
 /*
  * Based on: https://github.com/P-p-H-d/mlib/blob/5c57ad1f5185446842210934d022266f926a8aeb/example/ex-dict05.c
@@ -177,17 +173,43 @@ typedef struct {
  * deleted (1) is INT_MIN + 1
  * So valid range for integers are [INT_MIN+2, INT_MAX]
  */
-#define M_INT32_OOR_EQUAL(n, oor) (n == INT32_MIN + oor)
-#define M_INT32_OOR_SET(oor)      (INT32_MIN + oor)
-#define M_INT_OOR_EQUAL(int)      M_##int##_OOR_EQUAL
-#define M_INT_OOR_SET(int)        M_##int##_OOR_SET
-#define M_INT_HASH(n)             ((size_t)n) // Identity hash!
+#define M_i8_OOR_EQUAL(n, oor)  (n == INT8_MIN + oor)
+#define M_i8_OOR_SET(oor)       (INT8_MIN + oor)
+#define M_i16_OOR_EQUAL(n, oor) (n == INT16_MIN + oor)
+#define M_i16_OOR_SET(oor)      (INT16_MIN + oor)
+#define M_i32_OOR_EQUAL(n, oor) (n == INT32_MIN + oor)
+#define M_i32_OOR_SET(oor)      (INT32_MIN + oor)
+#define M_i64_OOR_EQUAL(n, oor) (n == INT64_MIN + oor)
+#define M_i64_OOR_SET(oor)      (INT64_MIN + oor)
+#define M_u8_OOR_EQUAL(n, oor)  (n == UINT8_MAX - oor)
+#define M_u8_OOR_SET(oor)       (UINT8_MAX - oor)
+#define M_u16_OOR_EQUAL(n, oor) (n == UINT16_MAX - oor)
+#define M_u16_OOR_SET(oor)      (UINT16_MAX - oor)
+#define M_u32_OOR_EQUAL(n, oor) (n == UINT32_MAX - oor)
+#define M_u32_OOR_SET(oor)      (UINT32_MAX - oor)
+#define M_u64_OOR_EQUAL(n, oor) (n == UINT64_MAX - oor)
+#define M_u64_OOR_SET(oor)      (UINT64_MAX - oor)
+#define M_INT_OOR_EQUAL(int)    M_##int##_OOR_EQUAL
+#define M_INT_OOR_SET(int)      M_##int##_OOR_SET
+#define M_INT_HASH(n)           ((size_t)n) // Identity hash!
 #define M_INT_EX_OPL(int)                       \
     M_OPEXTEND(                                 \
         M_BASIC_OPLIST,                         \
         OOR_EQUAL(API_0(M_INT_OOR_EQUAL(int))), \
         OOR_SET(API_4(M_INT_OOR_SET(int))),     \
         HASH(M_INT_HASH))
+
+#define M_OPL_i8()   M_INT_EX_OPL(i8)
+#define M_OPL_i16()  M_INT_EX_OPL(i16)
+#define M_OPL_i32()  M_INT_EX_OPL(i32)
+#define M_OPL_i64()  M_INT_EX_OPL(i64)
+#define M_OPL_u8()   M_INT_EX_OPL(u8)
+#define M_OPL_u16()  M_INT_EX_OPL(u16)
+#define M_OPL_u32()  M_INT_EX_OPL(u32)
+#define M_OPL_u64()  M_INT_EX_OPL(u64)
+#define M_OPL_f32()  M_BASIC_OPLIST
+#define M_OPL_f64()  M_BASIC_OPLIST
+#define M_OPL_f128() M_BASIC_OPLIST
 
 // Based on M_EACH() but also dereferences item pointer for convenience;
 // container and container_t are swapped to resemble variable declaration.
@@ -227,7 +249,7 @@ typedef struct {
 // clang-format on
 
 M_LIST_DUAL_PUSH_DEF(m_string_list, m_string_t)
-#define M_OPL_m_string_list_t() M_LIST_DUAL_PUSH_EX_OPL(m_string_list, m_string_t)
+#define M_OPL_m_string_list_t() M_LIST_OPLIST(m_string_list, M_OPL_m_string_t())
 
 typedef struct m_bstring_s* m_bstring_ptr;
 
