@@ -178,29 +178,29 @@ static void gui_ui_games_list_rebuild_index(Gui* gui, ImGuiTableSortSpecs* sort_
     GameIndex game_index;
     game_index_init(game_index);
 
-    GameIdArray game_ids;
-    game_id_array_init(game_ids);
+    GameArray game_array;
+    game_array_init(game_array);
 
     for each(GameDict_pair, pair, GameDict, games) {
         Game* game = pair.value;
         if(game->tab == NULL) {
-            game_id_array_push_back(game_ids, game->id);
+            game_array_push_back(game_array, game);
         }
     }
-    game_index_set_at(game_index, TAB_ID_NULL, game_ids);
+    game_index_set_at(game_index, TAB_ID_NULL, game_array);
 
     for each(Tab_ptr, tab, TabList, tabs) {
-        game_id_array_reset(game_ids);
+        game_array_reset(game_array);
         for each(GameDict_pair, pair, GameDict, games) {
             Game* game = pair.value;
             if(game->tab != NULL && game->tab->id == tab->id) {
-                game_id_array_push_back(game_ids, game->id);
+                game_array_push_back(game_array, game);
             }
         }
-        game_index_set_at(game_index, tab->id, game_ids);
+        game_index_set_at(game_index, tab->id, game_array);
     }
 
-    game_id_array_clear(game_ids);
+    game_array_clear(game_array);
 
     // FIXME: actually sort and filter
     UNUSED(sort_specs);

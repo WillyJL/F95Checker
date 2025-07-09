@@ -39,7 +39,7 @@ void gui_ui_tab_bar(Gui* gui) {
         size_t games_count;
 
         // First (Default/New) tab
-        games_count = game_id_array_size(*game_index_get(gui->ui_state.game_index, TAB_ID_NULL));
+        games_count = game_array_size(*game_index_get(gui->ui_state.game_index, TAB_ID_NULL));
         if(games_count != 0 || !settings->hide_empty_tabs) {
             m_string_printf(
                 str,
@@ -62,7 +62,7 @@ void gui_ui_tab_bar(Gui* gui) {
         TabList_it swap_tabs[2] = {};
         TabList_it prev_tab_it;
         for each(Tab_ptr, tab, TabList, tabs) {
-            games_count = game_id_array_size(*game_index_get(gui->ui_state.game_index, tab->id));
+            games_count = game_array_size(*game_index_get(gui->ui_state.game_index, tab->id));
             if(games_count == 0 && settings->hide_empty_tabs) {
                 continue;
             }
