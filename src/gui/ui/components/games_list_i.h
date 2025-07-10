@@ -4,29 +4,29 @@
 
 #include <std.h>
 
-#define _GamesListColumn(_, $) \
-    _($, ManualSort, 0)        \
-    _($, Version, 1)           \
-    _($, FinishedVersion, 2)   \
-    _($, InstalledVersion, 3)  \
-    _($, StatusAfterName, 4)   \
-    _($, Separator, 5)         \
-    _($, PlayButton, 6)        \
-    _($, Type, 7)              \
-    _($, Name, 8)              \
-    _($, Developer, 9)         \
-    _($, LastUpdated, 10)      \
-    _($, LastLaunched, 11)     \
-    _($, AddedOn, 12)          \
-    _($, Finished, 13)         \
-    _($, Installed, 14)        \
-    _($, Rating, 15)           \
-    _($, Notes, 16)            \
-    _($, OpenThread, 17)       \
-    _($, CopyLink, 18)         \
-    _($, OpenFolder, 19)       \
-    _($, StatusOwnColumn, 20)  \
-    _($, ForumScore, 21)
+#define _GamesListColumn(_, $)  \
+    _($, ManualSort, 0)         \
+    _($, Version, 1)            \
+    _($, FinishedVersion, 2)    \
+    _($, InstalledVersion, 3)   \
+    _($, StatusAfterName, 4)    \
+    _($, Separator, 5)          \
+    _($, LaunchButton, 6)       \
+    _($, Type, 7)               \
+    _($, Name, 8)               \
+    _($, Developer, 9)          \
+    _($, LastUpdated, 10)       \
+    _($, LastLaunched, 11)      \
+    _($, AddedOn, 12)           \
+    _($, FinishedCheckbox, 13)  \
+    _($, InstalledCheckbox, 14) \
+    _($, Rating, 15)            \
+    _($, Notes, 16)             \
+    _($, OpenUrlButton, 17)     \
+    _($, CopyUrlButton, 18)     \
+    _($, OpenFolderButton, 19)  \
+    _($, StatusOwnColumn, 20)   \
+    _($, Score, 21)
 SMARTENUM_DECLARE(_GamesListColumn, GamesListColumn)
 typedef struct {
     const char* icon;

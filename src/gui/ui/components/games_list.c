@@ -58,10 +58,10 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
             .flags = games_list_ghost_column_flags | ImGuiTableColumnFlags_NoHide,
             .ghost = true,
         },
-    [GamesListColumn_PlayButton] =
+    [GamesListColumn_LaunchButton] =
         {
             .icon = mdi_play,
-            .label = mdi_play " Play Button",
+            .label = mdi_play " Launch Button",
             .header = "",
             .flags = ImGuiTableColumnFlags_NoSort | ImGuiTableColumnFlags_NoResize,
         },
@@ -107,17 +107,17 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
             .header = "Added On",
             .flags = ImGuiTableColumnFlags_DefaultHide | ImGuiTableColumnFlags_NoResize,
         },
-    [GamesListColumn_Finished] =
+    [GamesListColumn_FinishedCheckbox] =
         {
             .icon = mdi_flag_checkered,
-            .label = mdi_flag_checkered " Finished",
+            .label = mdi_flag_checkered " Finished Checkbox",
             .header = mdi_flag_checkered,
             .flags = ImGuiTableColumnFlags_NoResize,
         },
-    [GamesListColumn_Installed] =
+    [GamesListColumn_InstalledCheckbox] =
         {
             .icon = mdi_download,
-            .label = mdi_download " Installed",
+            .label = mdi_download " Installed Checkbox",
             .header = mdi_download,
             .flags = ImGuiTableColumnFlags_NoResize,
         },
@@ -135,25 +135,25 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
             .header = "Notes",
             .flags = ImGuiTableColumnFlags_DefaultHide,
         },
-    [GamesListColumn_OpenThread] =
+    [GamesListColumn_OpenUrlButton] =
         {
             .icon = mdi_open_in_new,
-            .label = mdi_open_in_new " Open Thread",
+            .label = mdi_open_in_new " Open URL Button",
             .header = "",
             .flags = ImGuiTableColumnFlags_NoSort | ImGuiTableColumnFlags_NoResize,
         },
-    [GamesListColumn_CopyLink] =
+    [GamesListColumn_CopyUrlButton] =
         {
             .icon = mdi_content_copy,
-            .label = mdi_content_copy " Copy Link",
+            .label = mdi_content_copy " Copy URL Button",
             .header = "",
             .flags = ImGuiTableColumnFlags_DefaultHide | ImGuiTableColumnFlags_NoSort |
                      ImGuiTableColumnFlags_NoResize,
         },
-    [GamesListColumn_OpenFolder] =
+    [GamesListColumn_OpenFolderButton] =
         {
             .icon = mdi_folder_open_outline,
-            .label = mdi_folder_open_outline " Open Folder",
+            .label = mdi_folder_open_outline " Open Folder Button",
             .header = "",
             .flags = ImGuiTableColumnFlags_DefaultHide | ImGuiTableColumnFlags_NoSort |
                      ImGuiTableColumnFlags_NoResize,
@@ -165,7 +165,7 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
             .header = "",
             .flags = ImGuiTableColumnFlags_DefaultHide | ImGuiTableColumnFlags_NoResize,
         },
-    [GamesListColumn_ForumScore] =
+    [GamesListColumn_Score] =
         {
             .icon = mdi_message_star,
             .label = mdi_message_star " Forum Score",
@@ -313,8 +313,53 @@ static void gui_ui_games_list_draw_row(Gui* gui, Game* game) {
         default:
             // FIXME: implement other columns
             break;
+        case GamesListColumn_LaunchButton:
+            gui_ui_game_launch_button(gui, game);
+            break;
+        case GamesListColumn_Type:
+            gui_ui_game_type(gui, game);
+            break;
         case GamesListColumn_Name:
-            ImGui_TextUnformatted(m_string_get_cstr(game->name));
+            gui_ui_game_name(gui, game);
+            break;
+        case GamesListColumn_Developer:
+            gui_ui_game_developer(gui, game);
+            break;
+        case GamesListColumn_LastUpdated:
+            gui_ui_game_last_updated(gui, game);
+            break;
+        case GamesListColumn_LastLaunched:
+            gui_ui_game_last_launched(gui, game);
+            break;
+        case GamesListColumn_AddedOn:
+            gui_ui_game_added_on(gui, game);
+            break;
+        case GamesListColumn_FinishedCheckbox:
+            gui_ui_game_finished_checkbox(gui, game);
+            break;
+        case GamesListColumn_InstalledCheckbox:
+            gui_ui_game_installed_checkbox(gui, game);
+            break;
+        case GamesListColumn_Rating:
+            gui_ui_game_rating(gui, game);
+            break;
+        case GamesListColumn_Notes:
+            gui_ui_game_notes(gui, game);
+            break;
+        case GamesListColumn_OpenUrlButton:
+            gui_ui_game_open_url_button(gui, game);
+            break;
+        case GamesListColumn_CopyUrlButton:
+            gui_ui_game_copy_url_button(gui, game);
+            break;
+        case GamesListColumn_OpenFolderButton:
+            gui_ui_game_open_folder_button(gui, game);
+            break;
+        case GamesListColumn_StatusOwnColumn:
+            gui_ui_game_status(gui, game);
+            break;
+        case GamesListColumn_Score:
+            gui_ui_game_score(gui, game);
             break;
         }
     }
