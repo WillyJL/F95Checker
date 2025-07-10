@@ -77,14 +77,15 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
             .icon = mdi_gamepad_variant,
             .label = mdi_gamepad_variant " Name",
             .header = "Name",
-            .flags = ImGuiTableColumnFlags_NoHide,
+            .flags = ImGuiTableColumnFlags_NoHide | ImGuiTableColumnFlags_WidthStretch |
+                     ImGuiTableColumnFlags_DefaultSort,
         },
     [GamesListColumn_Developer] =
         {
             .icon = mdi_account,
             .label = mdi_account " Developer",
             .header = "Developer",
-            .flags = ImGuiTableColumnFlags_DefaultHide,
+            .flags = ImGuiTableColumnFlags_DefaultHide | ImGuiTableColumnFlags_WidthStretch,
         },
     [GamesListColumn_LastUpdated] =
         {
@@ -133,7 +134,7 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
             .icon = mdi_draw_pen,
             .label = mdi_draw_pen " Notes",
             .header = "Notes",
-            .flags = ImGuiTableColumnFlags_DefaultHide,
+            .flags = ImGuiTableColumnFlags_DefaultHide | ImGuiTableColumnFlags_WidthStretch,
         },
     [GamesListColumn_OpenUrlButton] =
         {
