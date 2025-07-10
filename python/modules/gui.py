@@ -951,16 +951,6 @@ class MainGUI():
                     if game.selected:
                         callbacks.launch_game(game)
 
-    def draw_game_name_text(self, game: Game):
-        if game.archived:
-            imgui.text_disabled(game.name)
-        elif game.finished == game.version:
-            imgui.text(game.name)
-        else:
-            imgui.text_colored(game.name, *globals.settings.style_accent)
-        if imgui.is_item_clicked(imgui.MOUSE_BUTTON_MIDDLE):
-            callbacks.clipboard_copy(game.name)
-
     def draw_game_finished_checkbox(self, game: Game, label=""):
         if game:
             installed_finished = game.finished == (game.installed or game.version)
@@ -2825,20 +2815,6 @@ class MainGUI():
                                     if cols.installed_version.enabled and game.installed:
                                         versions.append(f"{cols.installed_version.name[0]} {game.installed}")
                                 imgui.text_disabled("  |  ".join(versions))
-                        case cols.developer.index:
-                            imgui.text(game.developer or "Unknown")
-                        case cols.last_updated.index:
-                            imgui.push_font(imgui.fonts.mono)
-                            imgui.text(game.last_updated.display or "Unknown")
-                            imgui.pop_font()
-                        case cols.last_launched.index:
-                            imgui.push_font(imgui.fonts.mono)
-                            imgui.text(game.last_launched.display or "Never")
-                            imgui.pop_font()
-                        case cols.added_on.index:
-                            imgui.push_font(imgui.fonts.mono)
-                            imgui.text(game.added_on.display)
-                            imgui.pop_font()
                         case cols.finished.index:
                             self.draw_game_finished_checkbox(game)
                         case cols.installed.index:

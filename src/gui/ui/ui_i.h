@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../gui.h"
+
 #include "components/_components.h" // IWYU pragma: export
 #include "widgets/_widgets.h" // IWYU pragma: export
 
