@@ -321,6 +321,11 @@ static void gui_ui_games_list_draw_row(Gui* gui, Game* game) {
             gui_ui_game_type(gui, game);
             break;
         case GamesListColumn_Name:
+            if(settings->show_remove_btn) {
+                gui_ui_game_remove_button(gui, game);
+                ImGui_SameLine();
+            }
+            gui_ui_game_icons(gui, game);
             gui_ui_game_name(gui, game);
             break;
         case GamesListColumn_Developer:

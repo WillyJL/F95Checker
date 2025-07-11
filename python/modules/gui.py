@@ -811,100 +811,17 @@ class MainGUI():
             imgui.end_group()
 
     def draw_game_update_icon(self, game: Game):
-        quick_filter = globals.settings.quick_filters
-        with imgui.begin_group():
-            pos = imgui.get_cursor_pos()
-            imgui.text_colored(icons.star_circle, 0.85, 0.85, 0.00)
-            imgui.set_cursor_pos(pos)
-            imgui.invisible_button("", *imgui.get_item_rect_size())
-        if imgui.is_item_hovered():
-            imgui.begin_tooltip()
-            imgui.push_text_wrap_pos(min(imgui.get_font_size() * 35, imgui.io.display_size.x))
-            imgui.text("This game has been updated!")
-            imgui.text_disabled("Installed:")
-            imgui.same_line()
-            imgui.text(game.installed or 'N/A')
-            imgui.text_disabled("Latest:")
-            imgui.same_line()
-            imgui.text(game.version)
-            imgui.text(
-                "To remove this update marker:\n"
-                f"{icons.menu_right} Middle click\n"
-                f"{icons.menu_right} Alt + Left click\n"
-                f"{icons.menu_right} Mark game as installed"
-            )
-            imgui.pop_text_wrap_pos()
-            imgui.end_tooltip()
-        if imgui.is_item_clicked(imgui.MOUSE_BUTTON_MIDDLE):
-            # Middle click - remove update marker
-            game.updated = False
         if imgui.is_item_clicked(imgui.MOUSE_BUTTON_LEFT):
-            if imgui.is_key_down(glfw.KEY_LEFT_ALT):
-                # Alt + left click - remove update marker
-                game.updated = False
-            elif quick_filter:
+            if quick_filter:
                 # Left click - trigger quick filter
                 flt = Filter(FilterMode.Updated)
                 self.filters.append(flt)
 
-    def draw_game_unknown_tags_icon(self, game: Game):
-        with imgui.begin_group():
-            pos = imgui.get_cursor_pos()
-            imgui.text_colored(icons.progress_tag, 1.00, 0.65, 0.00)
-            imgui.set_cursor_pos(pos)
-            imgui.invisible_button("", *imgui.get_item_rect_size())
-        if imgui.is_item_hovered():
-            imgui.begin_tooltip()
-            imgui.push_text_wrap_pos(min(imgui.get_font_size() * 35, imgui.io.display_size.x))
-            imgui.text(
-                "This game has new tags that F95Checker failed to recognize:\n"
-                + "\n".join(f" - {tag}" for tag in game.unknown_tags)
-            )
-            imgui.text(
-                "To copy them:\n"
-                f"{icons.menu_right} Shift + Left click\n"
-                f"{icons.menu_right} Use Copy button in Tags section\n"
-            )
-            imgui.text(
-                "To remove this marker:\n"
-                f"{icons.menu_right} Middle click\n"
-                f"{icons.menu_right} Alt + Left click\n"
-            )
-            imgui.pop_text_wrap_pos()
-            imgui.end_tooltip()
-        if imgui.is_item_clicked(imgui.MOUSE_BUTTON_MIDDLE):
-            # Middle click - remove unknown tags marker
-            game.unknown_tags_flag = False
-        if imgui.is_item_clicked(imgui.MOUSE_BUTTON_LEFT):
-            if imgui.is_key_down(glfw.KEY_LEFT_ALT):
-                # Alt + left click - remove unknown tags marker
-                game.unknown_tags_flag = False
-            elif imgui.is_key_down(glfw.KEY_LEFT_SHIFT):
-                # Shift + left click - copy tags to clipboard
-                callbacks.clipboard_copy(", ".join(game.unknown_tags))
-
     def draw_game_archive_icon(self, game: Game):
-        quick_filter = globals.settings.quick_filters
         if quick_filter:
-            imgui.begin_group()
-            pos = imgui.get_cursor_pos()
-        imgui.text_disabled(icons.archive)
-        if quick_filter:
-            imgui.set_cursor_pos(pos)
             if imgui.invisible_button("", *imgui.get_item_rect_size()):
                 flt = Filter(FilterMode.Archived)
                 self.filters.append(flt)
-            imgui.end_group()
-        self.draw_hover_text(
-            "This game is archived!\n"
-            "In this state you won't receive update notifications for\n"
-            "this game and it will stay at the bottom of the list.\n"
-            "Middle click to remove it from the archive, alternatively\n"
-            "use the right click menu to do the same.",
-            text=None,
-        )
-        if imgui.is_item_clicked(imgui.MOUSE_BUTTON_MIDDLE):
-            game.archived = False
 
     def draw_game_more_info_button(self, game: Game, label="", selectable=False, carousel_ids: list = None):
         if selectable:
@@ -2775,20 +2692,7 @@ class MainGUI():
                             if globals.settings.show_remove_btn:
                                 self.draw_game_remove_button(game, icons.trash_can_outline)
                                 imgui.same_line()
-                            if game.archived:
-                                self.draw_game_archive_icon(game)
-                                imgui.same_line()
-                            if game.updated:
-                                self.draw_game_update_icon(game)
-                                imgui.same_line()
-                            if game.unknown_tags_flag:
-                                self.draw_game_unknown_tags_icon(game)
-                                imgui.same_line()
                             self.draw_game_name_text(game)
-                            if game.notes:
-                                imgui.same_line()
-                                imgui.text_colored(icons.draw_pen, 0.85, 0.20, 0.85)
-                                self.draw_hover_text(game.notes, text=None)
                             if game.labels:
                                 imgui.same_line()
                                 self.draw_game_labels_widget(game, wrap=False, small=True, align=True)
