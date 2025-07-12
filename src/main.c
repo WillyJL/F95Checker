@@ -41,6 +41,7 @@ i32 main(i32 argc, char** argv) {
 
     game_dict_init(games);
     db_load_games(db, games);
+    settings_after_games_load(settings, games);
 
     cookie_dict_init(cookies);
     db_load_cookies(db, cookies);

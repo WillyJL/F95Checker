@@ -54,7 +54,7 @@ typedef struct {
     bool insecure_ssl;
     f32 interface_scaling;
     Timestamp last_successful_refresh;
-    GameIdArray manual_sort_list;
+    GameArray manual_sort_list;
     bool mark_installed_after_add;
     i32 max_connections;
     i32 max_retries;
@@ -102,7 +102,12 @@ typedef struct {
     i32 zoom_area;
     bool zoom_enabled;
     f32 zoom_times;
+
+    GameIdArray _manual_sort_list_temp;
 } Settings;
 
 Settings* settings_init(void);
+
+void settings_after_games_load(Settings* settings, GameDict_ptr games);
+
 void settings_free(Settings* settings);

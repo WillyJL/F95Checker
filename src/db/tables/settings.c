@@ -98,11 +98,14 @@ static void db_parse_settings(Db* db, sqlite3_stmt* stmt, Settings* settings) {
 
     json_object* manual_sort_list_json = sqlite3_column_json(stmt, col++);
     game_id_array_resize(
-        settings->manual_sort_list,
+        settings->_manual_sort_list_temp,
         json_object_array_length(manual_sort_list_json));
     for(size_t i = 0; i < json_object_array_length(manual_sort_list_json); i++) {
         json_object* manual_sort_id = json_object_array_get_idx(manual_sort_list_json, i);
-        game_id_array_set_at(settings->manual_sort_list, i, json_object_get_int(manual_sort_id));
+        game_id_array_set_at(
+            settings->_manual_sort_list_temp,
+            i,
+            json_object_get_int(manual_sort_id));
     }
     json_object_put(manual_sort_list_json);
 
@@ -356,9 +359,9 @@ void db_do_save_setting(Db* db, Settings* settings, SettingsColumn column) {
         break;
     case SettingsColumn_manual_sort_list:
         json_object* manual_sort_list_json =
-            json_object_new_array_ext(game_id_array_size(settings->manual_sort_list));
-        for each(GameId, id, GameIdArray, settings->manual_sort_list) {
-            json_object_array_add(manual_sort_list_json, json_object_new_int(id));
+            json_object_new_array_ext(game_id_array_size(settings->_manual_sort_list_temp));
+        for each(Game*, game, GameArray, settings->manual_sort_list) {
+            json_object_array_add(manual_sort_list_json, json_object_new_int(game->id));
         }
         res = sqlite3_bind_json(stmt, 1, manual_sort_list_json);
         json_object_put(manual_sort_list_json);
