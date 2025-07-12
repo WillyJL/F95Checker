@@ -14,7 +14,7 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
         {
             .icon = mdi_cursor_move,
             .label = mdi_cursor_move " Manual Sort",
-            .header = "",
+            .header = "##Manual Sort",
             .flags = games_list_ghost_column_flags | ImGuiTableColumnFlags_DefaultHide,
             .ghost = true,
         },
@@ -22,7 +22,7 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
         {
             .icon = mdi_star_shooting,
             .label = mdi_star_shooting " Version",
-            .header = "",
+            .header = "##Version",
             .flags = games_list_ghost_column_flags,
             .ghost = true,
         },
@@ -30,7 +30,7 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
         {
             .icon = mdi_flag_checkered,
             .label = mdi_flag_checkered " Finished Version",
-            .header = "",
+            .header = "##Finished Version",
             .flags = games_list_ghost_column_flags | ImGuiTableColumnFlags_DefaultHide,
             .ghost = true,
         },
@@ -38,7 +38,7 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
         {
             .icon = mdi_download,
             .label = mdi_download " Installed Version",
-            .header = "",
+            .header = "##Installed Version",
             .flags = games_list_ghost_column_flags | ImGuiTableColumnFlags_DefaultHide,
             .ghost = true,
         },
@@ -46,7 +46,7 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
         {
             .icon = mdi_checkbox_marked_circle,
             .label = mdi_checkbox_marked_circle " Status (after name)",
-            .header = "",
+            .header = "##Status (after name)",
             .flags = games_list_ghost_column_flags,
             .ghost = true,
         },
@@ -54,7 +54,7 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
         {
             .icon = "",
             .label = "-----------------------------------",
-            .header = "",
+            .header = "##-----------------------------------",
             .flags = games_list_ghost_column_flags | ImGuiTableColumnFlags_NoHide,
             .ghost = true,
         },
@@ -62,7 +62,7 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
         {
             .icon = mdi_play,
             .label = mdi_play " Launch Button",
-            .header = "",
+            .header = "##Launch Button",
             .flags = ImGuiTableColumnFlags_NoSort | ImGuiTableColumnFlags_NoResize,
         },
     [GamesListColumn_Type] =
@@ -140,14 +140,14 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
         {
             .icon = mdi_open_in_new,
             .label = mdi_open_in_new " Open URL Button",
-            .header = "",
+            .header = "##Open URL Button",
             .flags = ImGuiTableColumnFlags_NoSort | ImGuiTableColumnFlags_NoResize,
         },
     [GamesListColumn_CopyUrlButton] =
         {
             .icon = mdi_content_copy,
             .label = mdi_content_copy " Copy URL Button",
-            .header = "",
+            .header = "##Copy URL Button",
             .flags = ImGuiTableColumnFlags_DefaultHide | ImGuiTableColumnFlags_NoSort |
                      ImGuiTableColumnFlags_NoResize,
         },
@@ -155,7 +155,7 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
         {
             .icon = mdi_folder_open_outline,
             .label = mdi_folder_open_outline " Open Folder Button",
-            .header = "",
+            .header = "##Open Folder Button",
             .flags = ImGuiTableColumnFlags_DefaultHide | ImGuiTableColumnFlags_NoSort |
                      ImGuiTableColumnFlags_NoResize,
         },
@@ -163,7 +163,7 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
         {
             .icon = mdi_checkbox_marked_circle,
             .label = mdi_checkbox_marked_circle " Status (own column)",
-            .header = "",
+            .header = "##Status (own column)",
             .flags = ImGuiTableColumnFlags_DefaultHide | ImGuiTableColumnFlags_NoResize,
         },
     [GamesListColumn_Score] =
