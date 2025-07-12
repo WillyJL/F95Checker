@@ -3,12 +3,15 @@
     // Extension identifier format: ${publisher}.${name}. Example: vscode.csharp
     // List of extensions which should be recommended for users of this workspace.
     "recommendations": [
+        "ms-python.black-formatter",
         "llvm-vs-code-extensions.vscode-clangd",
-        "twxs.cmake",
-        "ms-vscode.cmake-tools",
+        "mrmomo.meson-build",
+        "vadimcn.vscode-lldb",
+        "webfreak.debug",
     ],
     // List of extensions recommended by VS Code that should not be recommended for users of this workspace.
     "unwantedRecommendations": [
         "ms-vscode.cpptools",
+        "mesonbuild.mesonbuild",
     ]
 }

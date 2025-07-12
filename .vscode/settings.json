@@ -5,5 +5,4 @@
         "--clang-tidy",
         "--header-insertion=never",
     ],
-    "mesonbuild.configureOnOpen": false,
 }

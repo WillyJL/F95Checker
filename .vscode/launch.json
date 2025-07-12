@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "LLDB",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/current/F95Checker",
+            "cwd": "${workspaceFolder}/build/current",
+            "internalConsoleOptions": "openOnSessionStart",
+            "terminal": "console",
+        },
+        {
+            "name": "GDB",
+            "type": "gdb",
+            "request": "launch",
+            "target": "${workspaceFolder}/build/current/F95Checker",
+            "cwd": "${workspaceFolder}/build/current",
+            "internalConsoleOptions": "openOnSessionStart",
+        }
+    ]
+}
