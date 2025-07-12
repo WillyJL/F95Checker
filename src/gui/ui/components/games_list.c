@@ -92,21 +92,23 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
             .icon = mdi_update,
             .label = mdi_update " Last Updated",
             .header = "Last Updated",
-            .flags = ImGuiTableColumnFlags_NoResize,
+            .flags = ImGuiTableColumnFlags_PreferSortDescending | ImGuiTableColumnFlags_NoResize,
         },
     [GamesListColumn_LastLaunched] =
         {
             .icon = mdi_play,
             .label = mdi_play " Last Launched",
             .header = "Last Launched",
-            .flags = ImGuiTableColumnFlags_DefaultHide | ImGuiTableColumnFlags_NoResize,
+            .flags = ImGuiTableColumnFlags_DefaultHide |
+                     ImGuiTableColumnFlags_PreferSortDescending | ImGuiTableColumnFlags_NoResize,
         },
     [GamesListColumn_AddedOn] =
         {
             .icon = mdi_plus,
             .label = mdi_plus " Added On",
             .header = "Added On",
-            .flags = ImGuiTableColumnFlags_DefaultHide | ImGuiTableColumnFlags_NoResize,
+            .flags = ImGuiTableColumnFlags_DefaultHide |
+                     ImGuiTableColumnFlags_PreferSortDescending | ImGuiTableColumnFlags_NoResize,
         },
     [GamesListColumn_FinishedCheckbox] =
         {
@@ -127,7 +129,8 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
             .icon = mdi_star,
             .label = mdi_star " Rating",
             .header = "Rating",
-            .flags = ImGuiTableColumnFlags_DefaultHide | ImGuiTableColumnFlags_NoResize,
+            .flags = ImGuiTableColumnFlags_DefaultHide |
+                     ImGuiTableColumnFlags_PreferSortDescending | ImGuiTableColumnFlags_NoResize,
         },
     [GamesListColumn_Notes] =
         {
@@ -171,50 +174,10 @@ const GamesListColumnInfo games_list_column[GamesListColumn_COUNT] = {
             .icon = mdi_message_star,
             .label = mdi_message_star " Forum Score",
             .header = mdi_message_star,
-            .flags = ImGuiTableColumnFlags_DefaultHide | ImGuiTableColumnFlags_NoResize,
+            .flags = ImGuiTableColumnFlags_DefaultHide |
+                     ImGuiTableColumnFlags_PreferSortDescending | ImGuiTableColumnFlags_NoResize,
         },
 };
-
-static i32 placeholder_sort(Game* const* a, Game* const* b) {
-    // FIXME: proper sorting
-    return ((*a)->id < (*b)->id) ? -1 : ((*a)->id > (*b)->id);
-}
-
-static void gui_ui_games_list_rebuild_index(Gui* gui, ImGuiTableSortSpecs* sort_specs) {
-    GameIndex game_index;
-    game_index_init(game_index);
-
-    GameArray game_array;
-    game_array_init(game_array);
-
-    for each(GameDict_pair, pair, GameDict, games) {
-        Game* game = pair.value;
-        if(game->tab == NULL) {
-            game_array_push_back(game_array, game);
-        }
-    }
-    game_array_special_sort(game_array, &placeholder_sort);
-    game_index_set_at(game_index, TAB_ID_NULL, game_array);
-
-    for each(Tab_ptr, tab, TabList, tabs) {
-        game_array_reset(game_array);
-        for each(GameDict_pair, pair, GameDict, games) {
-            Game* game = pair.value;
-            if(game->tab != NULL && game->tab->id == tab->id) {
-                game_array_push_back(game_array, game);
-            }
-        }
-        game_array_special_sort(game_array, &placeholder_sort);
-        game_index_set_at(game_index, tab->id, game_array);
-    }
-
-    game_array_clear(game_array);
-
-    // FIXME: actually sort and filter
-    UNUSED(sort_specs);
-
-    game_index_move(gui->ui_state.game_index, game_index);
-}
 
 static void gui_ui_games_list_tick_index(Gui* gui, ImGuiTableSortSpecs* sort_specs) {
     const bool is_manual_sort = gui->ui_state.columns_enabled[GamesListColumn_ManualSort];
@@ -232,7 +195,7 @@ static void gui_ui_games_list_tick_index(Gui* gui, ImGuiTableSortSpecs* sort_spe
 
     if(gui->ui_state.need_game_index_rebuild) {
         gui->ui_state.need_game_index_rebuild = false;
-        gui_ui_games_list_rebuild_index(gui, sort_specs);
+        game_index_rebuild(gui->ui_state.game_index, sort_specs);
     }
 }
 

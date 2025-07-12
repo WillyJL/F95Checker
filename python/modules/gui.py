@@ -2482,23 +2482,11 @@ class MainGUI():
             self.prev_filters = self.filters.copy()
             self.recalculate_ids = True
         if self.recalculate_ids:
-            self.recalculate_ids = False
             # Pick base ID list
             if manual_sort:
-                changed = False
                 for id in globals.settings.manual_sort_list.copy():
                     if id not in globals.games:
                         globals.settings.manual_sort_list.remove(id)
-                        changed = True
-                for id in globals.games:
-                    if id not in globals.settings.manual_sort_list:
-                        globals.settings.manual_sort_list.insert(0, id)
-                        changed = True
-                if changed:
-                    async_thread.run(db.update_settings("manual_sort_list"))
-                base_ids = globals.settings.manual_sort_list
-            else:
-                base_ids = globals.games.keys()
             filtering = False
             # Filter globally by filters
             for flt in self.filters:
@@ -2555,42 +2543,17 @@ class MainGUI():
                     base_ids = filter(key, base_ids)
                     filtering = True
             self.filtering = filtering
-            # Finally consume the iterators (was lazy up until now)
-            base_ids = list(base_ids)
             # Sort globally by sortspecs
             if not manual_sort:
                 for sort_spec in self.sorts[table_id]:
                     match sort_spec.index:
-                        case cols.type.index:
-                            key = lambda id: globals.games[id].type.name
-                        case cols.developer.index:
-                            key = lambda id: globals.games[id].developer.lower()
-                        case cols.last_updated.index:
-                            key = lambda id: - globals.games[id].last_updated.value
-                        case cols.last_launched.index:
-                            key = lambda id: - globals.games[id].last_launched.value
-                        case cols.added_on.index:
-                            key = lambda id: - globals.games[id].added_on.value
                         case cols.finished.index:
                             key = lambda id: 2 if not globals.games[id].finished else 1 if globals.games[id].finished == (globals.games[id].installed or globals.games[id].version) else 0
                         case cols.installed.index:
                             key = lambda id: 2 if not globals.games[id].installed else 1 if globals.games[id].installed == globals.games[id].version else 0
-                        case cols.rating.index:
-                            key = lambda id: - globals.games[id].rating
-                        case cols.notes.index:
-                            key = lambda id: globals.games[id].notes.lower() or "z"
-                        case cols.status_standalone.index:
-                            key = lambda id: globals.games[id].status.value
                         case cols.score.index:
                             if globals.settings.weighted_score:
                                 key = lambda id: - utils.bayesian_average(globals.games[id].score, globals.games[id].votes)
-                            else:
-                                key = lambda id: - globals.games[id].score
-                        case _:  # Name and all others
-                            key = lambda id: globals.games[id].name.lower()
-                    base_ids.sort(key=key, reverse=sort_spec.reverse)
-                base_ids.sort(key=lambda id: globals.games[id].archived)
-                base_ids.sort(key=lambda id: globals.games[id].type is not Type.Unchecked)
             # Loop all tabs and filter by them
             self.show_games_ids = {
                 tab: (
