@@ -311,8 +311,14 @@ static void gui_ui_games_list_draw_row(Gui* gui, Game* game) {
         ImGui_TableSetColumnIndex(col);
 
         switch(col) {
-        default:
-            // FIXME: implement other columns
+        case GamesListColumn_COUNT:
+        case GamesListColumn_ManualSort:
+        case GamesListColumn_Version:
+        case GamesListColumn_FinishedVersion:
+        case GamesListColumn_InstalledVersion:
+        case GamesListColumn_StatusAfterName:
+        case GamesListColumn_Separator:
+            // Ghost columns
             break;
         case GamesListColumn_LaunchButton:
             gui_ui_game_launch_button(gui, game);
