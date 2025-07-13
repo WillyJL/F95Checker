@@ -123,6 +123,7 @@ void gui_ui_tab_bar(Gui* gui) {
             // Context menu
             bool set_name_focus = ImGui_IsPopupOpen(m_string_get_cstr(str), ImGuiPopupFlags_None);
             if(ImGui_BeginPopupContextItem()) {
+                // FIXME: tab context menu
                 // ImGui_SetNextItemWidth(ImGui_GetContentRegionAvail().x);
                 if(set_name_focus) {
                     ImGui_SetKeyboardFocusHere();

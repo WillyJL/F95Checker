@@ -5,9 +5,11 @@
 #include <globals.h>
 
 void gui_ui_game_row(Gui* gui, Game* game) {
+    ImGui_PushIDInt(game->id);
+
     // Base row height with a buttom to align the following text calls to center vertically
     ImGui_TableSetColumnIndex(GamesListColumn_Separator);
-    ImGui_ButtonEx("", (ImVec2){FLT_MIN, 0});
+    ImGui_ButtonEx("###game_row", (ImVec2){FLT_MIN, 0});
 
     for(GamesListColumn col = GamesListColumn_min(); col <= GamesListColumn_max(); col++) {
         if(!gui->ui_state.columns_enabled[col]) continue;
@@ -80,4 +82,6 @@ void gui_ui_game_row(Gui* gui, Game* game) {
     }
 
     // FIXME: implement row hitbox and click events
+
+    ImGui_PopID();
 }
