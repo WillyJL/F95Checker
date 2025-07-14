@@ -7,11 +7,15 @@ void gui_ui_game_rating(Gui* gui, Game* game) {
     ImGui_BeginGroup();
     for(u8 i = 0; i < 5; i++) {
         if(game->rating >= i + 1) {
-            ImGui_TextUnformatted(mdi_star);
-        } else if(game->rating <= i) {
-            ImGui_TextUnformatted(mdi_star_outline);
+            ImGui_TextColored(settings->style_accent, mdi_star);
         } else {
-            ImGui_TextUnformatted(mdi_star_half_full);
+            ImVec2 star_pos = ImGui_GetCursorPos();
+            ImGui_TextUnformatted(mdi_star_outline);
+            if(game->rating > i) {
+                ImGui_SameLineEx(0, 0);
+                ImGui_SetCursorPos(star_pos);
+                ImGui_TextColored(settings->style_accent, mdi_star_half);
+            }
         }
         ImGui_SameLineEx(0, 0);
     }
