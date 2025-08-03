@@ -88,22 +88,30 @@ def update_start_with_system(toggle: bool):
 def _fuzzy_match_subdir(where: pathlib.Path, match: str, best_partial_match: bool):
     clean_charset = string.ascii_letters + string.digits + " "
     clean_dir = "".join(char for char in match.replace("&", "and") if char in clean_charset)
-    clean_dir = re.sub(r" +", r" ", clean_dir).strip()
+    clean_dir = re.sub(r" +", r" ", clean_dir).strip().replace("_", " ")
+
+    clean_dir_underscore = clean_dir.replace(" ", "_")
+
     if (where / clean_dir).is_dir():
         where /= clean_dir
+    elif (where / clean_dir_underscore).is_dir():
+        where /= clean_dir_underscore
     else:
         try:
             dirs = [node.name for node in where.iterdir() if node.is_dir()]
             clean_dir_lower = clean_dir.lower()
+            clean_dir_underscore_lower = clean_dir_underscore.lower()
+
             if best_partial_match:
-                match_dirs = [d for d in dirs if clean_dir_lower in d.lower()]
+                match_dirs = [d for d in dirs if clean_dir_lower in d.lower().replace("_", " ") or clean_dir_underscore_lower in d.lower().replace(" ", "_")]
             else:
                 match_dirs = []
+
             if len(match_dirs) == 1:
                 where /= match_dirs[0]
             else:
-                ratio = lambda a, b: difflib.SequenceMatcher(None, a.lower(), b.lower()).quick_ratio()
-                similarity = {d: ratio(d, match) for d in dirs}
+                ratio = lambda a, b: difflib.SequenceMatcher(None, a.lower(), b.lower().replace("_", " ")).quick_ratio()
+                similarity = {d: ratio(d, clean_dir) for d in dirs}
                 best_match = max(similarity.keys())
                 if similarity[best_match] > 0.85:
                     where /= best_match
