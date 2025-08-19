@@ -450,12 +450,66 @@ def cleanup_temp_files():
             pass
 
 
-async def thread_search(category: str, search: str, query: str, sort="likes", count=15, page=1):
+def latest_updates_search_sanitize_query(query: str):
+    redis_stopwords = (
+        "a",
+        "is",
+        "the",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "but",
+        "by",
+        "for",
+        "if",
+        "in",
+        "into",
+        "it",
+        "no",
+        "not",
+        "of",
+        "on",
+        "or",
+        "such",
+        "that",
+        "their",
+        "then",
+        "there",
+        "these",
+        "they",
+        "this",
+        "to",
+        "was",
+        "will",
+        "with",
+    )
+    query = re.sub(r"’s |'s ", " ", query)
     query = query.encode("ascii", errors="replace").decode()
     query = re.sub(r"\.+ | \.+", " ", query)
-    for char in "?&/':;-.":
+    for char in "?&/':;-.+!~(),*":
         query = query.replace(char, " ")
-    query = re.sub(r"\s+", " ", query).strip()[:28]
+    query = re.sub(r"\s+", " ", query).strip()
+    words = query.split(" ")
+    for stopword in redis_stopwords:
+        for word in words.copy():
+            if word.lower() == stopword:
+                words.remove(word)
+    query = ""
+    while words:
+        append = f"{' ' if query else ''}{words.pop(0)}"
+        if len(query + append) > 30:
+            append = append[: 30 - len(query)]
+            if len(append) > 3 and append.strip().lower() not in redis_stopwords:
+                query += append
+            break
+        query += append
+    return query
+
+
+async def latest_updates_search(category: str, search: str, query: str, sort="likes", count=15, page=1):
     res = await fetch("GET", f95_latest_endpoint.format(
         cmd="list",
         cat=category,
@@ -483,6 +537,7 @@ async def thread_search(category: str, search: str, query: str, sort="likes", co
 def open_search_popup(query: str):
     results = None
     ran_query = query
+    real_query = query
     categories = [
         "Games",
         "Comics",
@@ -521,8 +576,13 @@ def open_search_popup(query: str):
         if imgui.button(f"{icons.magnify} Search") or activated:
             async_thread.run(_f95zone_run_search())
 
-        if not results:
-            imgui.text(f"Running F95zone search for {searches[ran_search].lower()} '{ran_query}' in {categories[ran_category].lower()} category...")
+        if real_query != ran_query:
+            imgui.text_disabled("Note: the real search query is different because Latest Updates struggles searching some words/symbols")
+        if results:
+            imgui.text("Click on any of the results to add it, click Ok when you're finished.")
+            imgui.text(f"Latest Updates search results for {searches[ran_search].lower()} '{real_query}' in {categories[ran_category].lower()} category:")
+        else:
+            imgui.text(f"Running F95zone search for {searches[ran_search].lower()} '{real_query}' in {categories[ran_category].lower()} category...")
             imgui.text("Status:")
             imgui.same_line()
             if results is None:
@@ -530,8 +590,8 @@ def open_search_popup(query: str):
             else:
                 imgui.text("No results!")
             return
+        imgui.text("\n")
 
-        imgui.text("Click on any of the results to add it, click Ok when you're finished.\n\n")
         for result in results:
             # TODO: make this pretty and show more info from latest updates
             if result.id in globals.games:
@@ -545,16 +605,17 @@ def open_search_popup(query: str):
             if clicked:
                 async_thread.run(callbacks.add_games(result))
     async def _f95zone_run_search():
-        nonlocal results, ran_query, ran_category, ran_search
+        nonlocal results, ran_query, real_query, ran_category, ran_search
         results = None
         ran_query = query
+        real_query = latest_updates_search_sanitize_query(ran_query)
         ran_category = category
         real_category = categories[ran_category].lower()
         ran_search = search
         real_search = searches[ran_search].lower()
         if real_search == "title":
             real_search = "search"
-        results = await thread_search(real_category, real_search, ran_query)
+        results = await latest_updates_search(real_category, real_search, real_query)
     utils.push_popup(
         utils.popup, "F95zone thread search",
         _f95zone_search_popup,

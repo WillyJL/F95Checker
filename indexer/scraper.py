@@ -2,7 +2,6 @@ import asyncio
 import dataclasses
 import json
 import logging
-import re
 import time
 
 from common import parser
@@ -53,7 +52,7 @@ async def thread(id: int) -> dict[str, str] | f95zone.IndexerError | None:
     version = ""
     try:
         async with f95zone.session.get(
-            f95zone.VERCHK_URL.format(threads=id),
+            f95zone.BULK_VERSION_CHECK_URL.format(threads=id),
         ) as req:
             res = await req.read()
     except Exception as exc:
@@ -79,18 +78,12 @@ async def thread(id: int) -> dict[str, str] | f95zone.IndexerError | None:
 
     # If tracked by latest updates, try to search the thread there to get more precise details
     if version:
-        query = ret.name.encode("ascii", errors="replace").decode()
-        query = re.sub(r"\.+ | \.+", " ", query)
-        for char in "?&/':;-":
-            query = query.replace(char, " ")
-        query = re.sub(r"\s+", " ", query).strip()[:28]
-        if len(words := query.split(" ")) > 2 and len(words[-1]) < 3:
-            query = " ".join(words[:-1])
-        for category in f95zone.LATEST_CATEGORIES:
+        query = f95zone.latest_updates_search_sanitize_query(ret.name)
+        for category in f95zone.LATEST_UPDATES_CATEGORIES:
 
             try:
                 async with f95zone.session.get(
-                    f95zone.SEARCH_URL.format(
+                    f95zone.LATEST_UPDATES_SEARCH_URL.format(
                         cmd="list",
                         cat=category,
                         page=1,

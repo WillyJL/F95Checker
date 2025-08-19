@@ -829,8 +829,6 @@ class MainGUI():
         return _scaled(globals.settings.interface_scaling, size)
 
     def main_loop(self):
-        if globals.settings.start_refresh and not self.hidden:
-            utils.start_refresh_task(api.refresh())
         # Loop variables
         prev_scaling = globals.settings.interface_scaling
         self.scroll_energy = 0.0
@@ -1029,6 +1027,8 @@ class MainGUI():
                         if first_frame:
                             if not globals.settings.start_in_background:
                                 glfw.show_window(self.window)
+                                if globals.settings.start_refresh:
+                                    utils.start_refresh_task(api.refresh())
                             first_frame = False
                     else:  # Visible but not drawing
                         time.sleep(1 / 15)

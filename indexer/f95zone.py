@@ -4,6 +4,7 @@ import dataclasses
 import datetime as dt
 import logging
 import os
+import re
 import sys
 
 import aiohttp
@@ -47,10 +48,10 @@ cookies: dict = None
 
 HOST = "https://f95zone.to"
 THREAD_URL = f"{HOST}/threads/{{thread}}"
-VERCHK_URL = f"{HOST}/sam/checker.php?threads={{threads}}"
-SEARCH_URL = f"{HOST}/sam/latest_alpha/latest_data.php?cmd={{cmd}}&cat={{cat}}&page={{page}}&{{search}}={{query}}&sort={{sort}}&rows={{rows}}&_={{ts}}"
-LATEST_URL = f"{HOST}/sam/latest_alpha/latest_data.php?cmd={{cmd}}&cat={{cat}}&page={{page}}&sort={{sort}}&rows={{rows}}&_={{ts}}"
-LATEST_CATEGORIES = (
+BULK_VERSION_CHECK_URL = f"{HOST}/sam/checker.php?threads={{threads}}"
+LATEST_UPDATES_SEARCH_URL = f"{HOST}/sam/latest_alpha/latest_data.php?cmd={{cmd}}&cat={{cat}}&page={{page}}&{{search}}={{query}}&sort={{sort}}&rows={{rows}}&_={{ts}}"
+LATEST_UPDATES_URL = f"{HOST}/sam/latest_alpha/latest_data.php?cmd={{cmd}}&cat={{cat}}&page={{page}}&sort={{sort}}&rows={{rows}}&_={{ts}}"
+LATEST_UPDATES_CATEGORIES = (
     "games",
     "comics",
     "animations",
@@ -146,3 +147,62 @@ def check_error(
         if isinstance(res, (asyncio.TimeoutError, aiohttp.ClientConnectionError)):
             logger.warning("F95zone temporarily unreachable")
             return ERROR_F95ZONE_UNAVAILABLE
+
+
+def latest_updates_search_sanitize_query(query: str):
+    redis_stopwords = (
+        "a",
+        "is",
+        "the",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "but",
+        "by",
+        "for",
+        "if",
+        "in",
+        "into",
+        "it",
+        "no",
+        "not",
+        "of",
+        "on",
+        "or",
+        "such",
+        "that",
+        "their",
+        "then",
+        "there",
+        "these",
+        "they",
+        "this",
+        "to",
+        "was",
+        "will",
+        "with",
+    )
+    query = re.sub(r"’s |'s ", " ", query)
+    query = query.encode("ascii", errors="replace").decode()
+    query = re.sub(r"\.+ | \.+", " ", query)
+    for char in "?&/':;-.+!~(),*":
+        query = query.replace(char, " ")
+    query = re.sub(r"\s+", " ", query).strip()
+    words = query.split(" ")
+    for stopword in redis_stopwords:
+        for word in words.copy():
+            if word.lower() == stopword:
+                words.remove(word)
+    query = ""
+    while words:
+        append = f"{' ' if query else ''}{words.pop(0)}"
+        if len(query + append) > 30:
+            append = append[: 30 - len(query)]
+            if len(append) > 3 and append.strip().lower() not in redis_stopwords:
+                query += append
+            break
+        query += append
+    return query
