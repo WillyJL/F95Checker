@@ -233,6 +233,8 @@ def has_authenticated_tracker(res: bytes | dict):
             res = json.loads(res)
             if res.get("error") == "Token invalid.":
                 return False
+            if res.get("error").startswith("Token expired."):
+                return False
             raise msgbox.Exc(
                 "Unknown response",
                 "RPDL sent an unknown response.",
