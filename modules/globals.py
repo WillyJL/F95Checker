@@ -76,7 +76,7 @@ def _():
                         try:
                             name = winreg.QueryValue(browsers, key)
                             args = shlex.split(winreg.QueryValue(browsers, key + "\\shell\\open\\command"))
-                            if args and pathlib.Path(shutil.which(args[0])).exists():
+                            if args and shutil.which(args[0]) and pathlib.Path(shutil.which(args[0])).exists():
                                 Browser.add(name, args=args)
                         except Exception:
                             pass  # Non-standard key
@@ -88,51 +88,60 @@ def _():
     elif os is Os.Linux:
         import configparser
         for xdg_dir in _os.environ.get("XDG_DATA_DIRS", "/usr/share/").split(":"):
-            if not xdg_dir:
-                continue
-            app_dir = pathlib.Path(xdg_dir) / "applications"
-            apps_file = app_dir / "mimeinfo.cache"
-            if not apps_file.is_file():
-                continue
-            raw = apps_file.read_bytes()
-            apps = []
-            for match in re.finditer(rb"x-scheme-handler/https?=(.+)", raw):
-                for app in match.group(1).split(b";"):
-                    app = str(app, encoding="utf-8")
-                    if app and app not in apps:
-                        apps.append(app)
-            for app in apps:
-                app_file = app_dir / app
-                if not app_file.is_file():
+            try:
+                if not xdg_dir:
                     continue
-                parser = configparser.RawConfigParser()
-                parser.read(app_file)
-                name = parser.get("Desktop Entry", "Name")
-                args = [arg for arg in shlex.split(parser.get("Desktop Entry", "Exec")) if not (len(arg) == 2 and arg.startswith("%"))]
-                if args and pathlib.Path(shutil.which(args[0])).exists():
-                    Browser.add(name, args=args)
+                app_dir = pathlib.Path(xdg_dir) / "applications"
+                apps_file = app_dir / "mimeinfo.cache"
+                if not apps_file.is_file():
+                    continue
+                raw = apps_file.read_bytes()
+                apps = []
+                for match in re.finditer(rb"x-scheme-handler/https?=(.+)", raw):
+                    for app in match.group(1).split(b";"):
+                        app = str(app, encoding="utf-8")
+                        if app and app not in apps:
+                            apps.append(app)
+                for app in apps:
+                    try:
+                        app_file = app_dir / app
+                        if not app_file.is_file():
+                            continue
+                        parser = configparser.RawConfigParser()
+                        parser.read(app_file)
+                        name = parser.get("Desktop Entry", "Name")
+                        args = [arg for arg in shlex.split(parser.get("Desktop Entry", "Exec")) if not (len(arg) == 2 and arg.startswith("%"))]
+                        if args and shutil.which(args[0]) and pathlib.Path(shutil.which(args[0])).exists():
+                            Browser.add(name, args=args)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
     elif os is Os.MacOS:
         import plistlib
         app_dir = pathlib.Path("/Applications")
         empty = []
         matches = ["http", "https"]
         for app in app_dir.glob("*.app"):
-            app_file = app / "Contents/Info.plist"
-            if not app_file.is_file():
-                continue
-            parser = plistlib.loads(app_file.read_bytes())
-            found = False
-            for handler in parser.get("CFBundleURLTypes", empty):
-                for scheme in handler.get("CFBundleURLSchemes", empty):
-                    if scheme in matches:
-                        name = parser["CFBundleName"]
-                        args = [app / f"Contents/MacOS/{parser['CFBundleExecutable']}"]
-                        if args and pathlib.Path(shutil.which(args[0])).exists():
-                            Browser.add(name, args=args)
-                        found = True
+            try:
+                app_file = app / "Contents/Info.plist"
+                if not app_file.is_file():
+                    continue
+                parser = plistlib.loads(app_file.read_bytes())
+                found = False
+                for handler in parser.get("CFBundleURLTypes", empty):
+                    for scheme in handler.get("CFBundleURLSchemes", empty):
+                        if scheme in matches:
+                            name = parser["CFBundleName"]
+                            args = [app / f"Contents/MacOS/{parser['CFBundleExecutable']}"]
+                            if args and shutil.which(args[0]) and pathlib.Path(shutil.which(args[0])).exists():
+                                Browser.add(name, args=args)
+                            found = True
+                            break
+                    if found:
                         break
-                if found:
-                    break
+            except Exception:
+                pass
 _()
 
 # Check self launch command and startup settings

@@ -7,7 +7,6 @@ import plistlib
 import re
 import shlex
 import stat
-import string
 import subprocess
 import time
 import typing
@@ -86,9 +85,7 @@ def update_start_with_system(toggle: bool):
 
 
 def _fuzzy_match_subdir(where: pathlib.Path, match: str, best_partial_match: bool):
-    clean_charset = string.ascii_letters + string.digits + " "
-    clean_dir = "".join(char for char in match.replace("&", "and") if char in clean_charset)
-    clean_dir = re.sub(r" +", r" ", clean_dir).strip()
+    clean_dir = utils.clean_str(match)
     if (where / clean_dir).is_dir():
         where /= clean_dir
     else:

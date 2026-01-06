@@ -5,6 +5,7 @@ import functools
 import io
 import random
 import re
+import string
 import time
 import typing
 
@@ -49,6 +50,13 @@ def bayesian_average(avg_rating, num_votes):
 
 def rand_num_str(len=8):
     return "".join((random.choice('0123456789') for _ in range(len)))
+
+
+def clean_str(text: str):
+    clean_charset = string.ascii_letters + string.digits + " "
+    clean_text = "".join(char for char in text.replace("&", "and") if char in clean_charset)
+    clean_text = re.sub(r"\s+", r" ", clean_text).strip()
+    return clean_text
 
 
 # https://stackoverflow.com/a/1094933

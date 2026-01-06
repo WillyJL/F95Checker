@@ -5211,17 +5211,18 @@ class MainGUI():
             imgui.end_table()
 
         if api.downloads:
+            imgui.text("\nDonor DDL:\n")
             to_remove = []
-            for name, download in api.downloads.items():
+            for download_id, download in api.downloads.items():
                 if not download:
                     continue
                 if download.state == download.State.Removed:
-                    to_remove.append(name)
+                    to_remove.append(download_id)
                     continue
                 imgui.spacing()
                 imgui.spacing()
                 imgui.spacing()
-                imgui.text("DDL: " + name)
+                imgui.text(download.name)
                 errored = download.error or download.progress != download.total
 
                 if download.state == download.State.Downloading:
@@ -5272,7 +5273,7 @@ class MainGUI():
                         )
                         if download.traceback and imgui.is_item_clicked():
                             utils.push_popup(
-                                msgbox.msgbox, f"Error downloading {name}",
+                                msgbox.msgbox, f"Error downloading {download.name}",
                                 download.error,
                                 MsgBox.error,
                                 more=download.traceback,
@@ -5297,12 +5298,12 @@ class MainGUI():
                         imgui.pop_disabled()
                 elif download.state == download.State.Stopped:
                     if imgui.button(icons.cancel):
-                        to_remove.append(name)
+                        to_remove.append(download_id)
                     imgui.same_line()
                     if imgui.button(icons.trash_can_outline):
                         async_thread.run(download.delete())
-            for name in to_remove:
-                del api.downloads[name]
+            for download_id in to_remove:
+                del api.downloads[download_id]
 
         imgui.spacing()
         imgui.spacing()

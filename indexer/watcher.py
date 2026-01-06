@@ -30,7 +30,6 @@ async def lifespan():
     try:
         yield
     finally:
-
         updates_task.cancel()
         versions_task.cancel()
 
@@ -179,7 +178,6 @@ async def poll_versions():
         invalidate_cache = cache.redis.pipeline()
 
         for names_chunk in chunks(names, WATCH_VERSIONS_CHUNK_SIZE):
-
             cached_data = cache.redis.pipeline()
             csv = ""
             ids = []

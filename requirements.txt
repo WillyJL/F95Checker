@@ -36,7 +36,8 @@ certifi
 # Archive extract
 py7zr==0.22.0
 rarfile==4.2
-zipfile-deflate64==0.2.0
+zipfile-deflate64==0.2.0 ; sys_platform != "darwin"
+zipfile-deflate64-macos==0.1.0 ; sys_platform == "darwin"
 
 # BeautifulSoup
 beautifulsoup4==4.12.3

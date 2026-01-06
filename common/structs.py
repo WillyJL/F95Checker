@@ -300,10 +300,12 @@ class DdlFile:
 
 @dataclasses.dataclass(slots=True)
 class FileDownload:
+    name: str
     url: str = ""
     cookies: dict = True
     checksum: tuple[str, str] = None
     path: pathlib.Path = None
+    path_nest_level: int = 0
     progress: int = 0
     total: int = None
 
@@ -330,6 +332,11 @@ class FileDownload:
             if self.extracted:
                 await loop.run_in_executor(None, functools.partial(shutil.rmtree, self.extracted, ignore_errors=True))
             await loop.run_in_executor(None, functools.partial(self.path.unlink, missing_ok=True))
+            path = self.path
+            for _ in range(self.path_nest_level):
+                path = path.parent
+                if next(path.iterdir(), None) is None:
+                    await loop.run_in_executor(None, functools.partial(path.rmdir))
         except Exception:
             pass
         self.state = self.State.Removed

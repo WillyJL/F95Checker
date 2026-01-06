@@ -64,7 +64,6 @@ async def lifespan():
     try:
         yield
     finally:
-
         await redis.aclose()
         redis = None
 
@@ -145,6 +144,8 @@ async def _update_thread_cache(id: int, name: str) -> None:
             INDEX_ERROR: result.error_flag,
             EXPIRE_TIME: int(now + result.retry_delay),
         }
+        if result.details:
+            new_fields[INDEX_ERROR] += f": {result.details}"
         # Consider new error as a change
         if old_fields.get(INDEX_ERROR) != new_fields.get(INDEX_ERROR):
             new_fields[LAST_CHANGE] = int(now)

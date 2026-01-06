@@ -224,7 +224,7 @@ def thread(res: bytes) -> ParsedThread | ParserError:
                 name += elem.text
         name = fixed_spaces(sanitize_whitespace(re.search(r"^\s*(.*?)(?:\s*\[.*?\]\s*)*$", name).group(1)))
 
-        thread_version = get_game_attr("version", "game version", "mod version")
+        thread_version = get_game_attr("version", "mod version", "game version")
         if not thread_version:
             if match := re.search(r"(?:\[.+?\] - )*.+?\[(.+?)\]", html.title.text):
                 thread_version = fixed_spaces(sanitize_whitespace(match.group(1)))

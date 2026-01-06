@@ -1354,17 +1354,8 @@ async def refresh(*games: list[Game], full=False, notifs=True, force_archived=Fa
         await db.update_settings("last_successful_refresh")
 
 
-async def download_file(name: str, download: FileDownload):
+async def download_file(download: FileDownload):
     try:
-        downloads[name] = download
-
-        if download.path is None:
-            downloads_dir = globals.settings.downloads_dir.get(globals.os)
-            if downloads_dir:
-                downloads_dir = pathlib.Path(downloads_dir)
-            else:
-                downloads_dir = pathlib.Path.home() / "Downloads"
-            download.path = downloads_dir / name
         download.path.parent.mkdir(parents=True, exist_ok=True)
         async with aiofiles.open(download.path, "wb") as file:
             download.state = download.State.Downloading
@@ -1562,17 +1553,27 @@ def open_ddl_popup(game: Game):
                         async_thread.run(_copy_ddl_link(results["session"], ddl_file))
                     globals.gui.draw_hover_text(f"Copy download link to clipboard", text=None)
                     imgui.same_line()
-                    if already_downloading := ddl_file.filename in downloads:
+                    if already_downloading := f"{game.id}/{ddl_file.filename}" in downloads:
                         imgui.push_disabled()
                     if imgui.button(icons.download_multiple):
                         async def _download_ddl_link(session_id: str, file: DdlFile):
+                            download = FileDownload(file.filename, total=file.size, checksum=("sha1", file.sha1))
+                            downloads_dir = globals.settings.downloads_dir.get(globals.os)
+                            if downloads_dir:
+                                downloads_dir = pathlib.Path(downloads_dir)
+                            else:
+                                downloads_dir = pathlib.Path.home() / "Downloads"
+                            game_subdir = utils.clean_str(game.name)[:32]
+                            download.path = downloads_dir / game_subdir / file.filename
+                            download.path_nest_level = 1
+                            download_id = f"{game.id}/{file.filename}"
                             try:
-                                downloads[file.filename] = download = FileDownload(total=file.size, checksum=("sha1", file.sha1))
+                                downloads[download_id] = download
                                 download.url, download.cookies = await ddl_file_link(session_id, file)
                             except Exception:
-                                del downloads[file.filename]
+                                del downloads[download_id]
                                 raise
-                            asyncio.create_task(download_file(file.filename, download))
+                            asyncio.create_task(download_file(download))
                         async_thread.run(_download_ddl_link(results["session"], ddl_file))
                     if already_downloading:
                         imgui.pop_disabled()

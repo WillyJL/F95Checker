@@ -38,10 +38,6 @@ async def thread(id: int) -> dict[str, str] | f95zone.IndexerError | None:
     loop = asyncio.get_event_loop()
     ret = await loop.run_in_executor(None, parser.thread, res)
     if isinstance(ret, parser.ParserError):
-
-        if ret.message == "Thread structure missing" and req.status in (403, 404):
-            return f95zone.ERROR_THREAD_MISSING
-
         logger.error(f"Thread {id} parsing failed: {ret.message}\n{ret.dump}")
         return f95zone.ERROR_PARSING_FAILED
 
@@ -80,7 +76,6 @@ async def thread(id: int) -> dict[str, str] | f95zone.IndexerError | None:
     if version:
         query = f95zone.latest_updates_search_sanitize_query(ret.name)
         for category in f95zone.LATEST_UPDATES_CATEGORIES:
-
             try:
                 async with f95zone.session.get(
                     f95zone.LATEST_UPDATES_SEARCH_URL.format(
@@ -163,13 +158,6 @@ async def thread(id: int) -> dict[str, str] | f95zone.IndexerError | None:
     else:
         reviews = await loop.run_in_executor(None, parser.reviews, res)
         if isinstance(reviews, parser.ParserError):
-
-            if reviews.message == "Thread structure missing" and req.status in (
-                403,
-                404,
-            ):
-                return f95zone.ERROR_THREAD_MISSING
-
             logger.error(
                 f"Thread {id} reviews parsing failed: {reviews.message}\n{reviews.dump}"
             )
