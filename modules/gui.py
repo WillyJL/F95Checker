@@ -900,7 +900,7 @@ class MainGUI():
                         or (imagehelper.redraw and globals.settings.play_gifs and (self.focused or globals.settings.play_gifs_unfocused))
                         or imgui.io.mouse_wheel or self.input_chars or any(imgui.io.mouse_down) or any(imgui.io.keys_down)
                         or (prev_mouse_pos != mouse_pos and (prev_win_hovered or win_hovered))
-                        or (self.focused or globals.settings.render_when_unfocused)
+                        or globals.settings.render_when_unfocused
                         or imagehelper.apply_queue or imagehelper.unload_queue
                         or prev_scaling != globals.settings.interface_scaling
                         or prev_minimized != self.minimized
