@@ -67,6 +67,8 @@ class GlfwRenderer(ProgrammablePipelineRenderer):
 
         if action == glfw.PRESS:
             io.keys_down[key] = True
+            if key == glfw.KEY_W and (mods & glfw.MOD_SUPER):
+                self.close_callback(window)
         elif action == glfw.RELEASE:
             io.keys_down[key] = False
 
