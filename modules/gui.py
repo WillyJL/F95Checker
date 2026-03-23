@@ -344,8 +344,6 @@ class MainGUI():
 
         # Setup Qt objects
         self.qt_app = QtWidgets.QApplication(sys.argv)
-        self._qt_anchor = QtWidgets.QWidget()  # hidden anchor keeps macOS app active
-        self._qt_anchor.hide()
         self.tray = TrayIcon(self)
 
         # Setup ImGui
@@ -5363,7 +5361,6 @@ class TrayIcon(QtWidgets.QSystemTrayIcon):
         self.menu.addAction(self.toggle_pause)
         self.menu.addAction(self.toggle_gui)
         self.menu.addAction(self.quit)
-        self.setContextMenu(self.menu)
         self.menu_open = False
         self.menu.aboutToShow.connect(self.showing_menu)
         self.menu.aboutToHide.connect(self.hiding_menu)
@@ -5433,5 +5430,7 @@ class TrayIcon(QtWidgets.QSystemTrayIcon):
         self.update_icon()
 
     def activated_filter(self, reason: QtWidgets.QSystemTrayIcon.ActivationReason):
-        if reason in self.show_gui_events:
+        if reason == QtWidgets.QSystemTrayIcon.ActivationReason.Context:
+            self.menu.popup(QtGui.QCursor.pos())
+        elif reason in self.show_gui_events:
             self.main_gui.show()
