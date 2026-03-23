@@ -21,18 +21,36 @@ on:
 
 jobs:
 
+  matrix-setup:
+    runs-on: ubuntu-latest
+    if: "github.event_name != 'push' || contains(github.event.head_commit.message, '+ BUILD')"
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - name: "Compute build matrix"
+        id: set
+        shell: python
+        run: |
+          import json, os
+          configs = [
+            {"os": "windows-2022",   "python": "3.12.4", "cx-freeze": "7.0.0", "cx-logging": "v3.2.0", "astcenc": "5.1.0", "compressonator": "4.5.52", "artifact": "Windows"},
+            {"os": "ubuntu-22.04",   "python": "3.12.4", "cx-freeze": "7.0.0", "cx-logging": "",       "astcenc": "5.1.0", "compressonator": "4.5.52", "artifact": "Linux"},
+            {"os": "macos-15-intel", "python": "3.12.4", "cx-freeze": "7.0.0", "cx-logging": "",       "astcenc": "5.1.0", "compressonator": "",        "artifact": "macOS-x64"},
+            {"os": "macos-15",       "python": "3.12.4", "cx-freeze": "7.0.0", "cx-logging": "",       "astcenc": "5.1.0", "compressonator": "",        "artifact": "macOS-arm64"},
+          ]
+          sel = "${{ inputs.os }}"
+          filtered = configs if not sel or sel in ("All", "Source") else [c for c in configs if c["artifact"] == sel]
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+            f.write("matrix=" + json.dumps({"config": filtered}) + "\n")
+
   build:
+    needs: matrix-setup
     strategy:
       fail-fast: false
-      matrix:
-        config:
-          - { os: "windows-2022",   python: "3.12.4", cx-freeze: "7.0.0", cx-logging: "v3.2.0", astcenc: "5.1.0", compressonator: "4.5.52", artifact: "Windows" }
-          - { os: "ubuntu-22.04",   python: "3.12.4", cx-freeze: "7.0.0", cx-logging: "",       astcenc: "5.1.0", compressonator: "4.5.52", artifact: "Linux" }
-          - { os: "macos-15-intel", python: "3.12.4", cx-freeze: "7.0.0", cx-logging: "",       astcenc: "5.1.0", compressonator: "",       artifact: "macOS-x64" }
-          - { os: "macos-15",       python: "3.12.4", cx-freeze: "7.0.0", cx-logging: "",       astcenc: "5.1.0", compressonator: "",       artifact: "macOS-arm64" }
+      matrix: ${{ fromJson(needs.matrix-setup.outputs.matrix) }}
     name: "${{ matrix.config.os }}"
     runs-on: "${{ matrix.config.os }}"
-    if: "(github.event_name != 'push' || contains(github.event.head_commit.message, '+ BUILD')) && (github.event_name != 'workflow_dispatch' || inputs.os == 'All' || inputs.os == matrix.config.artifact)"
+    if: "needs.matrix-setup.result == 'success' && (github.event_name != 'workflow_dispatch' || inputs.os != 'Source')"
     steps:
 
       # === SETUP ===
@@ -262,6 +280,7 @@ jobs:
     runs-on: "ubuntu-latest"
     if: "github.event_name == 'release'"
     needs:
+      - matrix-setup
       - build
       - source
     steps:
