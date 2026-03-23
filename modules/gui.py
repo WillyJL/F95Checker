@@ -913,7 +913,16 @@ class MainGUI():
                         or api.updating
                     )
                     if draw:
-                        draw_next = max(draw_next, imgui.io.delta_time + 1.0)  # Draw for at least next half second
+                        # Extend render budget based on UI liveness:
+                        # 0.5s while interactive (active item, open popup, hovered, scroll energy),
+                        # 0.2s otherwise (just enough for transitions to settle).
+                        live = (
+                            imgui.is_any_item_active()
+                            or imgui.is_popup_open("", imgui.POPUP_ANY_POPUP_ID)
+                            or any_hovered
+                            or abs(self.scroll_energy) > 0.1
+                        )
+                        draw_next = max(draw_next, imgui.io.delta_time + (0.5 if live else 0.2))
                     if draw_next > 0.0:  # Visible and drawing
                         if not first_frame:
                             draw_next -= imgui.io.delta_time
