@@ -2,6 +2,18 @@ name: "Build"
 
 on:
   workflow_dispatch:
+    inputs:
+      os:
+        description: "Target OS"
+        type: choice
+        default: "All"
+        options:
+          - "All"
+          - "Windows"
+          - "Linux"
+          - "macOS-x64"
+          - "macOS-arm64"
+          - "Source"
   push:
   release:
     types:
@@ -20,7 +32,7 @@ jobs:
           - { os: "macos-15",       python: "3.12.4", cx-freeze: "7.0.0", cx-logging: "",       astcenc: "5.1.0", compressonator: "",       artifact: "macOS-arm64" }
     name: "${{ matrix.config.os }}"
     runs-on: "${{ matrix.config.os }}"
-    if: "github.event_name != 'push' || contains(github.event.head_commit.message, '+ BUILD')"
+    if: "(github.event_name != 'push' || contains(github.event.head_commit.message, '+ BUILD')) && (github.event_name != 'workflow_dispatch' || inputs.os == 'All' || inputs.os == matrix.config.artifact)"
     steps:
 
       # === SETUP ===
@@ -177,7 +189,7 @@ jobs:
   source:
     name: "source"
     runs-on: "ubuntu-latest"
-    if: "github.event_name != 'push' || contains(github.event.head_commit.message, '+ BUILD')"
+    if: "(github.event_name != 'push' || contains(github.event.head_commit.message, '+ BUILD')) && (github.event_name != 'workflow_dispatch' || inputs.os == 'All' || inputs.os == 'Source')"
     steps:
 
       # === SETUP ===
