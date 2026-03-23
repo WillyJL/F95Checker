@@ -1030,7 +1030,7 @@ class MainGUI():
                                     utils.start_refresh_task(api.refresh())
                             first_frame = False
                     else:  # Visible but not drawing
-                        time.sleep(1 / 15)
+                        glfw.wait_events_timeout(1 / 15)
                 else:  # Not visible
                     # Unload images if necessary
                     imagehelper.post_draw(0)
