@@ -344,6 +344,8 @@ class MainGUI():
 
         # Setup Qt objects
         self.qt_app = QtWidgets.QApplication(sys.argv)
+        self._qt_anchor = QtWidgets.QWidget()  # hidden anchor keeps macOS app active
+        self._qt_anchor.hide()
         self.tray = TrayIcon(self)
 
         # Setup ImGui
