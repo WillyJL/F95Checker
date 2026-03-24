@@ -2146,6 +2146,7 @@ class MainGUI():
 
     def draw_game_info_popup(self, game: Game, carousel_ids: list = None, popup_uuid: str = ""):
         def popup_content():
+            imgui.set_scroll_x(0.0)
             # Image
             image = game.image
             avail = imgui.get_content_region_available()
