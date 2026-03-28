@@ -258,6 +258,40 @@ def _scaled(mult: float, size: int | float):
     return size * mult
 
 
+_used_mdi_range: list[int] | None = None
+
+def _build_mdi_range() -> list[int]:
+    global _used_mdi_range
+    if _used_mdi_range is not None:
+        return _used_mdi_range
+    import types
+    from modules import icons
+    icon_names = icons.names  # {dash-name: char}
+    used: set[int] = set()
+    def scan(co: types.CodeType):
+        for name in co.co_names:
+            char = icon_names.get(name.replace("_", "-"))
+            if char:
+                used.add(ord(char))
+        for c in co.co_consts:
+            if isinstance(c, types.CodeType):
+                scan(c)
+    for mod in sys.modules.values():
+        if not isinstance(mod, types.ModuleType):
+            continue
+        for attr in vars(mod).values():
+            if isinstance(attr, types.FunctionType):
+                scan(attr.__code__)
+            elif isinstance(attr, type):
+                for m in vars(attr).values():
+                    fn = getattr(m, "__func__", None) or (m if isinstance(m, types.FunctionType) else None)
+                    if isinstance(fn, types.FunctionType):
+                        scan(fn.__code__)
+    chars = sorted(used)
+    _used_mdi_range = [v for c in chars for v in (c, c)] + [0]
+    return _used_mdi_range
+
+
 class MainGUI():
     def __init__(self):
         # Constants
@@ -681,8 +715,18 @@ class MainGUI():
         mixin_config = imgui.core.FontConfig(**merge)
         karla_range = imgui.core.GlyphRanges([0x1,            0x25ca,         0])
         meslo_range = imgui.core.GlyphRanges([0x1,            0x2e2e,         0])
-        noto_range  = imgui.core.GlyphRanges([0x1,            0xfffd,         0])
-        mdi_range   = imgui.core.GlyphRanges([icons.min_char, icons.max_char, 0])
+        noto_range  = imgui.core.GlyphRanges([
+            0x001,  0x24F,   # Latin + Extended-A/B
+            0x300,  0x52F,   # Combining Marks, Greek, Cyrillic + Supplement
+            0x530,  0x6FF,   # Armenian, Hebrew, Arabic
+            0x900,  0x97F,   # Devanagari
+            0xE00,  0xE7F,   # Thai
+            0x1E00, 0x1EFF,  # Latin Extended Additional (incl. Vietnamese)
+            0x2000, 0x206F,  # General Punctuation (en/em dash, quotes, etc.)
+            0x20A0, 0x20CF,  # Currency symbols (€, ₹, ₩, etc.)
+            0
+        ])
+        mdi_range   = imgui.core.GlyphRanges(_build_mdi_range())
         mixin_range = imgui.core.GlyphRanges([0x3000,         0x3000,         0])
         msgbox_range_values = []
         for icon in [icons.information, icons.alert_rhombus, icons.alert_octagon]:
