@@ -63,8 +63,7 @@ def _():
 _()
 
 # Discover available browsers
-import threading
-def _discover_browsers():
+def _():
     if os is Os.Windows:
         import winreg
         for registry in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
@@ -143,7 +142,7 @@ def _discover_browsers():
                         break
             except Exception:
                 pass
-threading.Thread(target=_discover_browsers, daemon=True).start()
+_()
 
 # Check self launch command and startup settings
 start_cmd = None
