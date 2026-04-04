@@ -264,6 +264,7 @@ def _build_mdi_range() -> list[int]:
     global _used_mdi_range
     if _used_mdi_range is not None:
         return _used_mdi_range
+    import enum
     import types
     from modules import icons
     icon_names = icons.names  # {dash-name: char}
@@ -287,6 +288,13 @@ def _build_mdi_range() -> list[int]:
                     fn = getattr(m, "__func__", None) or (m if isinstance(m, types.FunctionType) else None)
                     if isinstance(fn, types.FunctionType):
                         scan(fn.__code__)
+                if issubclass(attr, enum.IntEnum):
+                    for member in attr:
+                        icon = getattr(member, "icon", None)
+                        if isinstance(icon, str):
+                            char = icon_names.get(icon.replace("_", "-"))
+                            if char:
+                                used.add(ord(char))
     chars = sorted(used)
     _used_mdi_range = [v for c in chars for v in (c, c)] + [0]
     return _used_mdi_range
