@@ -293,6 +293,8 @@ def thread(res: bytes) -> ParsedThread | ParserError:
             type = Type.ADRIFT
         elif game_has_prefixes("Flash"):
             type = Type.Flash
+        elif game_has_prefixes("Godot"):
+            type = Type.Godot
         elif game_has_prefixes("HTML"):
             type = Type.HTML
         elif game_has_prefixes("Java"):
