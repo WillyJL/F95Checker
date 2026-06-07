@@ -30,6 +30,14 @@ def apply():
             process = meta.self_path.parent / "Helpers/QtWebEngineProcess.app/Contents/MacOS/QtWebEngineProcess"
             if process.is_file():
                 os.environ["QTWEBENGINEPROCESS_PATH"] = str(process)
+                # Qt looks up its paths via CFBundleGetBundleWithIdentifier, which returns NULL
+                # for flat dylibs (not framework bundles). CFBundleCopyBundleURL(NULL) crashes
+                # in __CFCheckCFInfoPACSignature. Providing qt.conf bypasses the CFBundle lookup.
+                qtconf_dir = process.parent.parent / "Resources"
+                qtconf_path = qtconf_dir / "qt.conf"
+                if not qtconf_path.exists():
+                    qtconf_dir.mkdir(parents=True, exist_ok=True)
+                    qtconf_path.write_text("[Paths]\nPrefix = ../../../Resources/lib/PyQt6/Qt6\n")
 
     # Pillow image loading fixes
     import pillow_avif
