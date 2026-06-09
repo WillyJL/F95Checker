@@ -1406,6 +1406,7 @@ async def download_file(download: FileDownload):
         download.path.parent.mkdir(parents=True, exist_ok=True)
         async with aiofiles.open(download.path, "wb") as file:
             download.state = download.State.Downloading
+            download.start = time.time()
 
             can_resume = None
             while True:
@@ -1433,6 +1434,7 @@ async def download_file(download: FileDownload):
                                 return
                             if chunk:
                                 download.progress += await file.write(chunk)
+                                download.current = time.time()
                     except aiohttp.ClientPayloadError as exc:
                         if "ContentLengthError" in str(exc):
                             continue
@@ -1625,7 +1627,7 @@ def open_ddl_popup(game: Game):
                     if already_downloading:
                         imgui.pop_disabled()
                         globals.gui.draw_hover_text(
-                            "This file is already downloading in F95Checker.\n"
+                            "This file is currently downloading in F95Checker.\n"
                             "You can find it in the sidebar, below the settings.",
                             text=None,
                         )
