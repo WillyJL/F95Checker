@@ -320,6 +320,8 @@ class FileDownload:
 
     cancel: bool = False
     state: State = State.Preparing
+    start: Timestamp = time.time()
+    current:  Timestamp = time.time()
     extracted: pathlib.Path = None
     error: str = None
     traceback: str = None

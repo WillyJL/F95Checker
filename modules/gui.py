@@ -2138,11 +2138,12 @@ class MainGUI():
     def draw_game_info_popup(self, game: Game, carousel_ids: list = None, popup_uuid: str = ""):
         def popup_content():
             # Image
+            imgui.indent(imgui.style.scrollbar_size)
             image = game.image
             avail = imgui.get_content_region_available()
-            if imgui.get_scroll_max_y() > 0.0:
+            if imgui.get_scroll_max_y() <= 0.0:
                 # Avoid shifing content with/without scroll bar
-                avail = avail._replace(x=avail.x + imgui.style.scrollbar_size)
+                avail = avail._replace(x=avail.x - imgui.style.scrollbar_size)
             close_image = False
             zoom_popup = False
             out_height = (min(avail.y, self.scaled(690)) * self.scaled(0.4)) or 1
@@ -2229,6 +2230,7 @@ class MainGUI():
                 imgui.end_child()
                 imgui.set_cursor_pos(prev_pos)
                 imgui.dummy(out_width, out_height)
+            imgui.unindent(imgui.style.scrollbar_size)
             imgui.push_text_wrap_pos()
 
             imgui.push_font(imgui.fonts.big)
@@ -4015,6 +4017,9 @@ class MainGUI():
                         if imgui.selectable(f"{icons.reload_alert} Full Refresh (incl. everything)", False)[0]:
                             utils.start_refresh_task(api.refresh(full=True, force_archived=True, force_completed=True))
                 imgui.separator()
+                if imgui.selectable(f"{icons.monitor_arrow_down_variant} Check for app updates", False)[0]:
+                    utils.start_update_check()
+                imgui.separator()
                 if imgui.selectable(f"{icons.information_outline} More info", False)[0]:
                     utils.push_popup(
                         msgbox.msgbox, "About refreshing",
@@ -5255,11 +5260,13 @@ class MainGUI():
                     space_after = 0
 
                 ratio = download.progress / (download.total or 1)
+                downd = download.progress
+                speed = downd / ((download.current - download.start) or 1)
                 width = imgui.get_content_region_available_width() - space_after
                 height = imgui.get_frame_height()
                 imgui.progress_bar(ratio, (width, height))
                 if download.state == download.State.Downloading:
-                    text = f"{ratio:.0%}"
+                    text = f"{utils.sizeof_fmt(downd):>7} {min(ratio, 99):>3.0%} ({utils.sizeof_fmt(speed):>7}/s)"
                 elif download.state == download.State.Stopped:
                     if not errored:
                         text = "Done!"
@@ -5279,6 +5286,7 @@ class MainGUI():
                 else:
                     text = f"{download.state.name}..."
                 imgui.same_line()
+                imgui.push_font(imgui.fonts.mono_sm)
                 draw_list = imgui.get_window_draw_list()
                 col = imgui.get_color_u32_rgba(1, 1, 1, 1)
                 text_size = imgui.calc_text_size(text)
@@ -5286,6 +5294,7 @@ class MainGUI():
                 text_x = screen_pos.x - (width + text_size.x) / 2 - imgui.style.item_spacing.x
                 text_y = screen_pos.y + (height - text_size.y) / 2
                 draw_list.add_text(text_x, text_y, col, text)
+                imgui.pop_font()
 
                 if download.state == download.State.Downloading:
                     if was_canceling := download.cancel:

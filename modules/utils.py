@@ -47,12 +47,26 @@ def clean_str(text: str):
 
 
 # https://stackoverflow.com/a/1094933
+# Edited to always return at most 4 digit characters, eg:
+#  1.0MiB
+# 10.0MiB
+#  100MiB
+# 1000MiB
+# Makes it trivial to align by left-padding to 7 characters
 def sizeof_fmt(num, suffix="B"):
     for unit in ("", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"):
         if abs(num) < 1024.0:
-            return f"{num:3.1f}{unit}{suffix}"
+            if num < 100.0:
+                num = round(num, 1)
+            else:
+                num = int(num)
+            return f"{num}{unit}{suffix}"
         num /= 1024.0
-    return f"{num:.1f}Yi{suffix}"
+    if num < 100.0:
+        num = round(num, 1)
+    else:
+        num = int(num)
+    return f"{num}Yi{suffix}"
 
 
 @functools.cache
@@ -89,6 +103,16 @@ def is_refreshing():
     if globals.refresh_task and not globals.refresh_task.done():
         return True
     return False
+
+
+def start_update_check():
+    from modules import api
+    globals.last_update_check = None
+    update_check = async_thread.run(api.check_updates())
+    def reset_timer(_):
+        if globals.last_update_check is None:
+            globals.last_update_check = 0.0
+    update_check.add_done_callback(reset_timer)
 
 
 def start_refresh_task(coro: typing.Coroutine, reset_bg_timers=True, notify_new_games=True):
@@ -139,13 +163,7 @@ def start_refresh_task(coro: typing.Coroutine, reset_bg_timers=True, notify_new_
         except concurrent.futures.CancelledError:
             return
         if globals.last_update_check is not None and globals.last_update_check < time.time() - 21600:  # Check updates after refreshing at 6 hour intervals
-            from modules import api
-            globals.last_update_check = None
-            update_check = async_thread.run(api.check_updates())
-            def reset_timer(_):
-                if globals.last_update_check is None:
-                    globals.last_update_check = 0.0
-            update_check.add_done_callback(reset_timer)
+            start_update_check()
     globals.refresh_task.add_done_callback(done_callback)
 
 
