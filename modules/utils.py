@@ -105,6 +105,16 @@ def is_refreshing():
     return False
 
 
+def start_update_check():
+    from modules import api
+    globals.last_update_check = None
+    update_check = async_thread.run(api.check_updates())
+    def reset_timer(_):
+        if globals.last_update_check is None:
+            globals.last_update_check = 0.0
+    update_check.add_done_callback(reset_timer)
+
+
 def start_refresh_task(coro: typing.Coroutine, reset_bg_timers=True, notify_new_games=True):
     if is_refreshing():
         return
@@ -153,13 +163,7 @@ def start_refresh_task(coro: typing.Coroutine, reset_bg_timers=True, notify_new_
         except concurrent.futures.CancelledError:
             return
         if globals.last_update_check is not None and globals.last_update_check < time.time() - 21600:  # Check updates after refreshing at 6 hour intervals
-            from modules import api
-            globals.last_update_check = None
-            update_check = async_thread.run(api.check_updates())
-            def reset_timer(_):
-                if globals.last_update_check is None:
-                    globals.last_update_check = 0.0
-            update_check.add_done_callback(reset_timer)
+            start_update_check()
     globals.refresh_task.add_done_callback(done_callback)
 
 

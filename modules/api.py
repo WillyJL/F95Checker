@@ -1257,33 +1257,27 @@ async def check_updates():
             dst = globals.self_path.parent.parent.absolute()  # F95Checker.app/Contents/MacOS
         pid = os.getpid()
         if globals.os is Os.Windows:
-            script = "\n".join((
-                "try {"
-                'Write-Host "Waiting for F95Checker to quit..."',
-                f"Wait-Process -Id {pid}",
-                'Write-Host "Sleeping 3 seconds..."',
-                "Start-Sleep -Seconds 3",
-                'Write-Host "Deleting old version files..."',
-                " | ".join((
-                    f'Get-ChildItem -Force -Recurse -Path "{dst}"',
-                    "Select-Object -ExpandProperty FullName",
-                    "Sort-Object -Property Length -Descending",
-                    "Remove-Item -Force -Recurse",
-                )),
-                'Write-Host "Moving new version files..."',
-                " | ".join((
-                    f'Get-ChildItem -Force -Path "{src}"',
-                    "Select-Object -ExpandProperty FullName",
-                    f'Move-Item -Force -Destination "{dst}"',
-                )),
-                'Write-Host "Sleeping 3 seconds..."',
-                "Start-Sleep -Seconds 3",
-                'Write-Host "Starting F95Checker..."',
-                f"& {globals.start_cmd}",
-                "} catch {",
-                'Write-Host "An error occurred:`n" $_.InvocationInfo.PositionMessage "`n" $_',
-                "}",
-            ))
+            script = f"""\
+try {{
+    Write-Host "Waiting for F95Checker to quit..."
+    try {{
+        Wait-Process -Id {pid}
+    }} catch {{
+        Write-Host "F95Checker seems to have already quit"
+    }}
+    Write-Host "Sleeping 3 seconds..."
+    Start-Sleep -Seconds 3
+    Write-Host "Deleting old version files..."
+    Get-ChildItem -Force -Recurse -Path "{dst}" | Select-Object -ExpandProperty FullName | Sort-Object -Property Length -Descending | Remove-Item -Force -Recurse
+    Write-Host "Moving new version files..."
+    Get-ChildItem -Force -Path "{src}" | Select-Object -ExpandProperty FullName | Move-Item -Force -Destination "{dst}"
+    Write-Host "Sleeping 3 seconds..."
+    Start-Sleep -Seconds 3
+    Write-Host "Starting F95Checker..."
+    & {globals.start_cmd}
+}} catch {{
+    Write-Host "An error occurred:`n" $_.InvocationInfo.PositionMessage "`n" $_
+}}"""
             shell = [shutil.which("powershell")]
         else:
             for item in dst.iterdir():

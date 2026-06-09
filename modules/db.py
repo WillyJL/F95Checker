@@ -161,8 +161,30 @@ async def create_table(table_name: str, columns: dict[str, str], renames: list[t
 async def connect():
     global connection
 
-    migrate = not (globals.data_path / "db.sqlite3").is_file()
-    connection = await aiosqlite.connect(globals.data_path / "db.sqlite3")
+    db_path = globals.data_path / "db.sqlite3"
+
+    db_abs = db_path.resolve()
+    self_abs = globals.self_path.resolve()
+    if self_abs in db_abs.parents:
+        utils.push_popup(
+            msgbox.msgbox, "Unsupported configuration",
+            "The app data location:\n"
+            f"{db_path}\n"
+            "resides in a location:\n"
+            f"{db_abs}\n"
+            "which is inside the app install files:\n"
+            f"{self_abs}\n"
+            "\n"
+            "DO NOT:\n"
+            "- place the app install files inside the app data location\n"
+            "- symlink the app data location inside the app install files\n"
+            "The current configuration WILL lead to IRRECOVERABLE LOSS OF DATA upon app updates.",
+            MsgBox.error,
+            buttons={}
+        )
+
+    migrate = not db_path.is_file()
+    connection = await aiosqlite.connect(db_path)
     connection.row_factory = aiosqlite.Row  # Return sqlite3.Row instead of tuple
 
     await create_table(

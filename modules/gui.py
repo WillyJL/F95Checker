@@ -4015,6 +4015,9 @@ class MainGUI():
                         if imgui.selectable(f"{icons.reload_alert} Full Refresh (incl. everything)", False)[0]:
                             utils.start_refresh_task(api.refresh(full=True, force_archived=True, force_completed=True))
                 imgui.separator()
+                if imgui.selectable(f"{icons.monitor_arrow_down_variant} Check for app updates", False)[0]:
+                    utils.start_update_check()
+                imgui.separator()
                 if imgui.selectable(f"{icons.information_outline} More info", False)[0]:
                     utils.push_popup(
                         msgbox.msgbox, "About refreshing",
