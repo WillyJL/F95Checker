@@ -88,6 +88,15 @@ jobs:
           mkdir ./dist/
           mv ./build/*.app/ ./dist/
 
+          # Qt looks up its paths via CFBundleGetBundleWithIdentifier, which returns NULL
+          # for flat dylibs (not framework bundles). CFBundleCopyBundleURL(NULL) crashes
+          # in __CFCheckCFInfoPACSignature. Providing qt.conf bypasses the CFBundle lookup.
+          mkdir $(echo ./dist/*.app)/Contents/Helpers/QtWebEngineProcess.app/Contents/Resources/
+          cat << EOF > $(echo ./dist/*.app)/Contents/Helpers/QtWebEngineProcess.app/Contents/Resources/qt.conf
+          [Paths]
+          Prefix = ../../../Resources/lib/PyQt6/Qt6
+          EOF
+
       - name: "Resolve symlinks (Linux, macOS)"
         if: "runner.os != 'Windows'"
         run: |
