@@ -2,7 +2,7 @@
 - Right click option on Refresh button to manually check app updates (by @WillyJL)
 
 ### Updated:
-- Nothing
+- Show download size and speed in Donor DDL progress bar (#271 by @FaceCrap & @WillyJL)
 
 ### Fixed:
 - Fix updating on Windows when the app closes faster than Powershell starts (by @WillyJL)
