@@ -47,12 +47,26 @@ def clean_str(text: str):
 
 
 # https://stackoverflow.com/a/1094933
+# Edited to always return at most 4 digit characters, eg:
+#  1.0MiB
+# 10.0MiB
+#  100MiB
+# 1000MiB
+# Makes it trivial to align by left-padding to 7 characters
 def sizeof_fmt(num, suffix="B"):
     for unit in ("", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"):
         if abs(num) < 1024.0:
-            return f"{num:3.1f}{unit}{suffix}"
+            if num < 100.0:
+                num = round(num, 1)
+            else:
+                num = int(num)
+            return f"{num}{unit}{suffix}"
         num /= 1024.0
-    return f"{num:.1f}Yi{suffix}"
+    if num < 100.0:
+        num = round(num, 1)
+    else:
+        num = int(num)
+    return f"{num}Yi{suffix}"
 
 
 @functools.cache
