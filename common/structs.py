@@ -976,6 +976,9 @@ class Game:
     reviews            : list[Review]
     selected           : bool = False
     image              : "imagehelper.ImageHelper" = None
+    preview_images     : list["imagehelper.ImageHelper"] = dataclasses.field(default_factory=list)
+    previews_loading   : bool = False
+    previews_loaded    : bool = False
     executables_valids : list[bool] = None
     executables_valid  : bool = None
     timeline_events    : list[TimelineEvent] = dataclasses.field(default_factory=list)
@@ -998,15 +1001,67 @@ class Game:
         from external import imagehelper
         from modules import globals
         self.image = imagehelper.ImageHelper(globals.images_path, glob=f"{self.id}.*")
+        self.preview_images = []
         self.validate_executables()
+
+    async def load_previews_async(self):
+        """Download and cache the indexer's preview URLs on first use.
+
+        Preview URLs are intentionally not part of the cover-image cache: the
+        latter uses ``<id>.*`` and is replaced during refreshes.  Keeping the
+        preview cache under a separate prefix prevents a cover reset from
+        deleting the gallery.
+        """
+        if self.previews_loading or self.previews_loaded or not self.previews_urls:
+            return
+        self.previews_loading = True
+        try:
+            from external import imagehelper
+            from modules import api, globals, utils
+            self.preview_images.clear()
+            for index, url in enumerate(self.previews_urls):
+                if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+                    continue
+                digest = hashlib.sha1(url.encode("utf-8")).hexdigest()[:16]
+                glob = f"preview-{self.id}-{digest}.*"
+                paths = list(globals.images_path.glob(glob))
+                if not paths:
+                    try:
+                        data = await api.fetch(
+                            "GET", url,
+                            timeout=globals.settings.request_timeout * 4,
+                            raise_for_status=True,
+                        )
+                        if data:
+                            path = globals.images_path / f"preview-{self.id}-{digest}.{utils.image_ext(data)}"
+                            path.write_bytes(data)
+                    except Exception:
+                        continue
+                self.preview_images.append(imagehelper.ImageHelper(globals.images_path, glob=glob))
+            self.previews_loaded = True
+        finally:
+            self.previews_loading = False
 
     def delete_images(self):
         from modules import globals
+        self.unload_previews()
         for img in globals.images_path.glob(f"{self.id}.*"):
             try:
                 img.unlink()
             except Exception:
                 pass
+        for img in globals.images_path.glob(f"preview-{self.id}-*"):
+            try:
+                img.unlink()
+            except Exception:
+                pass
+
+    def unload_previews(self):
+        """Release decoded preview data and GPU textures, keeping disk cache."""
+        for image in self.preview_images:
+            image.unload()
+        self.preview_images.clear()
+        self.previews_loaded = False
 
     def refresh_image(self):
         self.image.glob = f"{self.id}.*"

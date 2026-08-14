@@ -2146,6 +2146,7 @@ class MainGUI():
                 avail = avail._replace(x=avail.x - imgui.style.scrollbar_size)
             close_image = False
             zoom_popup = False
+            rounding = self.scaled(globals.settings.style_corner_radius)
             out_height = (min(avail.y, self.scaled(690)) * self.scaled(0.4)) or 1
             out_width = avail.x or 1
             if image.error:
@@ -2170,7 +2171,6 @@ class MainGUI():
                 imgui.dummy(width + 2.0, height)
                 imgui.set_scroll_x(1.0)
                 imgui.set_cursor_screen_pos(image_pos)
-                rounding = self.scaled(globals.settings.style_corner_radius)
                 image.render(width, height, rounding=rounding)
                 if imgui.is_item_hovered():
                     # Image popup
@@ -2231,6 +2231,44 @@ class MainGUI():
                 imgui.set_cursor_pos(prev_pos)
                 imgui.dummy(out_width, out_height)
             imgui.unindent(imgui.style.scrollbar_size)
+
+            # The indexer stores these URLs separately from the cover image.
+            # Load them lazily so opening an info popup does not slow startup
+            # or download images for games the user never inspects.
+            if game.previews_urls:
+                if not game.previews_loaded and not game.previews_loading:
+                    async_thread.run(game.load_previews_async())
+                if game.preview_images:
+                    imgui.text(f"Previews ({len(game.preview_images)})")
+                    # Keep each preview at a useful thumbnail size and put
+                    # the row in a child with an explicit horizontal bar.
+                    # Without a child, ImGui clips same-line items at the
+                    # popup boundary and the parent only scrolls vertically.
+                    preview_width = max(self.scaled(240), (out_width - imgui.style.item_spacing.x) / 2)
+                    preview_height = self.scaled(260)
+                    horizontal_flags = (
+                        getattr(imgui, "WINDOW_HORIZONTAL_SCROLLING_BAR", 0) |
+                        getattr(imgui, "WINDOW_ALWAYS_HORIZONTAL_SCROLLBAR", 0)
+                    )
+                    imgui.begin_child(
+                        "###game_previews_gallery",
+                        width=out_width,
+                        height=preview_height + imgui.get_frame_height() + imgui.style.item_spacing.y,
+                        flags=horizontal_flags,
+                    )
+                    first = True
+                    for preview in game.preview_images:
+                        if preview.error:
+                            continue
+                        aspect = preview.height / preview.width if preview.width else 1.0
+                        height = min(preview_height, preview_width * aspect)
+                        if not first:
+                            imgui.same_line()
+                        preview.render(preview_width, height, rounding=rounding)
+                        first = False
+                    imgui.end_child()
+                elif game.previews_loading:
+                    imgui.text("Loading previews...")
             imgui.push_text_wrap_pos()
 
             imgui.push_font(imgui.fonts.big)
@@ -2739,13 +2777,21 @@ class MainGUI():
                             idx = 0
                         change_id = carousel_ids[idx]
             if change_id is not None:
+                # Swiping to another game closes this popup's gallery. Keep
+                # the downloaded files, but release decoded/GPU image data.
+                game.unload_previews()
                 utils.push_popup(self.draw_game_info_popup, globals.games[change_id], carousel_ids).uuid = popup_uuid
                 return True
             elif utils.close_weak_popup():
                     return True
         if game.id not in globals.games:
             return 0, True
-        return utils.popup(game.name, popup_content, closable=True, outside=False, resize=False, popup_uuid=popup_uuid)
+        result = utils.popup(game.name, popup_content, closable=True, outside=False, resize=False, popup_uuid=popup_uuid)
+        if result[1]:
+            # A closed info popup is no longer a visible owner of its
+            # textures. The URL cache stays on disk for cheap reopening.
+            game.unload_previews()
+        return result
 
     def draw_about_popup(self, popup_uuid: str = ""):
         def popup_content():
