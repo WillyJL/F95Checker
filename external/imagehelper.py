@@ -420,7 +420,11 @@ class ImageHelper:
                             tex_pos = 64 + kv_len
                             tex_len = struct.unpack(fmt, ktx_temp[tex_pos:tex_pos + 4])[0]
                             tex_pos += 4
-                            frames.append((ktx_temp[tex_pos:tex_pos + tex_len], int(frame.info.get("duration", 0))))
+                            texture = ktx_temp[tex_pos:tex_pos + tex_len]
+                            duration = int(frame.info.get("duration", 0))
+                            if duration < 1:
+                                duration = 100
+                            frames.append((texture, duration))
                             frames_remaining -= 1
                             compress_counter -= 1
                         ktx = build_ktx(texture_format, texture_pixfmt, pix_w, pix_h, frames)
@@ -475,11 +479,11 @@ class ImageHelper:
                 texture_len = struct.unpack("<Q", frames_data[data_pos:data_pos + 8])[0]
                 data_pos += 8
                 duration = struct.unpack("<I", frames_data[data_pos:data_pos + 4])[0]
+                if duration < 1:
+                    duration = 100
                 data_pos += 4
                 texture = frames_data[data_pos:data_pos + texture_len]
                 data_pos += texture_len
-                if duration < 1:
-                    duration = 100
                 frames.append((texture, duration))
 
             ktx = build_ktx(astc_format, astc_pixfmt, dim_x, dim_y, frames)
@@ -612,7 +616,10 @@ class ImageHelper:
                     if kv[4:4 + kv_pair_len].startswith(ktx_durations):
                         durationsms = kv[4 + len(ktx_durations):4 + kv_pair_len]
                         while len(durationsms) >= 4:
-                            durations.append(struct.unpack(fmt, durationsms[0:4])[0])
+                            duration = struct.unpack(fmt, durationsms[0:4])[0]
+                            if duration < 1:
+                                duration = 100
+                            durations.append(duration)
                             durationsms = durationsms[4:]
                         break
                     kv = kv[4 + kv_pair_len:]
@@ -671,7 +678,8 @@ class ImageHelper:
                 else:
                     texture = frame.convert("RGBA").tobytes("raw", "RGBA")
                 self.textures.append((texture, gl.GL_RGBA))
-                if (duration := frame.info.get("duration", 0)) < 1:
+                duration = frame.info.get("duration", 0)
+                if duration < 1:
                     duration = 100
                 self.durations.append(duration / 1000)
                 if first_frame:

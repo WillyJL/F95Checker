@@ -196,7 +196,7 @@ async def _launch_exe(executable: str):
         exe_flag = not (mode & stat.S_IEXEC < stat.S_IEXEC)
         with exe.open("rb") as f:
             # Check for shebang, exe and msi magic numbers
-            exe_magic = f.read(8).startswith((b"#!", b"MZ", b"ZM", b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"))
+            exe_magic = f.read(8).startswith((b"#!", b"\x7FELF", b"MZ", b"ZM", b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"))
         if exe_magic and not exe_flag:
             # Should be executable but isn't, fix it
             exe.chmod(mode | stat.S_IEXEC)

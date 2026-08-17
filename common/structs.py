@@ -174,6 +174,8 @@ class ChildPipe(AbstractPipe):
                 await self.stdin_event.wait()
                 self.stdin_event.clear()
             line = await self.loop.run_in_executor(None, sys.stdin.readline)
+            if not line:
+                return None
             try:
                 return json.loads(line)
             except json.JSONDecodeError:
