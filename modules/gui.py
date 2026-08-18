@@ -808,6 +808,7 @@ class MainGUI():
     def hide(self, *_, **__):
         if threading.current_thread() is not threading.main_thread():
             self.call_soon.append(self.hide)
+            return
         self.screen_pos = glfw.get_window_pos(self.window)
         glfw.hide_window(self.window)
         self.tray.update_status()
@@ -815,6 +816,7 @@ class MainGUI():
     def show(self, *_, **__):
         if threading.current_thread() is not threading.main_thread():
             self.call_soon.append(self.show)
+            return
         self.bg_mode_timer = None
         self.bg_mode_notifs_timer = None
         # if not self.hidden:
