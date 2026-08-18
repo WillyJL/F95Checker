@@ -836,6 +836,9 @@ class Settings:
     copy_urls_as_bbcode         : bool
     datestamp_format            : str
     default_exe_dir             : dict[Os, str]
+    default_launch_wrapper      : dict[int, str]
+    extra_runners_dir           : str
+    runner_prefix_dir           : str
     default_tab_is_new          : bool
     display_mode                : DisplayMode
     display_tab                 : Tab.get
@@ -969,6 +972,7 @@ class Game:
     updated            : bool | None
     archived           : bool
     executables        : list[str]
+    launch_wrapper     : str
     description        : str
     changelog          : str
     tags               : tuple[Tag]
