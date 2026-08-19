@@ -975,6 +975,9 @@ class Game:
     reviews_total      : int
     reviews            : list[Review]
     selected           : bool = False
+    launch_state       : str = ""
+    launch_started     : float = 0.0
+    launch_process     : typing.Any = None
     image              : "imagehelper.ImageHelper" = None
     executables_valids : list[bool] = None
     executables_valid  : bool = None

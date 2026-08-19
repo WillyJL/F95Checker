@@ -4,6 +4,7 @@ import difflib
 import os
 import pathlib
 import plistlib
+import psutil
 import re
 import shlex
 import stat
@@ -189,6 +190,19 @@ async def _launch_exe(executable: str):
         return
 
     if globals.os is Os.Windows:
+        with exe.open("rb") as f:
+            exe_magic = f.read(8).startswith((b"MZ", b"ZM"))
+        if exe_magic:
+            try:
+                return await asyncio.create_subprocess_exec(
+                    str(exe),
+                    cwd=str(exe.parent),
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+            except OSError:
+                pass
         # Open with default app
         await default_open(str(exe), cwd=str(exe.parent))
     else:
@@ -210,7 +224,7 @@ async def _launch_exe(executable: str):
                         file.chmod(mode | stat.S_IEXEC)
         if exe_magic and exe_flag:
             # Run as executable
-            await asyncio.create_subprocess_exec(
+            return await asyncio.create_subprocess_exec(
                 str(exe),
                 cwd=str(exe.parent),
                 stdin=subprocess.DEVNULL,
@@ -222,9 +236,85 @@ async def _launch_exe(executable: str):
             await default_open(str(exe), cwd=str(exe.parent))
 
 
+playing_grace_seconds = 3
+launch_state_changed = False
+
+
+def _track_launch(game: Game, process):
+    if process is None:
+        return
+    global launch_state_changed
+    game.launch_process = process
+    game.launch_started = time.time()
+    game.launch_state = "starting"
+    launch_state_changed = True
+
+    async def watch():
+        global launch_state_changed
+        tree = {}
+
+        def remember(proc):
+            try:
+                tree[(proc.pid, proc.create_time())] = proc
+            except psutil.Error:
+                pass
+
+        def scan():
+            pids = {pid for pid, _ in tree}
+            try:
+                for proc in psutil.process_iter(("pid", "ppid")):
+                    if proc.info["ppid"] in pids and proc.pid not in pids:
+                        remember(proc)
+            except psutil.Error:
+                pass
+
+        def tree_alive():
+            scan()
+            for proc in tree.values():
+                try:
+                    if proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE:
+                        return True
+                except psutil.Error:
+                    pass
+            return False
+
+        try:
+            remember(psutil.Process(process.pid))
+        except psutil.Error:
+            pass
+        deadline = time.time() + playing_grace_seconds
+        while time.time() < deadline:
+            try:
+                await asyncio.wait_for(asyncio.shield(process.wait()), timeout=0.25)
+            except (asyncio.TimeoutError, TimeoutError):
+                pass
+            scan()
+            if process.returncode is not None and not tree_alive():
+                break
+        else:
+            if game.launch_process is process:
+                game.launch_state = "playing"
+                launch_state_changed = True
+            while process.returncode is None or tree_alive():
+                if process.returncode is None:
+                    try:
+                        await asyncio.wait_for(asyncio.shield(process.wait()), timeout=1)
+                    except (asyncio.TimeoutError, TimeoutError):
+                        pass
+                else:
+                    await asyncio.sleep(1)
+        if game.launch_process is process:
+            game.launch_state = ""
+            game.launch_started = 0.0
+            game.launch_process = None
+            launch_state_changed = True
+
+    async_thread.run(watch())
+
+
 async def _launch_game_exe(game: Game, executable: str):
     try:
-        await _launch_exe(executable)
+        _track_launch(game, await _launch_exe(executable))
         game.last_launched = time.time()
         exe = pathlib.Path(executable)
         if utils.is_uri(executable):
