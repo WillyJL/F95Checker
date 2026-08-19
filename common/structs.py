@@ -953,6 +953,7 @@ class Game:
     last_full_check    : int
     last_check_version : str
     last_launched      : Datestamp
+    playtime           : float
     score              : float
     votes              : int
     rating             : int
@@ -977,6 +978,7 @@ class Game:
     selected           : bool = False
     launch_state       : str = ""
     launch_started     : float = 0.0
+    launch_flushed     : float = 0.0
     launch_process     : typing.Any = None
     image              : "imagehelper.ImageHelper" = None
     executables_valids : list[bool] = None
@@ -1140,6 +1142,7 @@ class Game:
             "last_full_check",
             "last_check_version",
             "last_launched",
+            "playtime",
             "score",
             "votes",
             "rating",

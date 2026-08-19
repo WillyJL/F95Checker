@@ -2324,6 +2324,22 @@ class MainGUI():
                 self.draw_hover_text("Click to set as launched right now!", text=None)
 
                 imgui.table_next_row()
+                imgui.table_next_column()
+                imgui.text_disabled("Playtime:")
+                imgui.same_line()
+                playtime = game.playtime
+                if game.launch_state and game.launch_started:
+                    playtime += time.time() - game.launch_started - game.launch_flushed
+                if playtime >= 3600:
+                    imgui.text(f"{playtime / 3600:.1f}h")
+                elif playtime >= 60:
+                    imgui.text(f"{int(playtime / 60)}m")
+                elif playtime:
+                    imgui.text("<1m")
+                else:
+                    imgui.text("None")
+
+                imgui.table_next_row()
 
                 imgui.table_next_column()
                 imgui.text_disabled("Forum Score:")

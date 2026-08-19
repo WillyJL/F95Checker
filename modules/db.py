@@ -305,6 +305,7 @@ async def connect():
             "last_full_check":             f'INTEGER DEFAULT 0',
             "last_check_version":          f'TEXT    DEFAULT ""',
             "last_launched":               f'INTEGER DEFAULT 0',
+            "playtime":                    f'REAL    DEFAULT 0',
             "score":                       f'REAL    DEFAULT 0',
             "votes":                       f'INTEGER DEFAULT 0',
             "rating":                      f'INTEGER DEFAULT 0',
