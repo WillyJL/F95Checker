@@ -1128,6 +1128,19 @@ class Game:
         async_thread.run(db.create_timeline_event(self.id, Timestamp(time.time()), list(args), type))
 
 
+    @property
+    def playtime_display(self):
+        playtime = self.playtime
+        if self.launch_state and self.launch_started:
+            playtime += time.time() - self.launch_started - self.launch_flushed
+        if playtime >= 3600:
+            return f"{playtime / 3600:.1f}h"
+        if playtime >= 60:
+            return f"{int(playtime / 60)}m"
+        if playtime:
+            return "<1m"
+        return ""
+
     def __setattr__(self, name: str, value: typing.Any):
         if hasattr(self, "_did_init") and self._did_init and name in [
             "custom",

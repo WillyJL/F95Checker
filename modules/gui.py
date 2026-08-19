@@ -182,6 +182,11 @@ class Columns:
             self, f"{icons.account} Developer",
             sortable=True,
         )
+        self.playtime = self.Column(
+            self, f"{icons.timer_outline} Playtime",
+            sortable=True,
+            resizable=False,
+        )
         self.last_updated = self.Column(
             self, f"{icons.update} Last Updated",
             default=True,
@@ -2327,17 +2332,7 @@ class MainGUI():
                 imgui.table_next_column()
                 imgui.text_disabled("Playtime:")
                 imgui.same_line()
-                playtime = game.playtime
-                if game.launch_state and game.launch_started:
-                    playtime += time.time() - game.launch_started - game.launch_flushed
-                if playtime >= 3600:
-                    imgui.text(f"{playtime / 3600:.1f}h")
-                elif playtime >= 60:
-                    imgui.text(f"{int(playtime / 60)}m")
-                elif playtime:
-                    imgui.text("<1m")
-                else:
-                    imgui.text("None")
+                imgui.text(game.playtime_display or "None")
 
                 imgui.table_next_row()
 
@@ -3169,6 +3164,8 @@ class MainGUI():
                             key = lambda id: globals.games[id].type.name
                         case cols.developer.index:
                             key = lambda id: globals.games[id].developer.lower()
+                        case cols.playtime.index:
+                            key = lambda id: - globals.games[id].playtime
                         case cols.last_updated.index:
                             key = lambda id: - globals.games[id].last_updated.value
                         case cols.last_launched.index:
@@ -3386,6 +3383,10 @@ class MainGUI():
                                 imgui.text_disabled("  |  ".join(versions))
                         case cols.developer.index:
                             imgui.text(game.developer or "Unknown")
+                        case cols.playtime.index:
+                            imgui.push_font(imgui.fonts.mono)
+                            imgui.text(game.playtime_display or "None")
+                            imgui.pop_font()
                         case cols.last_updated.index:
                             imgui.push_font(imgui.fonts.mono)
                             imgui.text(game.last_updated.display or "Unknown")
@@ -3671,6 +3672,9 @@ class MainGUI():
         if cols.score.enabled:
             _cluster_text(cols.score.name, f"{game.score:.1f} ({game.votes})")
             self.draw_hover_text(f"Weighted: {utils.bayesian_average(game.score, game.votes):.2f}", text=None)
+        if cols.playtime.enabled and not drag_drop and game.playtime_display:
+            _cluster_text(cols.playtime.name, game.playtime_display)
+            imgui.dummy(0, 0)
         if cols.last_updated.enabled:
             _cluster_text(cols.last_updated.name, game.last_updated.display or "Unknown")
         if cols.last_launched.enabled:
@@ -3701,6 +3705,8 @@ class MainGUI():
                     _cluster_text(cols.finished_version.name, game.finished)
                 if cols.installed_version.enabled and game.installed:
                     _cluster_text(cols.installed_version.name, game.installed)
+        if cols.playtime.enabled and drag_drop and game.playtime_display:
+            _cluster_text(cols.playtime.name, game.playtime_display)
         if cluster:
             imgui.dummy(0, 0)
         # Notes line
