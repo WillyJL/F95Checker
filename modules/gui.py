@@ -805,16 +805,15 @@ class MainGUI():
     def hidden(self):
         return not glfw.get_window_attrib(self.window, glfw.VISIBLE)
 
-    def hide(self, *_, **__):
-        if threading.current_thread() is not threading.main_thread():
-            self.call_soon.append(self.hide)
+    def _hide(self, *_, **__):
         self.screen_pos = glfw.get_window_pos(self.window)
         glfw.hide_window(self.window)
         self.tray.update_status()
 
-    def show(self, *_, **__):
-        if threading.current_thread() is not threading.main_thread():
-            self.call_soon.append(self.show)
+    def hide(self, *_, **__):
+        self.call_soon.append(self._hide)
+
+    def _show(self, *_, **__):
         self.bg_mode_timer = None
         self.bg_mode_notifs_timer = None
         # if not self.hidden:
@@ -824,6 +823,9 @@ class MainGUI():
             glfw.set_window_pos(self.window, *self.screen_pos)
         glfw.focus_window(self.window)
         self.tray.update_status()
+
+    def show(self, *_, **__):
+        self.call_soon.append(self._show)
 
     def scaled(self, size: int | float):
         return _scaled(globals.settings.interface_scaling, size)
