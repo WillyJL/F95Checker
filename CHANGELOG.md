@@ -3,7 +3,7 @@
 - Locally tracked playtime duration (by @cicklolwut)
 
 ### Updated:
-- Nothing
+- Animations (Video and GIF) and Comics (CG, Comics, Manga and Pinup) thread types are detected properly now, "Collection" and "SiteRip" prefixes are now ignored (by @WillyJL)
 
 ### Fixed:
 - Fix window show/hide from other threads and from tray icon (by @cicklolwut & @WillyJL)

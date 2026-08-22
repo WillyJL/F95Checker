@@ -435,7 +435,13 @@ def sql_to_py(value: str | int | float, data_type: typing.Type):
                 else:
                     value = None
             else:
-                value = data_type(value)
+                try:
+                    value = data_type(value)
+                except ValueError:
+                    if hasattr(data_type, "Unknown"):
+                        value = data_type.Unknown
+                    else:
+                        raise
     return value
 
 
