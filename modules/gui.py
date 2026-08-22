@@ -811,16 +811,15 @@ class MainGUI():
     def hidden(self):
         return not glfw.get_window_attrib(self.window, glfw.VISIBLE)
 
-    def hide(self, *_, **__):
-        if threading.current_thread() is not threading.main_thread():
-            self.call_soon.append(self.hide)
+    def _hide(self, *_, **__):
         self.screen_pos = glfw.get_window_pos(self.window)
         glfw.hide_window(self.window)
         self.tray.update_status()
 
-    def show(self, *_, **__):
-        if threading.current_thread() is not threading.main_thread():
-            self.call_soon.append(self.show)
+    def hide(self, *_, **__):
+        self.call_soon.append(self._hide)
+
+    def _show(self, *_, **__):
         self.bg_mode_timer = None
         self.bg_mode_notifs_timer = None
         # if not self.hidden:
@@ -830,6 +829,9 @@ class MainGUI():
             glfw.set_window_pos(self.window, *self.screen_pos)
         glfw.focus_window(self.window)
         self.tray.update_status()
+
+    def show(self, *_, **__):
+        self.call_soon.append(self._show)
 
     def scaled(self, size: int | float):
         return _scaled(globals.settings.interface_scaling, size)
@@ -2850,11 +2852,12 @@ class MainGUI():
                 "ascsd",
                 "GioBol",
                 "Jarulf",
+                "salkrim",
                 "rozzic",
                 "Belfaier",
                 "warez_gamez",
                 "DeadMoan",
-                "And 3 anons"
+                "And 4 anons"
             ]:
                 if imgui.get_content_region_available_width() < imgui.calc_text_size(name).x + self.scaled(20):
                     imgui.dummy(0, 0)
@@ -2871,6 +2874,8 @@ class MainGUI():
             imgui.text("FaceCrap: Multiple small fixes, improvements and finetuning")
             imgui.bullet()
             imgui.text("blackop: Proxy support, temporary ratelimit fix, linux login fix")
+            imgui.bullet()
+            imgui.text("cicklolwut: Security fixes, Linux wine/proton config, playtime stats")
             imgui.bullet()
             imgui.text("Sam: Support from F95zone side to make much this possible")
             imgui.bullet()
