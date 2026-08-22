@@ -983,7 +983,7 @@ class Game:
     reviews_total      : int
     reviews            : list[Review]
     selected           : bool = False
-    launch_state       : str = ""
+    launch_state       : LaunchState = LaunchState.Idle
     launch_started     : float = 0.0
     launch_flushed     : float = 0.0
     launch_process     : typing.Any = None
@@ -1138,7 +1138,7 @@ class Game:
     @property
     def playtime_display(self):
         playtime = self.playtime
-        if self.launch_state and self.launch_started:
+        if self.launch_state is not LaunchState.Idle and self.launch_started:
             playtime += time.time() - self.launch_started - self.launch_flushed
         if playtime >= 3600:
             return f"{playtime / 3600:.1f}h"
