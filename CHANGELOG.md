@@ -1,5 +1,5 @@
 ### Added:
-- Nothing
+- Show launch state on the play button (by @cicklolwut)
 
 ### Updated:
 - Nothing
