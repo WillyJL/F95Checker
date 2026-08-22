@@ -290,12 +290,14 @@ def _track_launch(game: Game, process):
 
         def flush_playtime():
             nonlocal flushed
+            global launch_state_changed
             if game.launch_process is not process:
                 return
             session = time.time() - session_start
             game.playtime += session - flushed
             flushed = session
             game.launch_flushed = flushed
+            launch_state_changed = True
 
         deadline = time.time() + playing_grace_seconds
         while time.time() < deadline:
