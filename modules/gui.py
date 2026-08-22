@@ -251,9 +251,10 @@ class Columns:
             short_header=True,
         )
         self.playtime = self.Column(
-            self, f"{icons.timer_outline} Playtime",
+            self, f"{icons.timer_play_outline} Playtime",
             sortable=True,
             resizable=False,
+            short_header=True,
         )
 
 cols = Columns()
@@ -2332,10 +2333,8 @@ class MainGUI():
                     game.last_launched = time.time()
                     game.add_timeline_event(TimelineEventType.GameLaunched, "date set manually")
                 self.draw_hover_text("Click to set as launched right now!", text=None)
-
-                imgui.table_next_row()
-                imgui.table_next_column()
-                imgui.text_disabled("Playtime:")
+                imgui.same_line(spacing=0)
+                imgui.text_disabled(", Playtime:")
                 imgui.same_line()
                 imgui.text(game.playtime_display or "None")
 
