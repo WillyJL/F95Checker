@@ -183,11 +183,6 @@ class Columns:
             self, f"{icons.account} Developer",
             sortable=True,
         )
-        self.playtime = self.Column(
-            self, f"{icons.timer_outline} Playtime",
-            sortable=True,
-            resizable=False,
-        )
         self.last_updated = self.Column(
             self, f"{icons.update} Last Updated",
             default=True,
@@ -254,6 +249,11 @@ class Columns:
             sortable=True,
             resizable=False,
             short_header=True,
+        )
+        self.playtime = self.Column(
+            self, f"{icons.timer_outline} Playtime",
+            sortable=True,
+            resizable=False,
         )
 
 cols = Columns()
