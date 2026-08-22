@@ -17,6 +17,7 @@ import imgui
 
 from common.structs import (
     Game,
+    LaunchState,
     MsgBox,
     Os,
     SearchResult,
@@ -246,7 +247,7 @@ def _track_launch(game: Game, process):
     global launch_state_changed
     game.launch_process = process
     game.launch_started = time.time()
-    game.launch_state = "starting"
+    game.launch_state = LaunchState.Starting
     launch_state_changed = True
 
     async def watch():
@@ -293,7 +294,7 @@ def _track_launch(game: Game, process):
                 break
         else:
             if game.launch_process is process:
-                game.launch_state = "playing"
+                game.launch_state = LaunchState.Playing
                 launch_state_changed = True
             while process.returncode is None or tree_alive():
                 if process.returncode is None:
@@ -304,7 +305,7 @@ def _track_launch(game: Game, process):
                 else:
                     await asyncio.sleep(1)
         if game.launch_process is process:
-            game.launch_state = ""
+            game.launch_state = LaunchState.Idle
             game.launch_started = 0.0
             game.launch_process = None
             launch_state_changed = True
