@@ -1,5 +1,6 @@
 ### Added:
 - Show launch state on the play button (by @cicklolwut)
+- Locally tracked playtime duration (by @cicklolwut)
 
 ### Updated:
 - Nothing

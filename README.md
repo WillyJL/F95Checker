@@ -32,6 +32,7 @@ An update checker and library tool for (NSFW) games on the [F95zone](https://f95
   - Forum score (value out of 5) and personal rating (5 stars)
   - Forum reviews (20 most recents)
   - Personal notes (textbox you can use however you want)
+  - Locally tracked playtime duration
   - Most of these details, and some extras, tracked in a local timeline
 - Sorting and filtering by most of above details, with multisort and multifilter support
 - Tag highlighting to quickly spot content you might like and what to avoid
