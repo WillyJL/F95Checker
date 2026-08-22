@@ -915,10 +915,10 @@ class MainGUI():
                         or api.session.connector._acquired
                         or prev_focused != self.focused
                         or prev_hidden != self.hidden
-                        or launch_changed
                         or size != self.prev_size
                         or self.recalculate_ids
                         or self.new_styles
+                        or launch_changed
                         or api.updating
                     )
                     if draw:
