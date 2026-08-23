@@ -1,5 +1,5 @@
 ### Added:
-- Exe wrappers (#289 by @cicklolwut & @WillyJL):
+- Exe launch wrappers (#289 by @cicklolwut & @WillyJL):
   - Allows setting custom arguments and wrapper commands for launching
   - Support for Wine/Proton on Linux/macOS
 - Show launch state on the play button (#288 by @cicklolwut)
