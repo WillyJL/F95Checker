@@ -4727,8 +4727,9 @@ class MainGUI():
             imgui.spacing()
 
         if draw_settings_section("Labels"):
-            buttons_offset = right_width - (3 * frame_height + 2 * imgui.style.item_spacing.x)
-            for label in Label.instances:
+            buttons_offset = right_width - (5 * frame_height + 4 * imgui.style.item_spacing.x)
+            swap = None
+            for label_i, label in enumerate(Label.instances):
                 imgui.table_next_row()
                 imgui.table_next_column()
                 imgui.set_next_item_width(imgui.get_content_region_available_width() + buttons_offset + imgui.style.cell_padding.x)
@@ -4747,13 +4748,34 @@ class MainGUI():
                     label.color = (*value, 1.0)
                     async_thread.run(db.update_label(label, "color"))
                 imgui.same_line()
-                if imgui.button(icons.filter_plus_outline, width=frame_height):
+                if label_i == 0:
+                    imgui.push_disabled()
+                if imgui.button(f"{icons.arrow_up}###label_up_{label.id}", width=frame_height):
+                    swap = (label_i, label_i - 1)
+                if label_i == 0:
+                    imgui.pop_disabled()
+                imgui.same_line()
+                if label_i == len(Label.instances) - 1:
+                    imgui.push_disabled()
+                if imgui.button(f"{icons.arrow_down}###label_down_{label.id}", width=frame_height):
+                    swap = (label_i, label_i + 1)
+                if label_i == len(Label.instances) - 1:
+                    imgui.pop_disabled()
+                imgui.same_line()
+                if imgui.button(f"{icons.filter_plus_outline}###label_filter_{label.id}", width=frame_height):
                     flt = Filter(FilterMode.Label)
                     flt.match = label
                     self.filters.append(flt)
                 imgui.same_line()
-                if imgui.button(icons.trash_can_outline, width=frame_height):
+                if imgui.button(f"{icons.trash_can_outline}###label_delete_{label.id}", width=frame_height):
                     async_thread.run(db.delete_label(label))
+
+            if swap:
+                Label.instances[swap[0]], Label.instances[swap[1]] = Label.instances[swap[1]], Label.instances[swap[0]]
+                Label.update_positions()
+                for game in globals.games.values():
+                    game.labels.sort(key=lambda label: Label.instances.index(label))
+                async_thread.run(db.update_label_positions())
 
             draw_settings_label("New label:")
             if imgui.button("Add", width=right_width):

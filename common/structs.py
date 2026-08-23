@@ -674,6 +674,7 @@ class Label:
     id: int
     name: str
     color: tuple[float]
+    position: int
     instances: typing.ClassVar = []
 
     @property
@@ -700,6 +701,16 @@ class Label:
     def remove(cls, self):
         while self in cls.instances:
             cls.instances.remove(self)
+
+    @classmethod
+    def update_positions(cls):
+        for self_i, self in enumerate(cls.instances):
+            self.position = self_i
+
+    @classmethod
+    def sort_instances(cls):
+        cls.instances.sort(key=lambda self: self.position)
+        cls.update_positions()
 
 
 @dataclasses.dataclass(slots=True)
@@ -998,6 +1009,7 @@ class Game:
 
     def __post_init__(self):
         self._did_init = True
+        self.labels.sort(key=lambda label: Label.instances.index(label))
         if self.custom is None:
             self.custom = bool(self.status is Status.Custom)
         if self.id < 0:
