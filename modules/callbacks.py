@@ -37,9 +37,9 @@ from modules import (
     globals,
     icons,
     msgbox,
-    runners,
     utils,
     webview,
+    wine,
 )
 
 
@@ -170,24 +170,14 @@ async def default_open(what: str, cwd: str = None):
         )
 
 
-windows_exe_magics = (b"MZ", b"ZM", b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1")  # .exe and .msi
-unix_exe_magics = (b"#!", b"\x7FELF")  # Shebang and ELF
 launch_watch_seconds = 15
 launch_watchers = set()
 
 
-def is_windows_exe(exe: pathlib.Path):
-    try:
-        with exe.open("rb") as file:
-            return file.read(8).startswith(windows_exe_magics)
-    except OSError:
-        return False
-
-
 def resolve_launch_wrapper(game: Game):
-    if wrapper := (game.launch_wrapper or "").strip():
+    if wrapper := game.launch_wrapper.get(globals.os, "").strip():
         return wrapper
-    return (globals.settings.default_launch_wrapper.get(game.type) or "").strip()
+    return globals.settings.default_launch_wrapper.get(globals.os, {}).get(game.type, "").strip()
 
 
 async def _launch_exe(executable: str, wrapper: str = ""):
@@ -212,44 +202,60 @@ async def _launch_exe(executable: str, wrapper: str = ""):
         open_webpage(exe.as_uri())
         return
 
-    if wrapper and is_windows_exe(exe):
-        runners.ensure_prefix(wrapper)
+    if wrapper:
+        if wine.is_supported() and not wine.cache:
+            # Ensure wine.match_runner() will work
+            wine.refresh()
+        is_wine_wrapper = wine.is_supported() and wine.match_runner(wrapper)
         args = shlex.split(wrapper)
         if any("%command%" in arg for arg in args):
             args = [arg.replace("%command%", str(exe)) for arg in args]
         else:
             args.append(str(exe))
-        errors = tempfile.NamedTemporaryFile(prefix="f95checker-launch-", suffix=".log", delete=False)
+        stderr = subprocess.DEVNULL
+        if is_wine_wrapper:
+            wine.ensure_prefix(wrapper)
+            error_log_file = tempfile.NamedTemporaryFile(prefix="f95checker-launch-", suffix=".log", delete=False)
+            stderr = error_log_file
         process = await asyncio.create_subprocess_exec(
             *args,
             cwd=str(exe.parent),
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
-            stderr=errors
+            stderr=stderr
         )
-        async def watch_wrapper():
-            try:
-                code = await asyncio.wait_for(asyncio.shield(process.wait()), timeout=launch_watch_seconds)
-            except (asyncio.TimeoutError, TimeoutError):
-                code = None
-            errors.close()
-            if code:
-                output = pathlib.Path(errors.name).read_text(errors="ignore").strip()[-1000:]
-                message = f"The launch wrapper exited with code {code}."
-                utils.push_popup(
-                    msgbox.msgbox, "Game launch error",
-                    f"{message}\n\n{output}" if output else message,
-                    MsgBox.error
-                )
-            try:
-                os.unlink(errors.name)
-            except OSError:
-                pass
-        watcher = asyncio.create_task(watch_wrapper())
-        launch_watchers.add(watcher)
-        watcher.add_done_callback(launch_watchers.discard)
+        if is_wine_wrapper:
+            async def watch_wrapper():
+                try:
+                    code = await asyncio.wait_for(asyncio.shield(process.wait()), timeout=launch_watch_seconds)
+                except (asyncio.TimeoutError, TimeoutError):
+                    code = None
+                error_log_file.close()
+                if code:
+                    error_log = pathlib.Path(error_log_file.name).read_text(errors="ignore").strip()[-10000:]
+                    utils.push_popup(
+                        msgbox.msgbox, "Game launch error",
+                        f"The launch wrapper exited with code {code}.\n",
+                        MsgBox.error,
+                        more=(
+                            "Command:\n"
+                            f"{shlex.join(args)}\n"
+                            "\n"
+                            "Error log:\n"
+                            f"{error_log}"
+                        ),
+                    )
+                try:
+                    os.unlink(error_log_file.name)
+                except OSError:
+                    pass
+            watcher = asyncio.create_task(watch_wrapper())
+            launch_watchers.add(watcher)
+            watcher.add_done_callback(launch_watchers.discard)
         return process
 
+    windows_exe_magics = (b"MZ", b"ZM", b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1")  # .exe and .msi
+    unix_exe_magics = (b"#!", b"\x7FELF")  # Shebang and ELF
     if globals.os is Os.Windows:
         with exe.open("rb") as f:
             exe_magic = f.read(8).startswith(windows_exe_magics)

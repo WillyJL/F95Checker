@@ -837,9 +837,7 @@ class Settings:
     copy_urls_as_bbcode         : bool
     datestamp_format            : str
     default_exe_dir             : dict[Os, str]
-    default_launch_wrapper      : dict[int, str]
-    extra_runners_dir           : str
-    runner_prefix_dir           : str
+    default_launch_wrapper      : dict[Os, dict[int, str]]
     default_tab_is_new          : bool
     display_mode                : DisplayMode
     display_tab                 : Tab.get
@@ -902,6 +900,8 @@ class Settings:
     unload_offscreen_images     : bool
     vsync_ratio                 : int
     weighted_score              : bool
+    wine_extra_runners_dirs     : dict[Os, list[str]]
+    wine_prefixes_dir           : dict[Os, str]
     zoom_area                   : int
     zoom_enabled                : bool
     zoom_times                  : float
@@ -971,7 +971,7 @@ class Game:
     updated            : bool | None
     archived           : bool
     executables        : list[str]
-    launch_wrapper     : str
+    launch_wrapper     : dict[Os, str]
     description        : str
     changelog          : str
     tags               : tuple[Tag]
@@ -1174,6 +1174,7 @@ class Game:
             "updated",
             "archived",
             "executables",
+            "launch_wrapper",
             "description",
             "changelog",
             "tags",

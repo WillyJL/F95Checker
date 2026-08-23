@@ -207,8 +207,6 @@ async def connect():
             "datestamp_format":            f'TEXT    DEFAULT "%b %d, %Y"',
             "default_exe_dir":             f'TEXT    DEFAULT "{{}}"',
             "default_launch_wrapper":      f'TEXT    DEFAULT "{{}}"',
-            "extra_runners_dir":           f'TEXT    DEFAULT ""',
-            "runner_prefix_dir":           f'TEXT    DEFAULT ""',
             "default_tab_is_new":          f'INTEGER DEFAULT {int(False)}',
             "display_mode":                f'INTEGER DEFAULT {DisplayMode.list}',
             "display_tab":                 f'INTEGER DEFAULT NULL',
@@ -271,6 +269,8 @@ async def connect():
             "unload_offscreen_images":     f'INTEGER DEFAULT {int(False)}',
             "vsync_ratio":                 f'INTEGER DEFAULT 1',
             "weighted_score":              f'INTEGER DEFAULT {int(False)}',
+            "wine_extra_runners_dirs":     f'TEXT    DEFAULT "{{}}"',
+            "wine_prefixes_dir":           f'TEXT    DEFAULT "{{}}"',
             "zoom_area":                   f'INTEGER DEFAULT 50',
             "zoom_enabled":                f'INTEGER DEFAULT {int(True)}',
             "zoom_times":                  f'REAL    DEFAULT 4.0',
@@ -317,7 +317,7 @@ async def connect():
             "updated":                     f'INTEGER DEFAULT NULL',
             "archived":                    f'INTEGER DEFAULT {int(False)}',
             "executables":                 f'TEXT    DEFAULT "[]"',
-            "launch_wrapper":              f'TEXT    DEFAULT ""',
+            "launch_wrapper":              f'TEXT    DEFAULT "{{}}"',
             "description":                 f'TEXT    DEFAULT ""',
             "changelog":                   f'TEXT    DEFAULT ""',
             "tags":                        f'TEXT    DEFAULT "[]"',
@@ -405,6 +405,11 @@ def sql_to_py(value: str | int | float, data_type: typing.Type):
                     key_type = args[0]
                     value_type = args[1]
                     value = data_type((key_type(int(k) if (type(k) is str and k.isdigit()) else k), value_type(v)) for k, v in value.items())
+                    if getattr(value_type, "__name__", None) == "dict" and (value_args := getattr(value_type, "__args__", None)):
+                        value_key_type = value_args[0]
+                        value_value_type = value_args[1]
+                        # Lord have mercy
+                        value = data_type((key_type(int(k) if (type(k) is str and k.isdigit()) else k), value_type((value_key_type(int(vk) if (type(vk) is str and vk.isdigit()) else vk), value_value_type(vv)) for vk, vv in v.items())) for k, v in value.items())
             except json.JSONDecodeError:
                 value = data_type([("", value)]) if value else data_type()
         case "list" | "tuple":

@@ -2,8 +2,16 @@ import os
 import pathlib
 import re
 import shlex
+import shutil
 
-from modules import globals
+from common.structs import Os
+from modules import (
+    globals,
+    utils,
+)
+
+def is_supported():
+    return globals.os in (Os.Linux, Os.MacOS)
 
 def steam_roots():
     home = pathlib.Path.home()
@@ -36,11 +44,13 @@ def _libraries(root: pathlib.Path):
 
 def discover():
     found: dict[str, pathlib.Path] = {}
+    if system_wine := shutil.which("wine"):
+        found["System Wine"] = pathlib.Path(system_wine)
+    if system_proton_ge := shutil.which("proton-ge"):
+        found["System Proton-GE"] = pathlib.Path(system_proton_ge)
     seen: set[pathlib.Path] = set()
-    extra = (globals.settings.extra_runners_dir or "").strip()
     roots = list(steam_roots())
-    if extra:
-        roots.append(pathlib.Path(extra))
+    roots.extend(pathlib.Path(extra) for extra in globals.settings.wine_extra_runners_dirs.get(globals.os, []))
     for root in roots:
         if not root.is_dir():
             continue
@@ -62,7 +72,11 @@ def discover():
             except OSError:
                 continue
             for child in children:
-                if child.is_dir() and (child / "proton").is_file():
+                if not child.is_dir():
+                   continue
+                elif (child / "wine").is_file():
+                    found[child.name] = child / "wine"
+                elif (child / "proton").is_file():
                     found[child.name] = child / "proton"
     return sorted(found.items())
 
@@ -74,25 +88,38 @@ def refresh():
 
 
 def prefix_root():
-    configured = (globals.settings.runner_prefix_dir or "").strip()
-    return pathlib.Path(configured) if configured else globals.data_path / "prefixes"
+    configured = (globals.settings.wine_prefixes_dir.get(globals.os) or "").strip()
+    return pathlib.Path(configured) if configured else (globals.data_path / "prefixes")
 
 
 def prefix_for(name: str):
-    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("_") or "default"
-    return prefix_root() / safe
+    return prefix_root() / utils.clean_str(name)
 
 
 def build_wrapper(runner: pathlib.Path, prefix: pathlib.Path):
-    steam_root = pathlib.Path.home() / ".steam/root"
-    return (
-        f"env STEAM_COMPAT_DATA_PATH={shlex.quote(str(prefix))}"
-        f" STEAM_COMPAT_CLIENT_INSTALL_PATH={shlex.quote(str(steam_root))}"
-        f" {shlex.quote(str(runner))} run %command%"
-    )
+    if runner.name == "wine":
+        return shlex.join([
+            "env",
+            f"WINEPREFIX={prefix}",
+            str(runner),
+            "%command%",
+        ])
+    elif runner.name in ("proton", "proton-ge"):
+        steam_root = pathlib.Path.home() / ".steam/root"
+        return shlex.join([
+            "env",
+            f"WINEPREFIX={prefix}",
+            f"STEAM_COMPAT_DATA_PATH={prefix}",
+            f"STEAM_COMPAT_CLIENT_INSTALL_PATH={steam_root}",
+            str(runner),
+            "run",
+            "%command%"
+        ])
+    else:
+        return "%command%"
 
 
-PREFIX_VAR = "STEAM_COMPAT_DATA_PATH="
+PREFIX_VAR = "WINEPREFIX="
 
 
 def ensure_prefix(wrapper: str):
@@ -110,7 +137,7 @@ def ensure_prefix(wrapper: str):
                     pass
 
 
-def match_runner(wrapper: str):
+def match_runner(wrapper: str | None):
     if not wrapper:
         return None
     for name, path in cache:

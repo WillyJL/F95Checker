@@ -69,9 +69,9 @@ from modules import (
     icons,
     msgbox,
     rpc_thread,
-    runners,
     rpdl,
     utils,
+    wine,
 )
 
 tool_page         = api.f95_threads_page + "44173/"
@@ -2335,10 +2335,6 @@ class MainGUI():
                     game.last_launched = time.time()
                     game.add_timeline_event(TimelineEventType.GameLaunched, "date set manually")
                 self.draw_hover_text("Click to set as launched right now!", text=None)
-                imgui.same_line(spacing=0)
-                imgui.text_disabled(", Playtime:")
-                imgui.same_line()
-                imgui.text(game.playtime_display or "None")
 
                 imgui.table_next_row()
 
@@ -2350,9 +2346,9 @@ class MainGUI():
                 imgui.text_disabled(f"({game.votes})")
 
                 imgui.table_next_column()
-                imgui.text_disabled("Personal Rating:")
+                imgui.text_disabled("Playtime:")
                 imgui.same_line()
-                self.draw_game_rating_widget(game)
+                imgui.text(game.playtime_display or "None")
 
                 imgui.table_next_row()
 
@@ -2360,6 +2356,23 @@ class MainGUI():
                 imgui.text_disabled("Type:")
                 imgui.same_line()
                 self.draw_type_widget(game.type)
+
+                imgui.table_next_column()
+                imgui.text_disabled("Personal Rating:")
+                imgui.same_line()
+                self.draw_game_rating_widget(game)
+
+                imgui.table_next_row()
+
+                imgui.table_next_column()
+                imgui.align_text_to_frame_padding()
+                imgui.text_disabled("Executables:")
+                imgui.same_line()
+                self.draw_game_add_exe_button(game, f"{icons.folder_edit_outline} Add")
+                imgui.same_line()
+                self.draw_game_open_folder_button(game, f"{icons.folder_open_outline} Open Folder")
+                imgui.same_line()
+                self.draw_game_clear_exes_button(game, f"{icons.folder_remove_outline} Clear")
 
                 imgui.table_next_column()
                 imgui.text_disabled("Tab:")
@@ -2386,27 +2399,31 @@ class MainGUI():
 
                 imgui.table_set_column_index(0)
                 imgui.align_text_to_frame_padding()
-                imgui.text_disabled("Executables:")
+                imgui.text_disabled("Exe Wrapper:")
                 imgui.same_line()
-                self.draw_game_add_exe_button(game, f"{icons.folder_edit_outline} Add")
-                imgui.same_line()
-                self.draw_game_open_folder_button(game, f"{icons.folder_open_outline} Open Folder")
-                imgui.same_line()
-                self.draw_game_clear_exes_button(game, f"{icons.folder_remove_outline} Clear")
-                if globals.os is Os.Linux:
-                    imgui.text_disabled("Wrapper:")
-                    imgui.same_line()
-                    imgui.set_next_item_width(-1)
-                    changed, value = imgui.input_text_with_hint(
-                        f"###{game.id}_launch_wrapper",
-                        "Inherits this engine's default",
-                        game.launch_wrapper or ""
-                    )
-                    if changed:
-                        game.launch_wrapper = value
-                    if imgui.begin_popup_context_item(f"###{game.id}_launch_wrapper_context"):
-                        utils.text_context(game, "launch_wrapper", no_icons=True)
-                        imgui.end_popup()
+                imgui.set_next_item_width(-1)
+                changed, value = imgui.input_text_with_hint(
+                    f"###{game.id}_launch_wrapper",
+                    f"Inherit default for {game.type.name}",
+                    game.launch_wrapper.get(globals.os, "")
+                )
+                if changed:
+                    game.launch_wrapper[globals.os] = value
+                if imgui.begin_popup_context_item(f"###{game.id}_launch_wrapper_context"):
+                    utils.text_context(game, "launch_wrapper", no_icons=True)
+                    imgui.end_popup()
+                self.draw_hover_text(
+                    "A custom command to wrap the executable path into. Useful for specifying custom ways to open it, like Wine/Proton for Windows games on Linux/macOS or a media player for animation/comic collections.\n"
+                    "Can also be used to specify custom arguments, to the exe or to a wrapper.\n"
+                    "\n"
+                    "Use %command% to substitute in the executable path, for example:\n"
+                    "- VLC.exe -LZ %command%\n"
+                    "- %command% -dx12\n"
+                    "- env WINEPREFIX=/path/to/prefix wine %command%\n"
+                    "\n"
+                    "This is a game-specific override. You can setup default wrappers in Settings > Manage > Exe Wrappers, which will also auto-detect Wine/Proton runners on Linux/macOS.",
+                    text=None,
+                )
                 ended_table = False
                 for executable in game.executables:
                     if not ended_table and (pos_y := imgui.get_cursor_pos_y()) >= labels_end_y:
@@ -4754,93 +4771,6 @@ class MainGUI():
             imgui.table_next_column()
             imgui.set_cursor_pos(pos)
             imgui.begin_group()
-            if globals.os is Os.Linux and imgui.tree_node("Launch wrappers", flags=imgui.TREE_NODE_SPAN_AVAILABLE_WIDTH):
-                offset = imgui.get_cursor_pos_x() - pos.x
-                if imgui.button("Configure", width=-offset):
-                    if not runners.cache:
-                        runners.refresh()
-                    def popup_content():
-                        imgui.text(
-                            "Run games through a compatibility runner instead of leaving Windows builds\n"
-                            "to the system wine. Each engine gets its own, and a single game can\n"
-                            "override it from its info panel."
-                        )
-                        imgui.spacing()
-                        imgui.text(f"{len(runners.cache)} runners found")
-                        imgui.same_line()
-                        if imgui.button(f"{icons.reload_alert} Rescan"):
-                            runners.refresh()
-                        imgui.same_line(spacing=imgui.style.item_spacing.x * 2)
-                        imgui.text("Extra folder:")
-                        imgui.same_line()
-                        self.draw_hover_text(
-                            "Only needed if a Steam install or a set of runners lives somewhere\n"
-                            "unusual. Steam's own libraries, including ones on other drives, are\n"
-                            "already found on their own.\n"
-                            "\n"
-                            "Accepts either a Steam installation or a folder holding runners."
-                        )
-                        imgui.same_line()
-                        changed, value = imgui.input_text_with_hint(
-                            "###extra_runners_dir", "A Steam install or runner folder found elsewhere", set.extra_runners_dir
-                        )
-                        if changed:
-                            set.extra_runners_dir = value
-                            async_thread.run(db.update_settings("extra_runners_dir"))
-                        imgui.text("Prefix folder:")
-                        imgui.same_line()
-                        self.draw_hover_text(
-                            "Where a runner keeps its files, one folder per engine. These reach\n"
-                            "hundreds of MB each, so somewhere with room is worth picking.\n"
-                            "\n"
-                            "Only applies to commands filled in after changing it."
-                        )
-                        imgui.same_line()
-                        changed, value = imgui.input_text_with_hint(
-                            "###runner_prefix_dir", str(runners.prefix_root()), set.runner_prefix_dir
-                        )
-                        if changed:
-                            set.runner_prefix_dir = value
-                            async_thread.run(db.update_settings("runner_prefix_dir"))
-                        imgui.spacing()
-                        for type in Type:
-                            if type.category is not Category.Games:
-                                continue
-                            current = set.default_launch_wrapper.get(type.value, "")
-                            matched = runners.match_runner(current)
-                            self.draw_type_widget(type)
-                            imgui.same_line()
-                            column_x = imgui.get_cursor_pos_x()
-                            imgui.set_next_item_width(self.scaled(240))
-                            if imgui.begin_combo(f"###wrapper_{type.value}", matched or ("Custom" if current else "None")):
-                                if imgui.selectable("None", not current)[0]:
-                                    set.default_launch_wrapper.pop(type.value, None)
-                                    async_thread.run(db.update_settings("default_launch_wrapper"))
-                                for name, path in runners.cache:
-                                    if imgui.selectable(name, name == matched)[0]:
-                                        set.default_launch_wrapper[type.value] = runners.build_wrapper(
-                                            path, runners.prefix_for(type.name)
-                                        )
-                                        async_thread.run(db.update_settings("default_launch_wrapper"))
-                                imgui.end_combo()
-                            if current:
-                                imgui.set_cursor_pos_x(column_x)
-                                imgui.align_text_to_frame_padding()
-                                imgui.text_disabled("command")
-                                imgui.same_line()
-                                imgui.set_next_item_width(-1)
-                                changed, value = imgui.input_text(f"###wrapper_text_{type.value}", current)
-                                if changed:
-                                    set.default_launch_wrapper[type.value] = value
-                                    async_thread.run(db.update_settings("default_launch_wrapper"))
-                    utils.push_popup(
-                        utils.popup, "Launch wrappers",
-                        popup_content,
-                        {f"{icons.check} Done": None},
-                        closable=True,
-                        outside=False
-                    )
-                imgui.tree_pop()
             if imgui.tree_node("Import", flags=imgui.TREE_NODE_SPAN_AVAILABLE_WIDTH):
                 offset = imgui.get_cursor_pos_x() - pos.x
                 if imgui.button("Thread links", width=-offset):
@@ -5022,6 +4952,158 @@ class MainGUI():
                     start_dir=set.default_exe_dir.get(globals.os),
                     callback=select_callback
                 ).tick)
+
+            draw_settings_label(
+                "Exe Wrappers:",
+                "Customize how executables are launched by default for each game engine / media type.\n"
+                "Useful for specifying custom ways to open them, like Wine/Proton for Windows games on Linux/macOS or a media player for animation/comic collections.\n"
+                "Can also be used to specify custom arguments, to the exe or to a wrapper."
+            )
+            if imgui.button("Configure", width=right_width):
+                if wine.is_supported() and not wine.cache:
+                    wine.refresh()
+                def popup_content():
+                    imgui.text(
+                        "Customize how executables are launched by default for each game engine / media type.\n"
+                        "Useful for specifying custom ways to open them, like Wine/Proton for Windows games\n"
+                        "on Linux/macOS or a media player for animation/comic collections.\n"
+                        "Can also be used to specify custom arguments, to the exe or to a wrapper.\n"
+                        "\n"
+                        "Use %command% to substitute in the executable path, for example:\n"
+                        "- VLC.exe -LZ %command%\n"
+                        "- %command% -dx12\n"
+                        "- env WINEPREFIX=/path/to/prefix wine %command%\n"
+                        "\n"
+                        "Each engine/type can have a wrapper configured for it below, and individual games can\n"
+                        "have it overridden from their info panel."
+                    )
+
+                    if wine.is_supported():
+                        imgui.spacing()
+                        imgui.spacing()
+                        imgui.push_font(imgui.fonts.bold)
+                        imgui.text("Wine/Proton runners")
+                        imgui.pop_font()
+
+                        imgui.text(
+                            "Run games through a compatibility runner instead of leaving Windows builds to the system\n"
+                            "wine. By default F95Checker will also specify separate prefixes for each engine."
+                        )
+
+                        imgui.spacing()
+
+                        imgui.align_text_to_frame_padding()
+                        imgui.text(f"Runners found: {len(wine.cache)}")
+                        imgui.same_line()
+                        if imgui.button(f"{icons.reload_alert} Rescan"):
+                            wine.refresh()
+
+                        if set.wine_extra_runners_dirs.get(globals.os) is None:
+                            set.wine_extra_runners_dirs[globals.os] = []
+                        imgui.align_text_to_frame_padding()
+                        imgui.text("Extra runner folders:")
+                        imgui.same_line()
+                        self.draw_hover_text(
+                            "Only needed if a Steam install or a set of runners lives somewhere\n"
+                            "unusual (eg Heroic, Lutris...). Steam's own libraries, including ones\n"
+                            "on other drives, arealready found on their own.\n"
+                            "\n"
+                            "Accepts either a Steam installation or a folder holding runners."
+                        )
+                        imgui.same_line()
+                        if imgui.button(icons.plus):
+                            set.wine_extra_runners_dirs[globals.os].append("")
+                            async_thread.run(db.update_settings("wine_extra_runners_dirs"))
+                        for i in reversed(range(len(set.wine_extra_runners_dirs[globals.os]))):
+                            if imgui.button(icons.trash_can_outline):
+                                del set.wine_extra_runners_dirs[globals.os][i]
+                                async_thread.run(db.update_settings("wine_extra_runners_dirs"))
+                                continue
+                            imgui.same_line()
+                            imgui.set_next_item_width(-imgui.FLOAT_MIN)
+                            changed, value = imgui.input_text_with_hint(
+                                f"###wine_extra_runners_dirs_{i}",
+                                "A Steam install or runner folder found elsewhere",
+                                set.wine_extra_runners_dirs[globals.os][i]
+                            )
+                            if changed:
+                                set.wine_extra_runners_dirs[globals.os][i] = value
+                                async_thread.run(db.update_settings("wine_extra_runners_dirs"))
+
+                        imgui.spacing()
+
+                        imgui.align_text_to_frame_padding()
+                        imgui.text("Prefixes folder:")
+                        imgui.same_line()
+                        self.draw_hover_text(
+                            "Where Wine/Proton keep their files, this is also where saves will (usually) be buried.\n"
+                            "These reach hundreds of MB each, so somewhere with room is worth picking.\n"
+                            "\n"
+                            "F95Checker will default to a separate prefix for each engine/type that is configured\n"
+                            "below to use a Wine/Proton runner.\n"
+                            "\n"
+                            "Only applies to commands filled in after changing it."
+                        )
+                        imgui.same_line()
+                        imgui.set_next_item_width(-imgui.FLOAT_MIN)
+                        changed, value = imgui.input_text_with_hint(
+                            "###wine_prefixes_dir", str(wine.prefix_root()), set.wine_prefixes_dir.get(globals.os, "")
+                        )
+                        if changed:
+                            set.wine_prefixes_dir[globals.os] = value
+                            async_thread.run(db.update_settings("wine_prefixes_dir"))
+
+                    if set.default_launch_wrapper.get(globals.os) is None:
+                        set.default_launch_wrapper[globals.os] = {}
+                    category = None
+                    for type in Type:
+                        if type.category is Category.Misc:
+                            continue
+                        if category is not type.category:
+                            category = type.category
+                            imgui.spacing()
+                            imgui.spacing()
+                            imgui.push_font(imgui.fonts.bold)
+                            imgui.text(type.category.name)
+                            imgui.pop_font()
+                        current = set.default_launch_wrapper[globals.os].get(type.value, None)
+                        wine_match = wine.match_runner(current) if wine.is_supported() else None
+                        self.draw_type_widget(type)
+                        imgui.same_line()
+                        column_x = imgui.get_cursor_pos_x()
+                        imgui.set_next_item_width(self.scaled(240))
+                        if imgui.begin_combo(f"###wrapper_{type.value}", wine_match or ("Custom" if current is not None else "None")):
+                            if imgui.selectable("None", current is None)[0]:
+                                set.default_launch_wrapper[globals.os].pop(type.value, None)
+                                current = None
+                                async_thread.run(db.update_settings("default_launch_wrapper"))
+                            if imgui.selectable("Custom", current is not None and not wine_match)[0]:
+                                set.default_launch_wrapper[globals.os][type.value] = "%command%"
+                                current = set.default_launch_wrapper[globals.os][type.value]
+                                async_thread.run(db.update_settings("default_launch_wrapper"))
+                            if wine.is_supported():
+                                for name, path in wine.cache:
+                                    if imgui.selectable(name, name == wine_match)[0]:
+                                        set.default_launch_wrapper[globals.os][type.value] = wine.build_wrapper(
+                                            path, wine.prefix_for(type.name)
+                                        )
+                                        async_thread.run(db.update_settings("default_launch_wrapper"))
+                            imgui.end_combo()
+                        if current is not None:
+                            imgui.set_cursor_pos_x(column_x)
+                            imgui.align_text_to_frame_padding()
+                            imgui.set_next_item_width(-imgui.FLOAT_MIN)
+                            changed, value = imgui.input_text(f"###wrapper_text_{type.value}", current)
+                            if changed:
+                                set.default_launch_wrapper[globals.os][type.value] = value
+                                async_thread.run(db.update_settings("default_launch_wrapper"))
+                utils.push_popup(
+                    utils.popup, "Exe wrappers",
+                    popup_content,
+                    {f"{icons.check} Done": None},
+                    closable=True,
+                    outside=True
+                )
 
             draw_settings_label(
                 "Downloads dir:",
