@@ -37,6 +37,7 @@ An update checker and library tool for (NSFW) games on the [F95zone](https://f95
 - Sorting and filtering by most of above details, with multisort and multifilter support
 - Tag highlighting to quickly spot content you might like and what to avoid
 - Also supports media (animations, collections...) and normal threads
+- Custom launch command wrappers, support for Wine/Proton on Linux/macOS
 - Custom games to manually add games from other platforms
 - Auto updating (the tool, NOT the games)
 - Background mode (periodically refresh in background and receive desktop notifications)
