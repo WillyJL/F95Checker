@@ -1009,7 +1009,7 @@ class Game:
 
     def __post_init__(self):
         self._did_init = True
-        self.labels.sort(key=lambda label: Label.instances.index(label))
+        self.labels.sort(key=lambda label: label.position)
         if self.custom is None:
             self.custom = bool(self.status is Status.Custom)
         if self.id < 0:
@@ -1128,7 +1128,7 @@ class Game:
     def add_label(self, label: Label):
         if label not in self.labels:
             self.labels.append(label)
-        self.labels.sort(key=lambda label: Label.instances.index(label))
+        self.labels.sort(key=lambda label: label.position)
         from external import async_thread
         from modules import db, globals
         async_thread.run(db.update_game(self, "labels"))

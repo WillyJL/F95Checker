@@ -47,6 +47,7 @@ from modules import (
 )
 
 connection: aiosqlite.Connection = None
+label_positions_lock: asyncio.Lock = None
 
 
 @contextlib.contextmanager
@@ -159,7 +160,7 @@ async def create_table(table_name: str, columns: dict[str, str], renames: list[t
 
 
 async def connect():
-    global connection
+    global connection, label_positions_lock
 
     db_path = globals.data_path / "db.sqlite3"
 
@@ -185,6 +186,7 @@ async def connect():
 
     migrate = not db_path.is_file()
     connection = await aiosqlite.connect(db_path)
+    label_positions_lock = asyncio.Lock()
     connection.row_factory = aiosqlite.Row  # Return sqlite3.Row instead of tuple
 
     await create_table(
@@ -654,10 +656,13 @@ async def update_label(label: Label, *keys: list[str]):
     """, tuple(values))
 
 
-async def update_label_positions():
-    Label.update_positions()
-    for label in Label.instances:
-        await update_label(label, "position")
+async def update_label_positions(positions: tuple[tuple[int, int], ...]):
+    async with label_positions_lock:
+        await connection.executemany("""
+            UPDATE labels
+            SET position=?
+            WHERE id=?
+        """, positions)
 
 
 async def delete_label(label: Label):
@@ -672,7 +677,9 @@ async def delete_label(label: Label):
         if flt.match is label:
             globals.gui.filters.remove(flt)
     Label.remove(label)
-    await update_label_positions()
+    Label.update_positions()
+    positions = tuple((label.position, label.id) for label in Label.instances)
+    await update_label_positions(positions)
 
 
 async def create_label():
