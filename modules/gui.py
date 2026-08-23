@@ -5066,7 +5066,7 @@ class MainGUI():
                             imgui.push_font(imgui.fonts.bold)
                             imgui.text(type.category.name)
                             imgui.pop_font()
-                        current = set.default_launch_wrapper[globals.os].get(type.value, None)
+                        current = set.default_launch_wrapper[globals.os].get(type, None)
                         wine_match = wine.match_runner(current) if wine.is_supported() else None
                         self.draw_type_widget(type)
                         imgui.same_line()
@@ -5074,17 +5074,17 @@ class MainGUI():
                         imgui.set_next_item_width(self.scaled(240))
                         if imgui.begin_combo(f"###wrapper_{type.value}", wine_match or ("Custom" if current is not None else "None")):
                             if imgui.selectable("None", current is None)[0]:
-                                set.default_launch_wrapper[globals.os].pop(type.value, None)
+                                set.default_launch_wrapper[globals.os].pop(type, None)
                                 current = None
                                 async_thread.run(db.update_settings("default_launch_wrapper"))
                             if imgui.selectable("Custom", current is not None and not wine_match)[0]:
-                                set.default_launch_wrapper[globals.os][type.value] = "%command%"
-                                current = set.default_launch_wrapper[globals.os][type.value]
+                                set.default_launch_wrapper[globals.os][type] = "%command%"
+                                current = set.default_launch_wrapper[globals.os][type]
                                 async_thread.run(db.update_settings("default_launch_wrapper"))
                             if wine.is_supported():
                                 for name, path in wine.cache:
                                     if imgui.selectable(name, name == wine_match)[0]:
-                                        set.default_launch_wrapper[globals.os][type.value] = wine.build_wrapper(
+                                        set.default_launch_wrapper[globals.os][type] = wine.build_wrapper(
                                             path, wine.prefix_for(type.name)
                                         )
                                         async_thread.run(db.update_settings("default_launch_wrapper"))
@@ -5095,7 +5095,7 @@ class MainGUI():
                             imgui.set_next_item_width(-imgui.FLOAT_MIN)
                             changed, value = imgui.input_text(f"###wrapper_text_{type.value}", current)
                             if changed:
-                                set.default_launch_wrapper[globals.os][type.value] = value
+                                set.default_launch_wrapper[globals.os][type] = value
                                 async_thread.run(db.update_settings("default_launch_wrapper"))
                 utils.push_popup(
                     utils.popup, "Exe wrappers",
