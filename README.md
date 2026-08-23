@@ -10,14 +10,15 @@ An update checker and library tool for (NSFW) games on the [F95zone](https://f95
 
 - Blazing fast™ and reliable
 - Very easy to setup and use
-- Cross platform (windows, linux, macos)
+- Cross platform (Windows, Linux, macOS-x64, macOS-arm64)
 - Beautiful and customizable interface
 - Compact list, comfy grid and kanban columns view modes
 - 2FA accounts supported
 - Alert and inbox checker
+- No account needed for basic functionality
 - Track what versions you installed and played
 - Launch games straight from the tool
-- Custom labels, organize your library how you want to
+- Custom labels and tabs, organize your library how you want to
 - Archive games to temporarily mute updates
 - Supported game details:
   - Name, Version, Developer
@@ -29,19 +30,24 @@ An update checker and library tool for (NSFW) games on the [F95zone](https://f95
   - Download links, F95zone Donor DDL and RPDL.net support
   - Forum tags and personal labels
   - Forum score (value out of 5) and personal rating (5 stars)
+  - Forum reviews (20 most recents)
   - Personal notes (textbox you can use however you want)
+  - Locally tracked playtime duration
+  - Most of these details, and some extras, tracked in a local timeline
 - Sorting and filtering by most of above details, with multisort and multifilter support
+- Tag highlighting to quickly spot content you might like and what to avoid
 - Also supports media (animations, collections...) and normal threads
 - Custom games to manually add games from other platforms
 - Auto updating (the tool, NOT the games)
 - Background mode (periodically refresh in background and receive desktop notifications)
 - Many ways to add games, including a companion web browser extension
+- Network proxy support
 
 ## Download: [here](https://github.com/WillyJL/F95Checker/releases/latest)
 
 ## Compatibility:
 
-Built with Python 3.11+ for Windows, Linux and MacOS.
+Built with Python 3.11/3.12 for Windows, Linux and macOS (x64 and arm64).
 
 Binaries are available for all 3 platforms, requiring no setup at all. If instead you want to run from source note that Python 3.11+ is required and you'll need to
 install the requirements with pip.
@@ -52,27 +58,28 @@ install the requirements with pip.
 
 - **Linux:** Extract and run `F95Checker`
 
-- **MacOS:** Extract, right click `F95Checker.app`, select "Open" in the menu and click "Open" in the next popup **\***
+- **macOS:** Extract, right click `F95Checker.app`, select "Open" in the menu and click "Open" in the next popup **\***
 
-- **Source:** Make sure you have Python 3.11+, install requirements with `pip3 install -U -r requirements.txt` and run with `python3 main.py` (this file is marked
+- **Source:** Make sure you have Python 3.11/3.12, install requirements with `pip3 install -U -r requirements.txt` and run with `python3 main.py` (this file is marked
 executable and has a shebang, you might be able to just double click it!)
 
-**\*** If MacOS says the application is damaged and should be moved to the trash you need to: close the popup, open a terminal, navigate to the
+**\*** If macOS says the application is damaged and should be moved to the trash you need to: close the popup, open a terminal, navigate to the
 location of the `F95Checker.app`, type in `xattr -d com.apple.quarantine F95Checker.app` and press enter; after this the method above to open the app should work fine.
 
 ## Browser extension
 
-The F95Checker browser addon allows you to easily add games to your desktop F95Checker library while browsing the forum in 3 ways:
+The F95Checker browser addon makes interactions between the F95zone forum and the F95Checker app more convenient:
 
-- Clicking the extension icon while viewing a thread
-- Right clicking a link to a thread
-- Right clicking anywhere on the background of a thread page
-
-Also, it allows you to quickly see what games you have added to your list (and which tab) with convenient icons on the forum.
+- Easily add games to your desktop F95Checker library while browsing the forum in 3 ways:
+  - Clicking the extension icon while viewing a thread
+  - Right clicking a link to a thread
+  - Right clicking anywhere on the background of a thread page
+- Quickly see what games you have added to your list (and which tab) with convenient icons on the forum
+- Highlight tags on the forum like in the app, to quickly spot what you might like and what to avoid
 
 The extension is available for both major browser families (Brave and Edge count as Chrome, LibreWolf counts as Firefox):
 
-- **Chrome:** Open `chrome://extensions/` in browser, enable "Developer mode", reload the page and drag `browser/chrome.zip` (from the tool folder) into the page
+- **Chrome:** Open `chrome://extensions/` in browser, enable "Developer mode", reload the page and drag `browser/chrome.zip` (from the app install folder) into the page
 
 - **Firefox:** Install from [AMO](https://addons.mozilla.org/firefox/addon/f95checker-browser-addon/)
 
@@ -133,7 +140,7 @@ Please note that this extension is solely to aid the usage of the desktop tool, 
     (usually `C:\Users\username\AppData\Roaming\f95checker\`)
   - `~/.config/f95checker/` on Linux
     (usually `/home/username/.config/f95checker/`)
-  - `~/Library/Application Support/f95checker/` on MacOS
+  - `~/Library/Application Support/f95checker/` on macOS
     (usually `/Users/username/Library/Application Support/f95checker/`)
 
   in a file named `db.sqlite3`, while images are saved in the `images` folder as `thread-id.ext`. The `imgui.ini` file stores some interface preferences, like window
@@ -242,8 +249,9 @@ Please note that this software is not ( yet ;) ) officially affiliated with the 
 Supporters:
 
 [FaceCrap](https://f95zone.to/members/2913051/) - [WhiteVanDaycare](https://f95zone.to/members/3509231/) - [ascsd](https://f95zone.to/members/3977760/) -
-[GioBol](https://f95zone.to/members/3716618/) - [Jarulf](https://f95zone.to/members/2709937/) - [rozzic](https://f95zone.to/members/449099/) -
-[Belfaier](https://f95zone.to/members/7363156/) - [warez_gamez](https://f95zone.to/members/81517/) - [DeadMoan](https://f95zone.to/members/4392187/) - And 3 anons
+[GioBol](https://f95zone.to/members/3716618/) - [Jarulf](https://f95zone.to/members/2709937/) - [salkrim](https://f95zone.to/members/3899517/) -
+[rozzic](https://f95zone.to/members/449099/) -[Belfaier](https://f95zone.to/members/7363156/) - [warez_gamez](https://f95zone.to/members/81517/) -
+[DeadMoan](https://f95zone.to/members/4392187/) - And 4 anons
 
 Contributors:
 
@@ -251,9 +259,10 @@ Contributors:
 - [littleraisins](https://github.com/littleraisins): Fixes, features and misc ideas from the (defunct) 'X' fork
 - [FaceCrap](https://github.com/FaceCrap): Multiple small fixes, improvements and finetuning
 - [blackop](https://github.com/disaster2395): Proxy support, temporary ratelimit fix, linux login fix
+- [cicklolwut](https://github.com/cicklolwut): Security fixes, Linux wine/proton config, playtime stats
 - [Sam](https://f95zone.to/members/7899/): Support from F95zone side to make much this possible
 - [GR3ee3N](https://github.com/GR3ee3N): Optimized build workflows and other PRs
-- [batblue](https://f95zone.to/members/4143766/): MacOS suppport and feedback guy
+- [batblue](https://f95zone.to/members/4143766/): macOS suppport and feedback guy
 - [unroot](https://f95zone.to/members/1585550/): Linux support and feedback guy
 - [ploper26](https://f95zone.to/members/1295524/): Suggested HEAD requests for refreshing
 - [ascsd](https://f95zone.to/members/3977760/): Helped with brainstorming on some issues and gave some tips

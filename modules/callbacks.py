@@ -4,6 +4,7 @@ import difflib
 import os
 import pathlib
 import plistlib
+import psutil
 import re
 import shlex
 import stat
@@ -16,6 +17,7 @@ import imgui
 
 from common.structs import (
     Game,
+    LaunchState,
     MsgBox,
     Os,
     SearchResult,
@@ -188,15 +190,30 @@ async def _launch_exe(executable: str):
         open_webpage(exe.as_uri())
         return
 
+    windows_exe_magics = (b"MZ", b"ZM", b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1")  # .exe and .msi
+    unix_exe_magics = (b"#!", b"\x7FELF")  # Shebang and ELF
     if globals.os is Os.Windows:
+        with exe.open("rb") as f:
+            exe_magic = f.read(8).startswith(windows_exe_magics)
+        if exe_magic:
+            # Run as executable and get PID
+            try:
+                return await asyncio.create_subprocess_exec(
+                    str(exe),
+                    cwd=str(exe.parent),
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+            except OSError:
+                pass
         # Open with default app
         await default_open(str(exe), cwd=str(exe.parent))
     else:
         mode = exe.stat().st_mode
         exe_flag = not (mode & stat.S_IEXEC < stat.S_IEXEC)
         with exe.open("rb") as f:
-            # Check for shebang, exe and msi magic numbers
-            exe_magic = f.read(8).startswith((b"#!", b"\x7FELF", b"MZ", b"ZM", b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"))
+            exe_magic = f.read(8).startswith((*unix_exe_magics, *windows_exe_magics))
         if exe_magic and not exe_flag:
             # Should be executable but isn't, fix it
             exe.chmod(mode | stat.S_IEXEC)
@@ -209,8 +226,8 @@ async def _launch_exe(executable: str):
                     if mode & stat.S_IEXEC < stat.S_IEXEC:
                         file.chmod(mode | stat.S_IEXEC)
         if exe_magic and exe_flag:
-            # Run as executable
-            await asyncio.create_subprocess_exec(
+            # Run as executable and get PID
+            return await asyncio.create_subprocess_exec(
                 str(exe),
                 cwd=str(exe.parent),
                 stdin=subprocess.DEVNULL,
@@ -222,9 +239,103 @@ async def _launch_exe(executable: str):
             await default_open(str(exe), cwd=str(exe.parent))
 
 
+playing_grace_seconds = 3
+launch_state_changed = False
+
+
+def _track_launch(game: Game, process):
+    if process is None:
+        return
+    global launch_state_changed
+    game.launch_process = process
+    game.launch_started = time.time()
+    game.launch_state = LaunchState.Starting
+    launch_state_changed = True
+
+    async def watch():
+        global launch_state_changed
+        tree = {}
+
+        def remember(proc):
+            try:
+                tree[(proc.pid, proc.create_time())] = proc
+            except psutil.Error:
+                pass
+
+        def scan():
+            pids = {pid for pid, _ in tree}
+            try:
+                for proc in psutil.process_iter(("pid", "ppid")):
+                    if proc.info["ppid"] in pids and proc.pid not in pids:
+                        remember(proc)
+            except psutil.Error:
+                pass
+
+        def tree_alive():
+            scan()
+            for proc in tree.values():
+                try:
+                    if proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE:
+                        return True
+                except psutil.Error:
+                    pass
+            return False
+
+        try:
+            remember(psutil.Process(process.pid))
+        except psutil.Error:
+            pass
+        session_start = time.time()
+        flushed = 0.0
+
+        def flush_playtime():
+            nonlocal flushed
+            global launch_state_changed
+            if game.launch_process is not process:
+                return
+            session = time.time() - session_start
+            game.playtime += session - flushed
+            flushed = session
+            game.launch_flushed = flushed
+            launch_state_changed = True
+
+        deadline = time.time() + playing_grace_seconds
+        while time.time() < deadline:
+            try:
+                await asyncio.wait_for(asyncio.shield(process.wait()), timeout=0.25)
+            except (asyncio.TimeoutError, TimeoutError):
+                pass
+            scan()
+            if process.returncode is not None and not tree_alive():
+                break
+        else:
+            if game.launch_process is process:
+                game.launch_state = LaunchState.Playing
+                launch_state_changed = True
+            while process.returncode is None or tree_alive():
+                if process.returncode is None:
+                    try:
+                        await asyncio.wait_for(asyncio.shield(process.wait()), timeout=1)
+                    except (asyncio.TimeoutError, TimeoutError):
+                        pass
+                else:
+                    await asyncio.sleep(1)
+                if time.time() - session_start - flushed >= 60:
+                    flush_playtime()
+        flush_playtime()
+        if game.launch_process is process:
+            game.launch_state = LaunchState.Idle
+            game.launch_started = 0.0
+            game.launch_flushed = 0.0
+            game.launch_process = None
+            launch_state_changed = True
+
+    async_thread.run(watch())
+
+
 async def _launch_game_exe(game: Game, executable: str):
     try:
-        await _launch_exe(executable)
+        _track_launch(game, await _launch_exe(executable))
         game.last_launched = time.time()
         exe = pathlib.Path(executable)
         if utils.is_uri(executable):

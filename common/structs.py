@@ -568,6 +568,13 @@ ExeState = IntEnumHack("ExeState", [
 ])
 
 
+LaunchState = IntEnumHack("LaunchState", [
+    ("Idle",     1),
+    ("Starting", 2),
+    ("Playing",  3),
+])
+
+
 MsgBox = IntEnumHack("MsgBox", [
     ("info",  (1, {"color": (0.10, 0.69, 0.95), "icon": "information"})),
     ("warn",  (2, {"color": (0.95, 0.69, 0.10), "icon": "alert_rhombus"})),
@@ -593,9 +600,10 @@ FilterMode = IntEnumHack("FilterMode", [
 
 
 Category = IntEnumHack("Category", [
-    ("Games", 1),
-    ("Media", 2),
-    ("Misc",  3),
+    ("Games",      1),
+    ("Animations", 2),
+    ("Comics",     3),
+    ("Misc",       4),
 ])
 
 
@@ -955,17 +963,15 @@ Type = IntEnumHack("Type", [
     ("Unreal Eng", (20, {"color": colors.hex_to_rgba_0_1("#0D47A1"), "category": Category.Games})),
     ("WebGL",      (21, {"color": colors.hex_to_rgba_0_1("#FE5901"), "category": Category.Games})),
     ("Wolf RPG",   (22, {"color": colors.hex_to_rgba_0_1("#4CAF50"), "category": Category.Games})),
-    ("CG",         (30, {"color": colors.hex_to_rgba_0_1("#DFCB37"), "category": Category.Media})),
-    ("Collection", (7,  {"color": colors.hex_to_rgba_0_1("#616161"), "category": Category.Media})),
-    ("Comics",     (24, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Media})),
-    ("GIF",        (25, {"color": colors.hex_to_rgba_0_1("#03A9F4"), "category": Category.Media})),
-    ("Manga",      (26, {"color": colors.hex_to_rgba_0_1("#0FB2FC"), "category": Category.Media})),
-    ("Pinup",      (27, {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Media})),
-    ("SiteRip",    (28, {"color": colors.hex_to_rgba_0_1("#8BC34A"), "category": Category.Media})),
-    ("Video",      (29, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Media})),
+    ("GIF",        (25, {"color": colors.hex_to_rgba_0_1("#03A9F4"), "category": Category.Animations})),
+    ("Video",      (29, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Animations})),
+    ("CG",         (30, {"color": colors.hex_to_rgba_0_1("#DFCB37"), "category": Category.Comics})),
+    ("Comics",     (24, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Comics})),
+    ("Manga",      (26, {"color": colors.hex_to_rgba_0_1("#0FB2FC"), "category": Category.Comics})),
+    ("Pinup",      (27, {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Comics})),
     ("Cheat Mod",  (3,  {"color": colors.hex_to_rgba_0_1("#D32F2F"), "category": Category.Misc})),
     ("Mod",        (8,  {"color": colors.hex_to_rgba_0_1("#BA4545"), "category": Category.Misc})),
-    ("READ ME",    (12, {"color": colors.hex_to_rgba_0_1("#DC143C"), "category": Category.Misc})),
+    ("README",     (12, {"color": colors.hex_to_rgba_0_1("#DC143C"), "category": Category.Misc})),
     ("Request",    (15, {"color": colors.hex_to_rgba_0_1("#D32F2F"), "category": Category.Misc})),
     ("Tool",       (17, {"color": colors.hex_to_rgba_0_1("#EC5555"), "category": Category.Misc})),
     ("Tutorial",   (18, {"color": colors.hex_to_rgba_0_1("#EC5555"), "category": Category.Misc})),
@@ -990,6 +996,7 @@ class Game:
     last_full_check    : int
     last_check_version : str
     last_launched      : Datestamp
+    playtime           : float
     score              : float
     votes              : int
     rating             : int
@@ -1012,6 +1019,10 @@ class Game:
     reviews_total      : int
     reviews            : list[Review]
     selected           : bool = False
+    launch_state       : LaunchState = LaunchState.Idle
+    launch_started     : float = 0.0
+    launch_flushed     : float = 0.0
+    launch_process     : typing.Any = None
     image              : "imagehelper.ImageHelper" = None
     executables_valids : list[bool] = None
     executables_valid  : bool = None
@@ -1160,6 +1171,19 @@ class Game:
         async_thread.run(db.create_timeline_event(self.id, Timestamp(time.time()), list(args), type))
 
 
+    @property
+    def playtime_display(self):
+        playtime = self.playtime
+        if self.launch_state is not LaunchState.Idle and self.launch_started:
+            playtime += time.time() - self.launch_started - self.launch_flushed
+        if playtime >= 3600:
+            return f"{playtime / 3600:.1f}h"
+        if playtime >= 60:
+            return f"{int(playtime / 60)}m"
+        if playtime:
+            return "<1m"
+        return ""
+
     def __setattr__(self, name: str, value: typing.Any):
         if hasattr(self, "_did_init") and self._did_init and name in [
             "custom",
@@ -1174,6 +1198,7 @@ class Game:
             "last_full_check",
             "last_check_version",
             "last_launched",
+            "playtime",
             "score",
             "votes",
             "rating",

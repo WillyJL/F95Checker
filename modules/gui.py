@@ -36,6 +36,7 @@ from common.structs import (
     FilterMode,
     Game,
     Label,
+    LaunchState,
     MsgBox,
     Os,
     ProxyType,
@@ -246,6 +247,12 @@ class Columns:
         )
         self.score = self.Column(
             self, f"{icons.message_star} Forum Score",
+            sortable=True,
+            resizable=False,
+            short_header=True,
+        )
+        self.playtime = self.Column(
+            self, f"{icons.timer_play_outline} Playtime",
             sortable=True,
             resizable=False,
             short_header=True,
@@ -806,16 +813,15 @@ class MainGUI():
     def hidden(self):
         return not glfw.get_window_attrib(self.window, glfw.VISIBLE)
 
-    def hide(self, *_, **__):
-        if threading.current_thread() is not threading.main_thread():
-            self.call_soon.append(self.hide)
+    def _hide(self, *_, **__):
         self.screen_pos = glfw.get_window_pos(self.window)
         glfw.hide_window(self.window)
         self.tray.update_status()
 
-    def show(self, *_, **__):
-        if threading.current_thread() is not threading.main_thread():
-            self.call_soon.append(self.show)
+    def hide(self, *_, **__):
+        self.call_soon.append(self._hide)
+
+    def _show(self, *_, **__):
         self.bg_mode_timer = None
         self.bg_mode_notifs_timer = None
         # if not self.hidden:
@@ -825,6 +831,9 @@ class MainGUI():
             glfw.set_window_pos(self.window, *self.screen_pos)
         glfw.focus_window(self.window)
         self.tray.update_status()
+
+    def show(self, *_, **__):
+        self.call_soon.append(self._show)
 
     def scaled(self, size: int | float):
         return _scaled(globals.settings.interface_scaling, size)
@@ -897,6 +906,8 @@ class MainGUI():
                         imgui.io.mouse_wheel = scroll_now
 
                     # Redraw only when needed
+                    launch_changed = callbacks.launch_state_changed
+                    callbacks.launch_state_changed = False
                     draw = (
                         (api.downloads and any(dl.state in (dl.State.Verifying, dl.State.Extracting) for dl in api.downloads.values()))
                         or (imagehelper.redraw and globals.settings.play_gifs and (self.focused or globals.settings.play_gifs_unfocused))
@@ -911,6 +922,7 @@ class MainGUI():
                         or size != self.prev_size
                         or self.recalculate_ids
                         or self.new_styles
+                        or launch_changed
                         or api.updating
                     )
                     if draw:
@@ -1323,10 +1335,21 @@ class MainGUI():
                 valid = game.executables_valid
             if not valid:
                 imgui.push_style_color(imgui.COLOR_TEXT, 0.87, 0.20, 0.20)
+        launch_state = game.launch_state if game else LaunchState.Idle
+        if launch_state is LaunchState.Starting:
+            label = label.replace(" Play", " Starting")
+            imgui.push_style_color(imgui.COLOR_TEXT, 0.95, 0.75, 0.20)
+        elif launch_state is LaunchState.Playing:
+            label = label.replace(" Play", " Playing")
+            imgui.push_style_color(imgui.COLOR_TEXT, 0.30, 0.85, 0.35)
+        else:
+            launch_state = LaunchState.Idle  # Make sure we don't imgui.pop_style_color() after
         if selectable:
             clicked = imgui.selectable(label, False)[0]
         else:
             clicked = imgui.button(label)
+        if launch_state is not LaunchState.Idle:
+            imgui.pop_style_color()
         if game and (not game.executables or not valid):
             imgui.pop_style_color()
         if imgui.is_item_clicked(imgui.MOUSE_BUTTON_MIDDLE):
@@ -2311,6 +2334,10 @@ class MainGUI():
                     game.last_launched = time.time()
                     game.add_timeline_event(TimelineEventType.GameLaunched, "date set manually")
                 self.draw_hover_text("Click to set as launched right now!", text=None)
+                imgui.same_line(spacing=0)
+                imgui.text_disabled(", Playtime:")
+                imgui.same_line()
+                imgui.text(game.playtime_display or "None")
 
                 imgui.table_next_row()
 
@@ -2825,11 +2852,12 @@ class MainGUI():
                 "ascsd",
                 "GioBol",
                 "Jarulf",
+                "salkrim",
                 "rozzic",
                 "Belfaier",
                 "warez_gamez",
                 "DeadMoan",
-                "And 3 anons"
+                "And 4 anons"
             ]:
                 if imgui.get_content_region_available_width() < imgui.calc_text_size(name).x + self.scaled(20):
                     imgui.dummy(0, 0)
@@ -2846,6 +2874,8 @@ class MainGUI():
             imgui.text("FaceCrap: Multiple small fixes, improvements and finetuning")
             imgui.bullet()
             imgui.text("blackop: Proxy support, temporary ratelimit fix, linux login fix")
+            imgui.bullet()
+            imgui.text("cicklolwut: Security fixes, Linux wine/proton config, playtime stats")
             imgui.bullet()
             imgui.text("Sam: Support from F95zone side to make much this possible")
             imgui.bullet()
@@ -3142,6 +3172,8 @@ class MainGUI():
                             key = lambda id: globals.games[id].type.name
                         case cols.developer.index:
                             key = lambda id: globals.games[id].developer.lower()
+                        case cols.playtime.index:
+                            key = lambda id: - globals.games[id].playtime
                         case cols.last_updated.index:
                             key = lambda id: - globals.games[id].last_updated.value
                         case cols.last_launched.index:
@@ -3359,6 +3391,10 @@ class MainGUI():
                                 imgui.text_disabled("  |  ".join(versions))
                         case cols.developer.index:
                             imgui.text(game.developer or "Unknown")
+                        case cols.playtime.index:
+                            imgui.push_font(imgui.fonts.mono)
+                            imgui.text(game.playtime_display or "None")
+                            imgui.pop_font()
                         case cols.last_updated.index:
                             imgui.push_font(imgui.fonts.mono)
                             imgui.text(game.last_updated.display or "Unknown")
@@ -3644,6 +3680,8 @@ class MainGUI():
         if cols.score.enabled:
             _cluster_text(cols.score.name, f"{game.score:.1f} ({game.votes})")
             self.draw_hover_text(f"Weighted: {utils.bayesian_average(game.score, game.votes):.2f}", text=None)
+        if cols.playtime.enabled and game.playtime_display:
+            _cluster_text(cols.playtime.name, game.playtime_display)
         if cols.last_updated.enabled:
             _cluster_text(cols.last_updated.name, game.last_updated.display or "Unknown")
         if cols.last_launched.enabled:
