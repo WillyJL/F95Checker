@@ -1087,6 +1087,7 @@ async def check_notifs(standalone=True, retry=False):
     for popup in globals.popup_stack:
         if popup.func is msgbox.msgbox and popup.args[0] == "Notifications":
             globals.popup_stack.remove(popup)
+            globals.popup_stack_changed = True
     if alerts != 0 and inbox != 0:
         msg = (
             f"You have {alerts + inbox} unread notifications!\n"
@@ -1340,6 +1341,7 @@ try {{
     for popup in globals.popup_stack:
         if popup.func is msgbox.msgbox and popup.args[0] == "F95Checker update":
             globals.popup_stack.remove(popup)
+            globals.popup_stack_changed = True
     if globals.frozen and globals.os is Os.MacOS:
         path = globals.self_path.parent.parent
     else:
