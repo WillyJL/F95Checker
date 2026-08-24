@@ -47,6 +47,7 @@ from modules import (
 )
 
 connection: aiosqlite.Connection = None
+label_positions_lock: asyncio.Lock = None
 
 
 @contextlib.contextmanager
@@ -159,7 +160,7 @@ async def create_table(table_name: str, columns: dict[str, str], renames: list[t
 
 
 async def connect():
-    global connection
+    global connection, label_positions_lock
 
     db_path = globals.data_path / "db.sqlite3"
 
@@ -185,6 +186,7 @@ async def connect():
 
     migrate = not db_path.is_file()
     connection = await aiosqlite.connect(db_path)
+    label_positions_lock = asyncio.Lock()
     connection.row_factory = aiosqlite.Row  # Return sqlite3.Row instead of tuple
 
     await create_table(
@@ -206,6 +208,7 @@ async def connect():
             "copy_urls_as_bbcode":         f'INTEGER DEFAULT {int(False)}',
             "datestamp_format":            f'TEXT    DEFAULT "%b %d, %Y"',
             "default_exe_dir":             f'TEXT    DEFAULT "{{}}"',
+            "default_launch_wrapper":      f'TEXT    DEFAULT "{{}}"',
             "default_tab_is_new":          f'INTEGER DEFAULT {int(False)}',
             "display_mode":                f'INTEGER DEFAULT {DisplayMode.list}',
             "display_tab":                 f'INTEGER DEFAULT NULL',
@@ -268,6 +271,8 @@ async def connect():
             "unload_offscreen_images":     f'INTEGER DEFAULT {int(False)}',
             "vsync_ratio":                 f'INTEGER DEFAULT 1',
             "weighted_score":              f'INTEGER DEFAULT {int(False)}',
+            "wine_extra_runners_dirs":     f'TEXT    DEFAULT "{{}}"',
+            "wine_prefixes_dir":           f'TEXT    DEFAULT "{{}}"',
             "zoom_area":                   f'INTEGER DEFAULT 50',
             "zoom_enabled":                f'INTEGER DEFAULT {int(True)}',
             "zoom_times":                  f'REAL    DEFAULT 4.0',
@@ -305,6 +310,7 @@ async def connect():
             "last_full_check":             f'INTEGER DEFAULT 0',
             "last_check_version":          f'TEXT    DEFAULT ""',
             "last_launched":               f'INTEGER DEFAULT 0',
+            "playtime":                    f'REAL    DEFAULT 0',
             "score":                       f'REAL    DEFAULT 0',
             "votes":                       f'INTEGER DEFAULT 0',
             "rating":                      f'INTEGER DEFAULT 0',
@@ -313,6 +319,7 @@ async def connect():
             "updated":                     f'INTEGER DEFAULT NULL',
             "archived":                    f'INTEGER DEFAULT {int(False)}',
             "executables":                 f'TEXT    DEFAULT "[]"',
+            "launch_wrapper":              f'TEXT    DEFAULT "{{}}"',
             "description":                 f'TEXT    DEFAULT ""',
             "changelog":                   f'TEXT    DEFAULT ""',
             "tags":                        f'TEXT    DEFAULT "[]"',
@@ -349,6 +356,7 @@ async def connect():
             "id":                          f'INTEGER PRIMARY KEY AUTOINCREMENT',
             "name":                        f'TEXT    DEFAULT ""',
             "color":                       f'TEXT    DEFAULT "#696969"',
+            "position":                    f'INTEGER DEFAULT 0',
         }
     )
     await create_table(
@@ -400,6 +408,11 @@ def sql_to_py(value: str | int | float, data_type: typing.Type):
                     key_type = args[0]
                     value_type = args[1]
                     value = data_type((key_type(int(k) if (type(k) is str and k.isdigit()) else k), value_type(v)) for k, v in value.items())
+                    if getattr(value_type, "__name__", None) == "dict" and (value_args := getattr(value_type, "__args__", None)):
+                        value_key_type = value_args[0]
+                        value_value_type = value_args[1]
+                        # Lord have mercy
+                        value = data_type((key_type(int(k) if (type(k) is str and k.isdigit()) else k), value_type((value_key_type(int(vk) if (type(vk) is str and vk.isdigit()) else vk), value_value_type(vv)) for vk, vv in v.items())) for k, v in value.items())
             except json.JSONDecodeError:
                 value = data_type([("", value)]) if value else data_type()
         case "list" | "tuple":
@@ -430,7 +443,13 @@ def sql_to_py(value: str | int | float, data_type: typing.Type):
                 else:
                     value = None
             else:
-                value = data_type(value)
+                try:
+                    value = data_type(value)
+                except ValueError:
+                    if hasattr(data_type, "Unknown"):
+                        value = data_type.Unknown
+                    else:
+                        raise
     return value
 
 
@@ -458,9 +477,11 @@ async def load():
     cursor = await connection.execute("""
         SELECT *
         FROM labels
+        ORDER BY id
     """)
     for label in await cursor.fetchall():
         Label.add(row_to_cls(label, Label))
+    Label.sort_instances()
 
     cursor = await connection.execute("""
         SELECT *
@@ -635,6 +656,16 @@ async def update_label(label: Label, *keys: list[str]):
     """, tuple(values))
 
 
+async def update_label_positions():
+    async with label_positions_lock:
+        positions = tuple((label.position, label.id) for label in Label.instances)
+        await connection.executemany("""
+            UPDATE labels
+            SET position=?
+            WHERE id=?
+        """, positions)
+
+
 async def delete_label(label: Label):
     await connection.execute(f"""
         DELETE FROM labels
@@ -647,18 +678,22 @@ async def delete_label(label: Label):
         if flt.match is label:
             globals.gui.filters.remove(flt)
     Label.remove(label)
+    Label.update_positions()
+    await update_label_positions()
 
 
 async def create_label():
     cursor = await connection.execute(f"""
         INSERT INTO labels
-        DEFAULT VALUES
-    """)
+        (position)
+        VALUES
+        (?)
+    """, (len(Label.instances),))
     cursor = await connection.execute(f"""
         SELECT *
         FROM labels
-        WHERE id={cursor.lastrowid}
-    """)
+        WHERE id=?
+    """, (cursor.lastrowid,))
     label = row_to_cls(await cursor.fetchone(), Label)
     Label.add(label)
     return label

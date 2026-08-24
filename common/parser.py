@@ -271,23 +271,20 @@ def thread(res: bytes) -> ParsedThread | ParserError:
             type = Type.Request
         elif game_has_prefixes("Tutorial"):
             type = Type.Tutorial
-        # Media Types
-        elif game_has_prefixes("SiteRip"):
-            type = Type.SiteRip
-        elif game_has_prefixes("Collection"):
-            type = Type.Collection
-        elif game_has_prefixes("Manga"):
-            type = Type.Manga
-        elif game_has_prefixes("Comics"):
-            type = Type.Comics
+        # Animation Types
         elif game_has_prefixes("Video"):
             type = Type.Video
         elif game_has_prefixes("GIF"):
             type = Type.GIF
-        elif game_has_prefixes("Pinup"):
-            type = Type.Pinup
+        # Comic Types
         elif game_has_prefixes("CG"):
             type = Type.CG
+        elif game_has_prefixes("Manga"):
+            type = Type.Manga
+        elif game_has_prefixes("Comics"):
+            type = Type.Comics
+        elif game_has_prefixes("Pinup"):
+            type = Type.Pinup
         # Game Engines
         elif game_has_prefixes("ADRIFT"):
             type = Type.ADRIFT

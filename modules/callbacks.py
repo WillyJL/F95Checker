@@ -4,10 +4,12 @@ import difflib
 import os
 import pathlib
 import plistlib
+import psutil
 import re
 import shlex
 import stat
 import subprocess
+import tempfile
 import time
 import typing
 
@@ -15,7 +17,9 @@ import glfw
 import imgui
 
 from common.structs import (
+    Category,
     Game,
+    LaunchState,
     MsgBox,
     Os,
     SearchResult,
@@ -36,6 +40,7 @@ from modules import (
     msgbox,
     utils,
     webview,
+    wine,
 )
 
 
@@ -111,6 +116,22 @@ def _fuzzy_match_subdir(where: pathlib.Path, match: str, best_partial_match: boo
 
 def add_game_exe(game: Game, callback: typing.Callable = None):
     use_uri = f"{icons.link_variant} Use URI"
+    use_dir = f"{icons.folder_outline} Use Dir"
+    use_file = f"{icons.file_outline} Use File"
+    def spawn_file_picker():
+        utils.push_popup(filepicker.FilePicker(
+            title=f"Select or drop executable for {game.name}",
+            start_dir=start_dir,
+            callback=select_callback,
+            buttons=[use_uri, use_dir]
+        ).tick)
+    def spawn_dir_picker():
+        utils.push_popup(filepicker.DirPicker(
+            title=f"Select or drop folder for {game.name}",
+            start_dir=start_dir,
+            callback=select_callback,
+            buttons=[use_uri, use_file]
+        ).tick)
     def select_callback(selected):
         if selected == use_uri:
             uri = ""
@@ -129,6 +150,12 @@ def add_game_exe(game: Game, callback: typing.Callable = None):
                 outside=False
             )
             return
+        elif selected == use_dir:
+            spawn_dir_picker()
+            return
+        elif selected == use_file:
+            spawn_file_picker()
+            return
         if selected:
             game.add_executable(selected)
         if callback:
@@ -141,12 +168,10 @@ def add_game_exe(game: Game, callback: typing.Callable = None):
             try_subdirs.append((game.name[:-len(" collection")], True))
         for subdir, best_partial_match in try_subdirs:
             start_dir = _fuzzy_match_subdir(start_dir, subdir, best_partial_match)
-    utils.push_popup(filepicker.FilePicker(
-        title=f"Select or drop executable for {game.name}",
-        start_dir=start_dir,
-        callback=select_callback,
-        buttons=[use_uri]
-    ).tick)
+    if game.type.category in (Category.Animations, Category.Comics):
+        spawn_dir_picker()
+    else:
+        spawn_file_picker()
 
 
 async def default_open(what: str, cwd: str = None):
@@ -166,7 +191,17 @@ async def default_open(what: str, cwd: str = None):
         )
 
 
-async def _launch_exe(executable: str):
+launch_watch_seconds = 15
+launch_watchers = set()
+
+
+def _resolve_launch_wrapper(game: Game):
+    if wrapper := game.launch_wrapper.get(globals.os, "").strip():
+        return wrapper
+    return globals.settings.default_launch_wrapper.get(globals.os, {}).get(game.type, "").strip()
+
+
+async def _launch_exe(executable: str, wrapper: str = ""):
     # Check URI scheme and launch with browser or default scheme handler
     if utils.is_uri(executable):
         if executable.startswith(("http://", "https://")):
@@ -181,22 +216,89 @@ async def _launch_exe(executable: str):
     if globals.os is Os.MacOS and exe.suffix == ".app" and exe.is_dir():
         await default_open(str(exe))
         return
-    if not exe.is_file():
+    if not exe.is_file() and not wrapper:
         raise FileNotFoundError()
 
     if exe.suffix == ".html":
         open_webpage(exe.as_uri())
         return
 
+    if wrapper:
+        if wine.is_supported() and not wine.cache:
+            # Ensure wine.match_runner() will work
+            wine.refresh()
+        is_wine_wrapper = wine.is_supported() and wine.match_runner(wrapper)
+        args = shlex.split(wrapper)
+        if any("%command%" in arg for arg in args):
+            args = [arg.replace("%command%", str(exe)) for arg in args]
+        else:
+            args.append(str(exe))
+        stderr = subprocess.DEVNULL
+        if is_wine_wrapper:
+            wine.ensure_prefix(wrapper)
+            error_log_file = tempfile.NamedTemporaryFile(prefix="f95checker-launch-", suffix=".log", delete=False)
+            stderr = error_log_file
+        process = await asyncio.create_subprocess_exec(
+            *args,
+            cwd=str(exe.parent),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=stderr
+        )
+        if is_wine_wrapper:
+            async def watch_wrapper():
+                try:
+                    code = await asyncio.wait_for(asyncio.shield(process.wait()), timeout=launch_watch_seconds)
+                except (asyncio.TimeoutError, TimeoutError):
+                    code = None
+                error_log_file.close()
+                if code:
+                    error_log = pathlib.Path(error_log_file.name).read_text(errors="ignore").strip()[-10000:]
+                    utils.push_popup(
+                        msgbox.msgbox, "Game launch error",
+                        f"The launch wrapper exited with code {code}.\n",
+                        MsgBox.error,
+                        more=(
+                            "Command:\n"
+                            f"{shlex.join(args)}\n"
+                            "\n"
+                            "Error log:\n"
+                            f"{error_log}"
+                        ),
+                    )
+                try:
+                    os.unlink(error_log_file.name)
+                except OSError:
+                    pass
+            watcher = asyncio.create_task(watch_wrapper())
+            launch_watchers.add(watcher)
+            watcher.add_done_callback(launch_watchers.discard)
+        return process
+
+    windows_exe_magics = (b"MZ", b"ZM", b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1")  # .exe and .msi
+    unix_exe_magics = (b"#!", b"\x7FELF")  # Shebang and ELF
     if globals.os is Os.Windows:
+        with exe.open("rb") as f:
+            exe_magic = f.read(8).startswith(windows_exe_magics)
+        if exe_magic:
+            # Run as executable and get PID
+            try:
+                return await asyncio.create_subprocess_exec(
+                    str(exe),
+                    cwd=str(exe.parent),
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+            except OSError:
+                pass
         # Open with default app
         await default_open(str(exe), cwd=str(exe.parent))
     else:
         mode = exe.stat().st_mode
         exe_flag = not (mode & stat.S_IEXEC < stat.S_IEXEC)
         with exe.open("rb") as f:
-            # Check for shebang, exe and msi magic numbers
-            exe_magic = f.read(8).startswith((b"#!", b"\x7FELF", b"MZ", b"ZM", b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"))
+            exe_magic = f.read(8).startswith((*unix_exe_magics, *windows_exe_magics))
         if exe_magic and not exe_flag:
             # Should be executable but isn't, fix it
             exe.chmod(mode | stat.S_IEXEC)
@@ -209,8 +311,8 @@ async def _launch_exe(executable: str):
                     if mode & stat.S_IEXEC < stat.S_IEXEC:
                         file.chmod(mode | stat.S_IEXEC)
         if exe_magic and exe_flag:
-            # Run as executable
-            await asyncio.create_subprocess_exec(
+            # Run as executable and get PID
+            return await asyncio.create_subprocess_exec(
                 str(exe),
                 cwd=str(exe.parent),
                 stdin=subprocess.DEVNULL,
@@ -222,9 +324,103 @@ async def _launch_exe(executable: str):
             await default_open(str(exe), cwd=str(exe.parent))
 
 
+playing_grace_seconds = 3
+launch_state_changed = False
+
+
+def _track_launch(game: Game, process):
+    if process is None:
+        return
+    global launch_state_changed
+    game.launch_process = process
+    game.launch_started = time.time()
+    game.launch_state = LaunchState.Starting
+    launch_state_changed = True
+
+    async def watch():
+        global launch_state_changed
+        tree = {}
+
+        def remember(proc):
+            try:
+                tree[(proc.pid, proc.create_time())] = proc
+            except psutil.Error:
+                pass
+
+        def scan():
+            pids = {pid for pid, _ in tree}
+            try:
+                for proc in psutil.process_iter(("pid", "ppid")):
+                    if proc.info["ppid"] in pids and proc.pid not in pids:
+                        remember(proc)
+            except psutil.Error:
+                pass
+
+        def tree_alive():
+            scan()
+            for proc in tree.values():
+                try:
+                    if proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE:
+                        return True
+                except psutil.Error:
+                    pass
+            return False
+
+        try:
+            remember(psutil.Process(process.pid))
+        except psutil.Error:
+            pass
+        session_start = time.time()
+        flushed = 0.0
+
+        def flush_playtime():
+            nonlocal flushed
+            global launch_state_changed
+            if game.launch_process is not process:
+                return
+            session = time.time() - session_start
+            game.playtime += session - flushed
+            flushed = session
+            game.launch_flushed = flushed
+            launch_state_changed = True
+
+        deadline = time.time() + playing_grace_seconds
+        while time.time() < deadline:
+            try:
+                await asyncio.wait_for(asyncio.shield(process.wait()), timeout=0.25)
+            except (asyncio.TimeoutError, TimeoutError):
+                pass
+            scan()
+            if process.returncode is not None and not tree_alive():
+                break
+        else:
+            if game.launch_process is process:
+                game.launch_state = LaunchState.Playing
+                launch_state_changed = True
+            while process.returncode is None or tree_alive():
+                if process.returncode is None:
+                    try:
+                        await asyncio.wait_for(asyncio.shield(process.wait()), timeout=1)
+                    except (asyncio.TimeoutError, TimeoutError):
+                        pass
+                else:
+                    await asyncio.sleep(1)
+                if time.time() - session_start - flushed >= 60:
+                    flush_playtime()
+        flush_playtime()
+        if game.launch_process is process:
+            game.launch_state = LaunchState.Idle
+            game.launch_started = 0.0
+            game.launch_flushed = 0.0
+            game.launch_process = None
+            launch_state_changed = True
+
+    async_thread.run(watch())
+
+
 async def _launch_game_exe(game: Game, executable: str):
     try:
-        await _launch_exe(executable)
+        _track_launch(game, await _launch_exe(executable, wrapper=_resolve_launch_wrapper(game)))
         game.last_launched = time.time()
         exe = pathlib.Path(executable)
         if utils.is_uri(executable):
@@ -301,7 +497,9 @@ async def _open_folder(executable: str):
     exe = pathlib.Path(executable)
     if globals.settings.default_exe_dir.get(globals.os) and not exe.is_absolute():
         exe = pathlib.Path(globals.settings.default_exe_dir.get(globals.os)) / exe
-    folder = exe.parent
+    folder = exe
+    if not folder.is_dir():
+        folder = exe.parent
     if not folder.is_dir():
         raise FileNotFoundError()
 

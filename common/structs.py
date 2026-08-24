@@ -568,6 +568,13 @@ ExeState = IntEnumHack("ExeState", [
 ])
 
 
+LaunchState = IntEnumHack("LaunchState", [
+    ("Idle",     1),
+    ("Starting", 2),
+    ("Playing",  3),
+])
+
+
 MsgBox = IntEnumHack("MsgBox", [
     ("info",  (1, {"color": (0.10, 0.69, 0.95), "icon": "information"})),
     ("warn",  (2, {"color": (0.95, 0.69, 0.10), "icon": "alert_rhombus"})),
@@ -593,9 +600,10 @@ FilterMode = IntEnumHack("FilterMode", [
 
 
 Category = IntEnumHack("Category", [
-    ("Games", 1),
-    ("Media", 2),
-    ("Misc",  3),
+    ("Games",      1),
+    ("Animations", 2),
+    ("Comics",     3),
+    ("Misc",       4),
 ])
 
 
@@ -666,6 +674,7 @@ class Label:
     id: int
     name: str
     color: tuple[float]
+    position: int
     instances: typing.ClassVar = []
 
     @property
@@ -692,6 +701,16 @@ class Label:
     def remove(cls, self):
         while self in cls.instances:
             cls.instances.remove(self)
+
+    @classmethod
+    def update_positions(cls):
+        for self_i, self in enumerate(cls.instances):
+            self.position = self_i
+
+    @classmethod
+    def sort_instances(cls):
+        cls.instances.sort(key=lambda self: self.position)
+        cls.update_positions()
 
 
 @dataclasses.dataclass(slots=True)
@@ -812,6 +831,40 @@ Browser.add("Integrated", 0)
 Browser.add("Custom", -1)
 
 
+Type = IntEnumHack("Type", [
+    ("ADRIFT",     (2,  {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Games})),
+    ("Flash",      (4,  {"color": colors.hex_to_rgba_0_1("#616161"), "category": Category.Games})),
+    ("Godot",      (31, {"color": colors.hex_to_rgba_0_1("#03A9F4"), "category": Category.Games})),
+    ("HTML",       (5,  {"color": colors.hex_to_rgba_0_1("#689F38"), "category": Category.Games})),
+    ("Java",       (6,  {"color": colors.hex_to_rgba_0_1("#52A6B0"), "category": Category.Games})),
+    ("Others",     (9,  {"color": colors.hex_to_rgba_0_1("#8BC34A"), "category": Category.Games})),
+    ("QSP",        (10, {"color": colors.hex_to_rgba_0_1("#D32F2F"), "category": Category.Games})),
+    ("RAGS",       (11, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Games})),
+    ("RenPy",      (14, {"color": colors.hex_to_rgba_0_1("#B069E8"), "category": Category.Games})),
+    ("RPGM",       (13, {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Games})),
+    ("Tads",       (16, {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Games})),
+    ("Unity",      (19, {"color": colors.hex_to_rgba_0_1("#FE5901"), "category": Category.Games})),
+    ("Unreal Eng", (20, {"color": colors.hex_to_rgba_0_1("#0D47A1"), "category": Category.Games})),
+    ("WebGL",      (21, {"color": colors.hex_to_rgba_0_1("#FE5901"), "category": Category.Games})),
+    ("Wolf RPG",   (22, {"color": colors.hex_to_rgba_0_1("#4CAF50"), "category": Category.Games})),
+    ("GIF",        (25, {"color": colors.hex_to_rgba_0_1("#03A9F4"), "category": Category.Animations})),
+    ("Video",      (29, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Animations})),
+    ("CG",         (30, {"color": colors.hex_to_rgba_0_1("#DFCB37"), "category": Category.Comics})),
+    ("Comics",     (24, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Comics})),
+    ("Manga",      (26, {"color": colors.hex_to_rgba_0_1("#0FB2FC"), "category": Category.Comics})),
+    ("Pinup",      (27, {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Comics})),
+    ("Cheat Mod",  (3,  {"color": colors.hex_to_rgba_0_1("#D32F2F"), "category": Category.Misc})),
+    ("Mod",        (8,  {"color": colors.hex_to_rgba_0_1("#BA4545"), "category": Category.Misc})),
+    ("README",     (12, {"color": colors.hex_to_rgba_0_1("#DC143C"), "category": Category.Misc})),
+    ("Request",    (15, {"color": colors.hex_to_rgba_0_1("#D32F2F"), "category": Category.Misc})),
+    ("Tool",       (17, {"color": colors.hex_to_rgba_0_1("#EC5555"), "category": Category.Misc})),
+    ("Tutorial",   (18, {"color": colors.hex_to_rgba_0_1("#EC5555"), "category": Category.Misc})),
+    ("Misc",       (1,  {"color": colors.hex_to_rgba_0_1("#B8B00C"), "category": Category.Misc})),
+    ("Unchecked",  (23, {"color": colors.hex_to_rgba_0_1("#393939"), "category": Category.Misc})),
+    ("Unknown",    (32, {"color": colors.hex_to_rgba_0_1("#393939"), "category": Category.Misc})),
+])
+
+
 @dataclasses.dataclass(slots=True)
 class Settings:
     background_on_close         : bool
@@ -829,6 +882,7 @@ class Settings:
     copy_urls_as_bbcode         : bool
     datestamp_format            : str
     default_exe_dir             : dict[Os, str]
+    default_launch_wrapper      : dict[Os, dict[Type, str]]
     default_tab_is_new          : bool
     display_mode                : DisplayMode
     display_tab                 : Tab.get
@@ -891,6 +945,8 @@ class Settings:
     unload_offscreen_images     : bool
     vsync_ratio                 : int
     weighted_score              : bool
+    wine_extra_runners_dirs     : dict[Os, list[str]]
+    wine_prefixes_dir           : dict[Os, str]
     zoom_area                   : int
     zoom_enabled                : bool
     zoom_times                  : float
@@ -900,42 +956,6 @@ class Settings:
             from modules import globals
             self.default_exe_dir[globals.os] = self.default_exe_dir[""]
             del self.default_exe_dir[""]
-
-
-Type = IntEnumHack("Type", [
-    ("ADRIFT",     (2,  {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Games})),
-    ("Flash",      (4,  {"color": colors.hex_to_rgba_0_1("#616161"), "category": Category.Games})),
-    ("Godot",      (31, {"color": colors.hex_to_rgba_0_1("#03A9F4"), "category": Category.Games})),
-    ("HTML",       (5,  {"color": colors.hex_to_rgba_0_1("#689F38"), "category": Category.Games})),
-    ("Java",       (6,  {"color": colors.hex_to_rgba_0_1("#52A6B0"), "category": Category.Games})),
-    ("Others",     (9,  {"color": colors.hex_to_rgba_0_1("#8BC34A"), "category": Category.Games})),
-    ("QSP",        (10, {"color": colors.hex_to_rgba_0_1("#D32F2F"), "category": Category.Games})),
-    ("RAGS",       (11, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Games})),
-    ("RenPy",      (14, {"color": colors.hex_to_rgba_0_1("#B069E8"), "category": Category.Games})),
-    ("RPGM",       (13, {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Games})),
-    ("Tads",       (16, {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Games})),
-    ("Unity",      (19, {"color": colors.hex_to_rgba_0_1("#FE5901"), "category": Category.Games})),
-    ("Unreal Eng", (20, {"color": colors.hex_to_rgba_0_1("#0D47A1"), "category": Category.Games})),
-    ("WebGL",      (21, {"color": colors.hex_to_rgba_0_1("#FE5901"), "category": Category.Games})),
-    ("Wolf RPG",   (22, {"color": colors.hex_to_rgba_0_1("#4CAF50"), "category": Category.Games})),
-    ("CG",         (30, {"color": colors.hex_to_rgba_0_1("#DFCB37"), "category": Category.Media})),
-    ("Collection", (7,  {"color": colors.hex_to_rgba_0_1("#616161"), "category": Category.Media})),
-    ("Comics",     (24, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Media})),
-    ("GIF",        (25, {"color": colors.hex_to_rgba_0_1("#03A9F4"), "category": Category.Media})),
-    ("Manga",      (26, {"color": colors.hex_to_rgba_0_1("#0FB2FC"), "category": Category.Media})),
-    ("Pinup",      (27, {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Media})),
-    ("SiteRip",    (28, {"color": colors.hex_to_rgba_0_1("#8BC34A"), "category": Category.Media})),
-    ("Video",      (29, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Media})),
-    ("Cheat Mod",  (3,  {"color": colors.hex_to_rgba_0_1("#D32F2F"), "category": Category.Misc})),
-    ("Mod",        (8,  {"color": colors.hex_to_rgba_0_1("#BA4545"), "category": Category.Misc})),
-    ("READ ME",    (12, {"color": colors.hex_to_rgba_0_1("#DC143C"), "category": Category.Misc})),
-    ("Request",    (15, {"color": colors.hex_to_rgba_0_1("#D32F2F"), "category": Category.Misc})),
-    ("Tool",       (17, {"color": colors.hex_to_rgba_0_1("#EC5555"), "category": Category.Misc})),
-    ("Tutorial",   (18, {"color": colors.hex_to_rgba_0_1("#EC5555"), "category": Category.Misc})),
-    ("Misc",       (1,  {"color": colors.hex_to_rgba_0_1("#B8B00C"), "category": Category.Misc})),
-    ("Unchecked",  (23, {"color": colors.hex_to_rgba_0_1("#393939"), "category": Category.Misc})),
-    ("Unknown",    (32, {"color": colors.hex_to_rgba_0_1("#393939"), "category": Category.Misc})),
-])
 
 
 @dataclasses.dataclass(slots=True)
@@ -953,6 +973,7 @@ class Game:
     last_full_check    : int
     last_check_version : str
     last_launched      : Datestamp
+    playtime           : float
     score              : float
     votes              : int
     rating             : int
@@ -961,6 +982,7 @@ class Game:
     updated            : bool | None
     archived           : bool
     executables        : list[str]
+    launch_wrapper     : dict[Os, str]
     description        : str
     changelog          : str
     tags               : tuple[Tag]
@@ -975,6 +997,10 @@ class Game:
     reviews_total      : int
     reviews            : list[Review]
     selected           : bool = False
+    launch_state       : LaunchState = LaunchState.Idle
+    launch_started     : float = 0.0
+    launch_flushed     : float = 0.0
+    launch_process     : typing.Any = None
     image              : "imagehelper.ImageHelper" = None
     preview_images     : list["imagehelper.ImageHelper"] = dataclasses.field(default_factory=list)
     previews_loading   : bool = False
@@ -986,6 +1012,7 @@ class Game:
 
     def __post_init__(self):
         self._did_init = True
+        self.labels.sort(key=lambda label: label.position)
         if self.custom is None:
             self.custom = bool(self.status is Status.Custom)
         if self.id < 0:
@@ -1098,10 +1125,10 @@ class Game:
                     if base in exe.parents:
                         self.executables[i] = exe.relative_to(base).as_posix()
                         changed = True
-                    executables_valids.append(exe.is_file() or (globals.os is Os.MacOS and exe.suffix == ".app" and exe.is_dir()))
+                    executables_valids.append(exe.is_file() or exe.is_dir())
                 else:
                     abs_exe = base / exe
-                    executables_valids.append(abs_exe.is_file() or (globals.os is Os.MacOS and abs_exe.suffix == ".app" and abs_exe.is_dir()))
+                    executables_valids.append(abs_exe.is_file() or abs_exe.is_dir())
             self.executables_valids = executables_valids
             if changed:
                 from external import async_thread
@@ -1156,7 +1183,7 @@ class Game:
     def add_label(self, label: Label):
         if label not in self.labels:
             self.labels.append(label)
-        self.labels.sort(key=lambda label: Label.instances.index(label))
+        self.labels.sort(key=lambda label: label.position)
         from external import async_thread
         from modules import db, globals
         async_thread.run(db.update_game(self, "labels"))
@@ -1178,6 +1205,19 @@ class Game:
         async_thread.run(db.create_timeline_event(self.id, Timestamp(time.time()), list(args), type))
 
 
+    @property
+    def playtime_display(self):
+        playtime = self.playtime
+        if self.launch_state is not LaunchState.Idle and self.launch_started:
+            playtime += time.time() - self.launch_started - self.launch_flushed
+        if playtime >= 3600:
+            return f"{playtime / 3600:.1f}h"
+        if playtime >= 60:
+            return f"{int(playtime / 60)}m"
+        if playtime:
+            return "<1m"
+        return ""
+
     def __setattr__(self, name: str, value: typing.Any):
         if hasattr(self, "_did_init") and self._did_init and name in [
             "custom",
@@ -1192,6 +1232,7 @@ class Game:
             "last_full_check",
             "last_check_version",
             "last_launched",
+            "playtime",
             "score",
             "votes",
             "rating",
