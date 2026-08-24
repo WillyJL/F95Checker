@@ -751,6 +751,15 @@ class MainGUI():
         try:
             with open(globals.data_path / "filters.pkl", "rb") as file:
                 self.filters = pickle.load(file)
+                for flt in self.filters:
+                    match flt.mode:
+                        case FilterMode.Label:
+                            # Field added later, replace broken object with real one
+                            if not hasattr(flt.match, "position"):
+                                try:
+                                    flt.match = Label.get(flt.match.id)
+                                except Exception:
+                                    self.filters.remove(flt)
         except Exception:
             self.filters = []
 
