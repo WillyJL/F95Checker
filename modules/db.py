@@ -656,8 +656,9 @@ async def update_label(label: Label, *keys: list[str]):
     """, tuple(values))
 
 
-async def update_label_positions(positions: tuple[tuple[int, int], ...]):
+async def update_label_positions():
     async with label_positions_lock:
+        positions = tuple((label.position, label.id) for label in Label.instances)
         await connection.executemany("""
             UPDATE labels
             SET position=?
@@ -678,8 +679,7 @@ async def delete_label(label: Label):
             globals.gui.filters.remove(flt)
     Label.remove(label)
     Label.update_positions()
-    positions = tuple((label.position, label.id) for label in Label.instances)
-    await update_label_positions(positions)
+    await update_label_positions()
 
 
 async def create_label():

@@ -4775,8 +4775,7 @@ class MainGUI():
                 Label.update_positions()
                 for game in globals.games.values():
                     game.labels.sort(key=lambda label: label.position)
-                positions = tuple((label.position, label.id) for label in Label.instances)
-                async_thread.run(db.update_label_positions(positions))
+                async_thread.run(db.update_label_positions())
 
             draw_settings_label("New label:")
             if imgui.button("Add", width=right_width):
