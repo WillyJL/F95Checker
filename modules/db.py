@@ -556,6 +556,7 @@ def py_to_sql(value: enum.Enum | Timestamp | bool | list | tuple | typing.Any):
 
 
 async def update_game_id(game: Game, new_id):
+    old_id = game.id
     await connection.execute(f"""
         UPDATE games
         SET
@@ -575,10 +576,23 @@ async def update_game_id(game: Game, new_id):
     for event in game.timeline_events:
         event.game_id = new_id
 
-    for img in globals.images_path.glob(f"{game.id}.*"):
+    for img in globals.images_path.glob(f"{old_id}.*"):
         try:
             shutil.move(img, img.with_name(f"{new_id}{''.join(img.suffixes)}"))
         except Exception:
+            pass
+    old_preview_dir = globals.images_path / "previews" / str(old_id)
+    new_preview_dir = globals.images_path / "previews" / str(new_id)
+    if old_preview_dir.is_dir():
+        new_preview_dir.mkdir(parents=True, exist_ok=True)
+        for img in old_preview_dir.iterdir():
+            try:
+                shutil.move(img, new_preview_dir / img.name)
+            except Exception:
+                pass
+        try:
+            old_preview_dir.rmdir()
+        except OSError:
             pass
     game.id = new_id
     game.refresh_image()
