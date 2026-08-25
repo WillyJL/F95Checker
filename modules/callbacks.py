@@ -718,7 +718,7 @@ def remove_game(*games: list[Game], bypass_confirm=False):
     def remove_callback():
         for game in games:
             id = game.id
-            game.delete_images()
+            game.delete_images(cover_only=False)
             del globals.games[id]
             globals.gui.recalculate_ids = True
             async_thread.run(db.delete_game(id))

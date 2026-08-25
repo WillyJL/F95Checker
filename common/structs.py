@@ -1084,25 +1084,26 @@ class Game:
         self.preview_load_future = None
         self.previews_loading = False
 
-    def delete_images(self):
+    def delete_images(self, cover_only=True):
         from modules import globals
-        self.cancel_preview_loading()
-        self.unload_previews()
         for img in globals.images_path.glob(f"{self.id}.*"):
             try:
                 img.unlink()
             except Exception:
                 pass
-        preview_dir = globals.images_path / "previews" / str(self.id)
-        for img in preview_dir.glob("*"):
+        if not cover_only:
+            self.cancel_preview_loading()
+            self.unload_previews()
+            preview_dir = globals.images_path / "previews" / str(self.id)
+            for img in preview_dir.glob("*"):
+                try:
+                    img.unlink()
+                except Exception:
+                    pass
             try:
-                img.unlink()
-            except Exception:
+                preview_dir.rmdir()
+            except OSError:
                 pass
-        try:
-            preview_dir.rmdir()
-        except OSError:
-            pass
 
     def unload_previews(self):
         """Release decoded preview data and GPU textures, keeping disk cache."""
