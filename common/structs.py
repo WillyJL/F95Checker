@@ -8,6 +8,7 @@ import json
 import os
 import pathlib
 import shutil
+import string
 import sys
 import time
 import typing
@@ -1053,10 +1054,9 @@ class Game:
             # decoded image data are released before rebuilding it.
             self.unload_previews()
             preview_dir = globals.images_path / f"previews/{self.id}"
-            async def _maybe_fetch_preview(url: str):
+            async def _maybe_fetch_preview(url: str, digest: str):
                 if not url.startswith(("http://", "https://")):
                     return
-                digest = hashlib.sha1(url.encode("utf-8")).hexdigest()
                 glob = f"{digest}.*"
                 paths = list(preview_dir.glob(glob))
                 if not paths:
@@ -1075,7 +1075,19 @@ class Game:
                     except Exception:
                         return
                 self.preview_images.append(imagehelper.ImageHelper(preview_dir, glob=glob))
-            await asyncio.gather(*(_maybe_fetch_preview(url) for url in self.previews_urls))
+            digests = [hashlib.sha1(url.encode("utf-8")).hexdigest() for url in self.previews_urls]
+            for img in preview_dir.glob("*"):
+                digest = img.stem
+                if len(digest) != 40 or not all(c in string.hexdigits for c in digest):
+                    # Not a digest
+                    continue
+                if digest not in digests:
+                    # Old preview
+                    try:
+                        img.unlink()
+                    except Exception:
+                        pass
+            await asyncio.gather(*(_maybe_fetch_preview(url, digest) for url, digest in zip(self.previews_urls, digests)))
             self.previews_loaded = True
         finally:
             self.previews_loading = False
