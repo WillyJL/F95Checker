@@ -749,17 +749,24 @@ class MainGUI():
 
     def load_filters(self):
         try:
+            # TODO: replace this with a better system, pickle is a disaster waiting to happen (and already kinda did, hence matching by IDs below)
             with open(globals.data_path / "filters.pkl", "rb") as file:
                 self.filters = pickle.load(file)
                 for flt in self.filters:
-                    match flt.mode:
-                        case FilterMode.Label:
-                            # Field added later, replace broken object with real one
-                            if not hasattr(flt.match, "position"):
-                                try:
-                                    flt.match = Label.get(flt.match.id)
-                                except Exception:
-                                    self.filters.remove(flt)
+                    try:
+                        match flt.mode:
+                            case FilterMode.Exe_State:
+                                flt.match = ExeState(flt.match.value)
+                            case FilterMode.Label:
+                                flt.match = Label.get(flt.match.id)
+                            case FilterMode.Status:
+                                flt.match = Status(flt.match.value)
+                            case FilterMode.Tag:
+                                flt.match = Tag(flt.match.value)
+                            case FilterMode.Type:
+                                flt.match = Type(flt.match.value)
+                    except Exception:
+                        self.filters.remove(flt)
         except Exception:
             self.filters = []
 
@@ -5560,6 +5567,13 @@ class MainGUI():
                     if not errored:
                         if imgui.button(icons.open_in_app):
                             async_thread.run(callbacks.default_open(download.path))
+                        imgui.same_line()
+                    else:
+                        if imgui.button(icons.refresh):
+                            async def _retry(download):
+                                await download.delete()
+                                async_thread.run(api.download_file(download))
+                            async_thread.run(_retry(download))
                         imgui.same_line()
                     space_after = (
                         2 * (
