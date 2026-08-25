@@ -1050,11 +1050,11 @@ class Game:
             # this list. Use the normal cleanup path so existing textures and
             # decoded image data are released before rebuilding it.
             self.unload_previews()
-            for index, url in enumerate(self.previews_urls):
-                if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+            preview_dir = globals.images_path / f"previews/{self.id}"
+            for url in self.previews_urls:
+                if not url.startswith(("http://", "https://")):
                     continue
                 digest = hashlib.sha1(url.encode("utf-8")).hexdigest()
-                preview_dir = globals.images_path / "previews" / str(self.id)
                 glob = f"{digest}.*"
                 paths = list(preview_dir.glob(glob))
                 if not paths:
