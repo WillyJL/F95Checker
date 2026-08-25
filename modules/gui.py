@@ -2285,13 +2285,10 @@ class MainGUI():
             if game.previews_urls:
                 if not game.previews_loaded and not game.previews_loading:
                     game.preview_load_future = async_thread.run(game.load_previews_async())
-                if game.previews_loading:
-                    download_count = api.images_counter.count
-                    loading_text = (
-                        f" · Downloading {download_count} image"
-                        f"{'s' if download_count != 1 else ''}"
-                        if download_count else " · Loading..."
-                    )
+                if (count := imagehelper.compress_counter) > 0:
+                    loading_text = " · Compressing images..." if count == 1 else f" · Compressing {count} frames..."
+                elif game.previews_loading and (count := api.images_counter.count) > 0:
+                    loading_text = f" · Downloading {count} image{'s' if count > 1 else ''}..."
                 else:
                     loading_text = ""
                 imgui.text(f"Previews ({len(game.preview_images)}/{len(game.previews_urls)}){loading_text}")
