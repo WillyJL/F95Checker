@@ -749,24 +749,17 @@ class MainGUI():
 
     def load_filters(self):
         try:
-            # TODO: replace this with a better system, pickle is a disaster waiting to happen (and already kinda did, hence matching by IDs below)
             with open(globals.data_path / "filters.pkl", "rb") as file:
                 self.filters = pickle.load(file)
                 for flt in self.filters:
-                    try:
-                        match flt.mode:
-                            case FilterMode.Exe_State:
-                                flt.match = ExeState(flt.match.value)
-                            case FilterMode.Label:
-                                flt.match = Label.get(flt.match.id)
-                            case FilterMode.Status:
-                                flt.match = Status(flt.match.value)
-                            case FilterMode.Tag:
-                                flt.match = Tag(flt.match.value)
-                            case FilterMode.Type:
-                                flt.match = Type(flt.match.value)
-                    except Exception:
-                        self.filters.remove(flt)
+                    match flt.mode:
+                        case FilterMode.Label:
+                            # Field added later, replace broken object with real one
+                            if not hasattr(flt.match, "position"):
+                                try:
+                                    flt.match = Label.get(flt.match.id)
+                                except Exception:
+                                    self.filters.remove(flt)
         except Exception:
             self.filters = []
 
@@ -2282,9 +2275,18 @@ class MainGUI():
             # or download images for games the user never inspects.
             if game.previews_urls:
                 if not game.previews_loaded and not game.previews_loading:
-                    async_thread.run(game.load_previews_async())
+                    game.preview_load_future = async_thread.run(game.load_previews_async())
+                if game.previews_loading:
+                    download_count = api.images_counter.count
+                    loading_text = (
+                        f" · Downloading {download_count} image"
+                        f"{'s' if download_count != 1 else ''}"
+                        if download_count else " · Loading..."
+                    )
+                else:
+                    loading_text = ""
+                imgui.text(f"Previews ({len(game.preview_images)}/{len(game.previews_urls)}){loading_text}")
                 if game.preview_images:
-                    imgui.text(f"Previews ({len(game.preview_images)})")
                     # Keep each preview at a useful thumbnail size and put
                     # the row in a child with an explicit horizontal bar.
                     # Without a child, ImGui clips same-line items at the
@@ -2303,17 +2305,24 @@ class MainGUI():
                     )
                     first = True
                     for preview in game.preview_images:
-                        if preview.error:
-                            continue
                         aspect = preview.height / preview.width if preview.width else 1.0
                         height = min(preview_height, preview_width * aspect)
                         if not first:
                             imgui.same_line()
+                        preview_pos = imgui.get_cursor_pos()
                         preview.render(preview_width, height, rounding=rounding)
+                        if preview.error:
+                            # Keep failed previews in the gallery so users
+                            # can see that an item failed rather than assuming
+                            # it was silently omitted.
+                            preview_hovered = imgui.is_item_hovered()
+                            imgui.set_cursor_pos(preview_pos)
+                            imgui.text_wrapped("Preview unavailable")
+                            imgui.set_cursor_pos((preview_pos.x, preview_pos.y + height))
+                            if preview_hovered:
+                                imgui.set_tooltip(preview.error)
                         first = False
                     imgui.end_child()
-                elif game.previews_loading:
-                    imgui.text("Loading previews...")
             imgui.push_text_wrap_pos()
 
             imgui.push_font(imgui.fonts.big)
@@ -2860,17 +2869,20 @@ class MainGUI():
             if change_id is not None:
                 # Swiping to another game closes this popup's gallery. Keep
                 # the downloaded files, but release decoded/GPU image data.
+                game.cancel_preview_loading()
                 game.unload_previews()
                 utils.push_popup(self.draw_game_info_popup, globals.games[change_id], carousel_ids).uuid = popup_uuid
                 return True
             elif utils.close_weak_popup():
                     return True
         if game.id not in globals.games:
+            game.cancel_preview_loading()
             return 0, True
         result = utils.popup(game.name, popup_content, closable=True, outside=False, resize=False, popup_uuid=popup_uuid)
         if result[1]:
             # A closed info popup is no longer a visible owner of its
             # textures. The URL cache stays on disk for cheap reopening.
+            game.cancel_preview_loading()
             game.unload_previews()
         return result
 
@@ -5546,13 +5558,6 @@ class MainGUI():
                     if not errored:
                         if imgui.button(icons.open_in_app):
                             async_thread.run(callbacks.default_open(download.path))
-                        imgui.same_line()
-                    else:
-                        if imgui.button(icons.refresh):
-                            async def _retry(download):
-                                await download.delete()
-                                async_thread.run(api.download_file(download))
-                            async_thread.run(_retry(download))
                         imgui.same_line()
                     space_after = (
                         2 * (
