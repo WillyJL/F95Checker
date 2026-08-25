@@ -1005,6 +1005,7 @@ class Game:
     preview_images     : list["imagehelper.ImageHelper"] = dataclasses.field(default_factory=list)
     previews_loading   : bool = False
     previews_loaded    : bool = False
+    preview_load_future: typing.Any = dataclasses.field(default=None, init=False, repr=False, compare=False)
     executables_valids : list[bool] = None
     executables_valid  : bool = None
     timeline_events    : list[TimelineEvent] = dataclasses.field(default_factory=list)
@@ -1045,29 +1046,56 @@ class Game:
         try:
             from external import imagehelper
             from modules import api, globals, utils
-            self.preview_images.clear()
+            # A retry or resumed load may already have partially populated
+            # this list. Use the normal cleanup path so existing textures and
+            # decoded image data are released before rebuilding it.
+            self.unload_previews()
             for index, url in enumerate(self.previews_urls):
                 if not isinstance(url, str) or not url.startswith(("http://", "https://")):
                     continue
-                digest = hashlib.sha1(url.encode("utf-8")).hexdigest()[:16]
-                glob = f"preview-{self.id}-{digest}.*"
-                paths = list(globals.images_path.glob(glob))
+                digest = hashlib.sha1(url.encode("utf-8")).hexdigest()
+                preview_dir = globals.images_path / "previews" / str(self.id)
+                glob = f"{digest}.*"
+                paths = list(preview_dir.glob(glob))
+                if not paths:
+                    # Migrate the previous flat, 16-character cache name
+                    # instead of downloading the same preview again.
+                    legacy_paths = list(globals.images_path.glob(f"preview-{self.id}-{digest[:16]}.*"))
+                    if legacy_paths:
+                        preview_dir.mkdir(parents=True, exist_ok=True)
+                        for legacy_path in legacy_paths:
+                            try:
+                                migrated_path = preview_dir / f"{digest}{''.join(legacy_path.suffixes)}"
+                                shutil.move(legacy_path, migrated_path)
+                            except Exception:
+                                pass
+                        paths = list(preview_dir.glob(glob))
                 if not paths:
                     try:
-                        data = await api.fetch(
-                            "GET", url,
-                            timeout=globals.settings.request_timeout * 4,
-                            raise_for_status=True,
-                        )
+                        with api.images_counter:
+                            data = await api.fetch(
+                                "GET", url,
+                                timeout=globals.settings.request_timeout * 4,
+                                raise_for_status=True,
+                            )
                         if data:
-                            path = globals.images_path / f"preview-{self.id}-{digest}.{utils.image_ext(data)}"
+                            preview_dir.mkdir(parents=True, exist_ok=True)
+                            path = preview_dir / f"{digest}.{utils.image_ext(data)}"
                             path.write_bytes(data)
                     except Exception:
                         continue
-                self.preview_images.append(imagehelper.ImageHelper(globals.images_path, glob=glob))
+                self.preview_images.append(imagehelper.ImageHelper(preview_dir, glob=glob))
             self.previews_loaded = True
         finally:
             self.previews_loading = False
+
+    def cancel_preview_loading(self):
+        """Cancel an in-flight preview request when its popup is dismissed."""
+        future = self.preview_load_future
+        if future is not None and not future.done():
+            future.cancel()
+        self.preview_load_future = None
+        self.previews_loading = False
 
     def delete_images(self):
         from modules import globals
@@ -1077,11 +1105,22 @@ class Game:
                 img.unlink()
             except Exception:
                 pass
+        # Remove caches made by the pre-subfolder preview implementation.
         for img in globals.images_path.glob(f"preview-{self.id}-*"):
             try:
                 img.unlink()
             except Exception:
                 pass
+        preview_dir = globals.images_path / "previews" / str(self.id)
+        for img in preview_dir.glob("*"):
+            try:
+                img.unlink()
+            except Exception:
+                pass
+        try:
+            preview_dir.rmdir()
+        except OSError:
+            pass
 
     def unload_previews(self):
         """Release decoded preview data and GPU textures, keeping disk cache."""
