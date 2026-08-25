@@ -581,19 +581,10 @@ async def update_game_id(game: Game, new_id):
             shutil.move(img, img.with_name(f"{new_id}{''.join(img.suffixes)}"))
         except Exception:
             pass
-    old_preview_dir = globals.images_path / "previews" / str(old_id)
-    new_preview_dir = globals.images_path / "previews" / str(new_id)
-    if old_preview_dir.is_dir():
-        new_preview_dir.mkdir(parents=True, exist_ok=True)
-        for img in old_preview_dir.iterdir():
-            try:
-                shutil.move(img, new_preview_dir / img.name)
-            except Exception:
-                pass
-        try:
-            old_preview_dir.rmdir()
-        except OSError:
-            pass
+    try:
+        shutil.move(globals.images_path / f"previews/{old_id}", globals.images_path / f"previews/{new_id}")
+    except Exception:
+        pass
     game.id = new_id
     game.refresh_image()
 
