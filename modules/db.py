@@ -561,17 +561,17 @@ async def update_game_id(game: Game, new_id):
         UPDATE games
         SET
             id={new_id}
-        WHERE id={game.id}
+        WHERE id={old_id}
     """)
     globals.games[new_id] = game
-    if game.id != new_id:
-        del globals.games[game.id]
+    if old_id != new_id:
+        del globals.games[old_id]
 
     await connection.execute(f"""
         UPDATE timeline_events
         SET
             game_id={new_id}
-        WHERE game_id={game.id}
+        WHERE game_id={old_id}
     """)
     for event in game.timeline_events:
         event.game_id = new_id
