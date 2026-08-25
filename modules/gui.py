@@ -2154,8 +2154,8 @@ class MainGUI():
             globals.updated_games.clear()
         return opened, closed
 
-    def draw_game_image_error(self, game: Game, width: float, height: float):
-        if game.image.error == "Image file missing":
+    def draw_game_image_error(self, game: Game, image: imagehelper.ImageHelper, width: float, height: float):
+        if image is game.image and image.error == "Image file missing":
             text = "Image missing!"
             if game.custom:
                 hover_text = "Right click in More Info popup to add an image."
@@ -2168,7 +2168,7 @@ class MainGUI():
                 )
         else:
             text = "Image error!"
-            hover_text = game.image.error or "Unknown error"
+            hover_text = image.error or "Unknown error"
 
         text_size = imgui.calc_text_size(text)
         if text_size.x >= width:
@@ -2197,7 +2197,7 @@ class MainGUI():
             out_height = (min(avail.y, self.scaled(690)) * self.scaled(0.4)) or 1
             out_width = avail.x or 1
             if image.error:
-                self.draw_game_image_error(game, out_width, out_height)
+                self.draw_game_image_error(game, game.image, out_width, out_height)
             else:
                 aspect_ratio = image.height / image.width
                 if aspect_ratio > (out_height / out_width):
@@ -2298,35 +2298,27 @@ class MainGUI():
                     # Without a child, ImGui clips same-line items at the
                     # popup boundary and the parent only scrolls vertically.
                     preview_width = max(self.scaled(240), (out_width - imgui.style.item_spacing.x) / 2)
-                    preview_height = self.scaled(260)
+                    preview_height = preview_width / (16 / 9)
                     horizontal_flags = (
                         imgui.WINDOW_HORIZONTAL_SCROLLING_BAR |
-                        imgui.WINDOW_ALWAYS_HORIZONTAL_SCROLLBAR
+                        imgui.WINDOW_ALWAYS_HORIZONTAL_SCROLLBAR |
+                        imgui.WINDOW_NO_SCROLLBAR
                     )
                     imgui.begin_child(
                         "###game_previews_gallery",
                         width=out_width,
-                        height=preview_height + imgui.get_frame_height() + imgui.style.item_spacing.y,
+                        height=preview_height + 2 * imgui.style.window_padding.y,
                         flags=horizontal_flags,
                     )
                     first = True
                     for preview in game.preview_images:
-                        aspect = preview.height / preview.width if preview.width else 1.0
-                        height = min(preview_height, preview_width * aspect)
                         if not first:
                             imgui.same_line()
-                        preview_pos = imgui.get_cursor_pos()
-                        preview.render(preview_width, height, rounding=rounding)
                         if preview.error:
-                            # Keep failed previews in the gallery so users
-                            # can see that an item failed rather than assuming
-                            # it was silently omitted.
-                            preview_hovered = imgui.is_item_hovered()
-                            imgui.set_cursor_pos(preview_pos)
-                            imgui.text_wrapped("Preview unavailable")
-                            imgui.set_cursor_pos((preview_pos.x, preview_pos.y + height))
-                            if preview_hovered:
-                                imgui.set_tooltip(preview.error)
+                            self.draw_game_image_error(game, preview, preview_width, preview_height)
+                        else:
+                            crop = preview.crop_to_ratio(preview_width / preview_height, fit=globals.settings.fit_images)
+                            preview.render(preview_width, preview_height, *crop, rounding=rounding)
                         first = False
                     imgui.end_child()
             imgui.push_text_wrap_pos()
@@ -3677,7 +3669,7 @@ class MainGUI():
         # Image
         if game.image.error:
             showed_img = imgui.is_rect_visible(cell_width, img_height)
-            self.draw_game_image_error(game, cell_width, img_height)
+            self.draw_game_image_error(game, game.image, cell_width, img_height)
         else:
             crop = game.image.crop_to_ratio(globals.settings.cell_image_ratio, fit=globals.settings.fit_images)
             showed_img = game.image.render(cell_width, img_height, *crop, rounding=rounding, flags=imgui.DRAW_ROUND_CORNERS_TOP)
