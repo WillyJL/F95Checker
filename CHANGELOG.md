@@ -1,4 +1,8 @@
 ### Added:
+- Preview images in More Info popup (#285 by @Crykon & @WillyJL):
+  - Opt-in from Settings > Images > Preview images
+  - Downloads on-demand only while the game's More Info popup is open, resuming/interrupting as it's opened/closed
+  - Caches to disk, which can take a lot of space, so off by default
 - Exe launch wrappers (#289 by @cicklolwut & @WillyJL):
   - Allows setting custom arguments and wrapper commands for launching
   - Support for Wine/Proton on Linux/macOS
