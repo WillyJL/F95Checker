@@ -1046,14 +1046,15 @@ class Game:
         try:
             from external import imagehelper
             from modules import api, globals, utils
+            import aiofiles
             # A retry or resumed load may already have partially populated
             # this list. Use the normal cleanup path so existing textures and
             # decoded image data are released before rebuilding it.
             self.unload_previews()
             preview_dir = globals.images_path / f"previews/{self.id}"
-            for url in self.previews_urls:
+            async def _maybe_fetch_preview(url: str):
                 if not url.startswith(("http://", "https://")):
-                    continue
+                    return
                 digest = hashlib.sha1(url.encode("utf-8")).hexdigest()
                 glob = f"{digest}.*"
                 paths = list(preview_dir.glob(glob))
@@ -1068,10 +1069,12 @@ class Game:
                         if data:
                             preview_dir.mkdir(parents=True, exist_ok=True)
                             path = preview_dir / f"{digest}.{utils.image_ext(data)}"
-                            path.write_bytes(data)
+                            async with aiofiles.open(path, "wb") as f:
+                                await f.write(data)
                     except Exception:
-                        continue
+                        return
                 self.preview_images.append(imagehelper.ImageHelper(preview_dir, glob=glob))
+            await asyncio.gather(*(_maybe_fetch_preview(url) for url in self.previews_urls))
             self.previews_loaded = True
         finally:
             self.previews_loading = False
