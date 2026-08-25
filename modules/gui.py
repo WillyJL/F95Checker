@@ -2303,8 +2303,8 @@ class MainGUI():
                     preview_width = max(self.scaled(240), (out_width - imgui.style.item_spacing.x) / 2)
                     preview_height = self.scaled(260)
                     horizontal_flags = (
-                        getattr(imgui, "WINDOW_HORIZONTAL_SCROLLING_BAR", 0) |
-                        getattr(imgui, "WINDOW_ALWAYS_HORIZONTAL_SCROLLBAR", 0)
+                        imgui.WINDOW_HORIZONTAL_SCROLLING_BAR |
+                        imgui.WINDOW_ALWAYS_HORIZONTAL_SCROLLBAR
                     )
                     imgui.begin_child(
                         "###game_previews_gallery",
