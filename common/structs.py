@@ -1058,19 +1058,6 @@ class Game:
                 glob = f"{digest}.*"
                 paths = list(preview_dir.glob(glob))
                 if not paths:
-                    # Migrate the previous flat, 16-character cache name
-                    # instead of downloading the same preview again.
-                    legacy_paths = list(globals.images_path.glob(f"preview-{self.id}-{digest[:16]}.*"))
-                    if legacy_paths:
-                        preview_dir.mkdir(parents=True, exist_ok=True)
-                        for legacy_path in legacy_paths:
-                            try:
-                                migrated_path = preview_dir / f"{digest}{''.join(legacy_path.suffixes)}"
-                                shutil.move(legacy_path, migrated_path)
-                            except Exception:
-                                pass
-                        paths = list(preview_dir.glob(glob))
-                if not paths:
                     try:
                         with api.images_counter:
                             data = await api.fetch(
@@ -1101,12 +1088,6 @@ class Game:
         from modules import globals
         self.unload_previews()
         for img in globals.images_path.glob(f"{self.id}.*"):
-            try:
-                img.unlink()
-            except Exception:
-                pass
-        # Remove caches made by the pre-subfolder preview implementation.
-        for img in globals.images_path.glob(f"preview-{self.id}-*"):
             try:
                 img.unlink()
             except Exception:
