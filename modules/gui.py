@@ -1778,11 +1778,13 @@ class MainGUI():
 
     def draw_game_notes_widget(self, game: Game, multiline=True, width: int | float = None):
         if multiline:
+            available_height = imgui.get_content_region_available().y - imgui.style.item_spacing.y
+            content_height = imgui.get_text_line_height() * game.notes.count("\n") + imgui.get_frame_height_with_spacing() + imgui.style.frame_padding.y * 4
             changed, value = imgui.input_text_multiline(
                 f"###{game.id}_notes",
                 value=game.notes,
                 width=width or imgui.get_content_region_available_width(),
-                height=self.scaled(450)
+                height=max(available_height, content_height)
             )
             if changed:
                 game.notes = value
@@ -2433,39 +2435,6 @@ class MainGUI():
 
                 imgui.table_next_column()
                 imgui.align_text_to_frame_padding()
-                imgui.text_disabled("Executables:")
-                imgui.same_line()
-                self.draw_game_add_exe_button(game, f"{icons.folder_edit_outline} Add")
-                imgui.same_line()
-                self.draw_game_open_folder_button(game, f"{icons.folder_open_outline} Open Folder")
-                imgui.same_line()
-                self.draw_game_clear_exes_button(game, f"{icons.folder_remove_outline} Clear")
-
-                imgui.table_next_column()
-                imgui.text_disabled("Tab:")
-                imgui.same_line()
-                self.draw_game_tab_widget(game)
-
-                imgui.table_next_row()
-
-                # Draw labels on right first, so executables on left can then overflow below to right
-                imgui.table_set_column_index(1)
-                imgui.begin_group()
-                imgui.align_text_to_frame_padding()
-                imgui.text_disabled("Labels:")
-                imgui.same_line()
-                if game.labels:
-                    self.draw_game_labels_widget(game)
-                else:
-                    imgui.button("Right click to add")
-                imgui.end_group()
-                labels_end_y = imgui.get_cursor_pos_y()
-                if imgui.begin_popup_context_item(f"###{game.id}_context_labels"):
-                    self.draw_game_labels_select_widget(game)
-                    imgui.end_popup()
-
-                imgui.table_set_column_index(0)
-                imgui.align_text_to_frame_padding()
                 imgui.text_disabled("Exe Wrapper:")
                 imgui.same_line()
                 imgui.set_next_item_width(-1)
@@ -2492,6 +2461,39 @@ class MainGUI():
                     "This is a game-specific override. You can setup default wrappers in Settings > Manage > Exe Wrappers, which will also auto-detect Wine/Proton runners on Linux/macOS.",
                     text=None,
                 )
+
+                imgui.table_next_column()
+                imgui.text_disabled("Tab:")
+                imgui.same_line()
+                self.draw_game_tab_widget(game)
+
+                imgui.table_next_row()
+
+                # Draw labels on right first, so executables on left can then overflow below to right
+                imgui.table_set_column_index(1)
+                imgui.begin_group()
+                imgui.align_text_to_frame_padding()
+                imgui.text_disabled("Labels:")
+                imgui.same_line()
+                if game.labels:
+                    self.draw_game_labels_widget(game)
+                else:
+                    imgui.button("Right click to add")
+                imgui.end_group()
+                labels_end_y = imgui.get_cursor_pos_y()
+                if imgui.begin_popup_context_item(f"###{game.id}_context_labels"):
+                    self.draw_game_labels_select_widget(game)
+                    imgui.end_popup()
+
+                imgui.table_set_column_index(0)
+                imgui.align_text_to_frame_padding()
+                imgui.text_disabled("Executables:")
+                imgui.same_line()
+                self.draw_game_add_exe_button(game, f"{icons.folder_edit_outline} Add")
+                imgui.same_line()
+                self.draw_game_open_folder_button(game, f"{icons.folder_open_outline} Open Folder")
+                imgui.same_line()
+                self.draw_game_clear_exes_button(game, f"{icons.folder_remove_outline} Clear")
                 ended_table = False
                 for executable in game.executables:
                     if not ended_table and (pos_y := imgui.get_cursor_pos_y()) >= labels_end_y:
