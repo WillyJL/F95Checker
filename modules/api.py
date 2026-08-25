@@ -122,7 +122,8 @@ updating = False
 session: aiohttp.ClientSession = None
 ssl_context: ssl.SSLContext = None
 temp_prefix = "F95Checker-Temp-"
-f95_ratelimit = aiolimiter.AsyncLimiter(max_rate=1, time_period=2)
+f95_ratelimit_forum = aiolimiter.AsyncLimiter(max_rate=1, time_period=2)
+f95_ratelimit_attachments = aiolimiter.AsyncLimiter(max_rate=2, time_period=1)
 f95_ratelimit_sleeping = CounterContext()
 fast_checks_sem: asyncio.Semaphore = None
 full_checks_sem: asyncio.Semaphore = None
@@ -255,10 +256,12 @@ async def request(method: str, url: str, read=True, cookies: dict = True, **kwar
         cookies = globals.cookies
     elif cookies is False:
         cookies = {}
-    is_ratelimit_request = url.startswith(f95_host) and not url.startswith(f95_no_ratelimit_urls)
+    is_forum_request = url.startswith(f95_host) and not url.startswith(f95_no_ratelimit_urls)
+    is_attachments_request = url.startswith(f95_attachments_hosts)
+    if_ratelimit_request = is_forum_request or is_attachments_request
     ratelimit_retries = 10
     ratelimit_sleep = 0
-    _can_ratelimit = lambda: is_ratelimit_request and ratelimit_retries > 1
+    _can_ratelimit = lambda: if_ratelimit_request and ratelimit_retries > 1
     async def _do_ratelimit():
         nonlocal ratelimit_retries, ratelimit_sleep
         ratelimit_retries -= 1
@@ -268,10 +271,15 @@ async def request(method: str, url: str, read=True, cookies: dict = True, **kwar
     while retries and ratelimit_retries:
         try:
             # Only ratelimit when connecting to F95zone
-            maybe_ratelimit = f95_ratelimit if is_ratelimit_request else contextlib.nullcontext()
-            if not is_ratelimit_request and url.startswith(f95_host):
+            if is_forum_request:
+                maybe_ratelimit = f95_ratelimit_forum
+            elif is_attachments_request:
+                maybe_ratelimit = f95_ratelimit_attachments
+            else:
+                maybe_ratelimit = contextlib.nullcontext()
+            if not if_ratelimit_request and url.startswith(f95_host):
                 # Don't ratelimit before request, but allow detecting and retrying if ratelimit happens
-                is_ratelimit_request = True
+                if_ratelimit_request = True
             async with maybe_ratelimit, session.request(
                 method,
                 url,

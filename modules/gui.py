@@ -1006,7 +1006,7 @@ class MainGUI():
                             text = "Checking for updates..."
                         elif (count := imagehelper.compress_counter) > 0:
                             text = "Compressing images..." if count == 1 else f"Compressing {count} frames..."
-                        elif api.f95_ratelimit._waiters or api.f95_ratelimit_sleeping.count:
+                        elif api.f95_ratelimit_forum._waiters or api.f95_ratelimit_attachments._waiters or api.f95_ratelimit_sleeping.count:
                             text = f"Waiting for F95zone ratelimit..."
                         else:
                             text = self.watermark_text
