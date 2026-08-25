@@ -2282,7 +2282,7 @@ class MainGUI():
             # The indexer stores these URLs separately from the cover image.
             # Load them lazily so opening an info popup does not slow startup
             # or download images for games the user never inspects.
-            if game.previews_urls:
+            if globals.settings.previews_enabled and game.previews_urls:
                 if not game.previews_loaded and not game.previews_loading:
                     game.preview_load_future = async_thread.run(game.load_previews_async())
                 if (count := imagehelper.compress_counter) > 0:
@@ -4579,6 +4579,14 @@ class MainGUI():
 
             if not set.zoom_enabled:
                 imgui.pop_disabled()
+
+            draw_settings_label(
+                "Preview images:",
+                "Downloads preview images when opening the More Info popup for games and shows them below the main image. They are "
+                "saved to disk too, and as such it can start taking up a lot of space. Disabling this option will not delete "
+                "previously downloaded preview images from disk. Default is off."
+            )
+            draw_settings_checkbox("previews_enabled")
 
             draw_settings_label("Play GIFs:")
             if draw_settings_checkbox("play_gifs"):
