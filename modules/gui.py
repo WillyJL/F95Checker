@@ -2886,6 +2886,7 @@ class MainGUI():
                     return True
         if game.id not in globals.games:
             game.cancel_preview_loading()
+            game.unload_previews()
             return 0, True
         result = utils.popup(game.name, popup_content, closable=True, outside=False, resize=False, popup_uuid=popup_uuid)
         if result[1]:

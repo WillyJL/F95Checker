@@ -1086,6 +1086,7 @@ class Game:
 
     def delete_images(self):
         from modules import globals
+        self.cancel_preview_loading()
         self.unload_previews()
         for img in globals.images_path.glob(f"{self.id}.*"):
             try:

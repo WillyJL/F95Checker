@@ -557,6 +557,8 @@ def py_to_sql(value: enum.Enum | Timestamp | bool | list | tuple | typing.Any):
 
 async def update_game_id(game: Game, new_id):
     old_id = game.id
+    game.cancel_preview_loading()
+    game.unload_previews()
     await connection.execute(f"""
         UPDATE games
         SET
