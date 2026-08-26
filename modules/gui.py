@@ -9,6 +9,7 @@ import itertools
 import pathlib
 import pickle
 import platform
+import socket
 import sys
 import threading
 import time
@@ -348,6 +349,8 @@ class MainGUI():
         self.prev_filters: list[Filter] = []
         self.ghost_columns_enabled_count = 0
         self.bg_mode_notifs_timer: float = None
+        self.last_wall_time = time.time()
+        self.last_monotonic_time = time.monotonic()
         self.sorts: dict[str, list[SortSpec]] = {}
         self.show_games_ids: dict[Tab, list[int]] = {}
 
@@ -875,6 +878,18 @@ class MainGUI():
         try:
             # While window is open
             while not glfw.window_should_close(self.window):
+                # Detect system sleep/resume: wall clock jumping far ahead of monotonic clock means
+                # the PC was suspended, so push back any pending bg timers to avoid firing immediately
+                # with a stale/dead network connection right after waking up
+                now_wall = time.time()
+                now_mono = time.monotonic()
+                if (now_wall - self.last_wall_time) - (now_mono - self.last_monotonic_time) > 10:
+                    if self.bg_mode_timer:
+                        self.bg_mode_timer = now_wall + globals.settings.bg_refresh_interval * 60
+                    if self.bg_mode_notifs_timer:
+                        self.bg_mode_notifs_timer = now_wall + globals.settings.bg_notifs_interval * 60
+                self.last_wall_time = now_wall
+                self.last_monotonic_time = now_mono
                 # Tick events and inputs
                 prev_mouse_pos = imgui.io.mouse_pos
                 prev_minimized = self.minimized
@@ -1075,18 +1090,24 @@ class MainGUI():
                             self.bg_mode_timer = time.time() + globals.settings.bg_refresh_interval * 60
                             self.tray.update_status()
                         elif self.bg_mode_timer and time.time() > self.bg_mode_timer:
-                            # Run scheduled refresh
-                            self.bg_mode_timer = None
-                            utils.start_refresh_task(api.refresh(notifs=False), reset_bg_timers=False)
+                            # Run scheduled refresh, unless network isn't up yet (e.g. right after waking from sleep)
+                            if utils.is_network_available():
+                                self.bg_mode_timer = None
+                                utils.start_refresh_task(api.refresh(notifs=False), reset_bg_timers=False)
+                            else:
+                                self.bg_mode_timer = time.time() + 15
                         elif globals.settings.check_notifs:
                             if not self.bg_mode_notifs_timer:
                                 # Schedule next notif check
                                 self.bg_mode_notifs_timer = time.time() + globals.settings.bg_notifs_interval * 60
                                 self.tray.update_status()
                             elif self.bg_mode_notifs_timer and time.time() > self.bg_mode_notifs_timer:
-                                # Run scheduled notif check
-                                self.bg_mode_notifs_timer = None
-                                utils.start_refresh_task(api.check_notifs(standalone=True), reset_bg_timers=False, notify_new_games=False)
+                                # Run scheduled notif check, unless network isn't up yet (e.g. right after waking from sleep)
+                                if utils.is_network_available():
+                                    self.bg_mode_notifs_timer = None
+                                    utils.start_refresh_task(api.check_notifs(standalone=True), reset_bg_timers=False, notify_new_games=False)
+                                else:
+                                    self.bg_mode_notifs_timer = time.time() + 15
                     # Wait idle time
                     if self.tray.menu_open:
                         time.sleep(1 / 60)

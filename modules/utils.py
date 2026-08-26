@@ -4,6 +4,7 @@ import functools
 import io
 import random
 import re
+import socket
 import string
 import time
 import typing
@@ -103,6 +104,16 @@ def is_refreshing():
     if globals.refresh_task and not globals.refresh_task.done():
         return True
     return False
+
+
+def is_network_available():
+    # Quick, cheap synchronous DNS check, used to avoid firing background tasks (and their
+    # noisy error popups) right after waking from sleep, before the network is back up
+    try:
+        socket.getaddrinfo("f95zone.to", 443)
+        return True
+    except OSError:
+        return False
 
 
 def start_update_check():
