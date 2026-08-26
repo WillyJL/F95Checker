@@ -9,7 +9,6 @@ import itertools
 import pathlib
 import pickle
 import platform
-import socket
 import sys
 import threading
 import time
