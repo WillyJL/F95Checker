@@ -59,7 +59,11 @@ from modules import (
     webview,
 )
 
-f95_domain = "f95zone.to"
+f95_domains = (
+    f95_domain := "f95zone.to",
+    f95_domain_com := "f95zone.com",
+    f95_domain_ninja := "f95zone.ninja"
+)
 f95_host = "https://" + f95_domain
 f95_check_login_fast    = f95_host + "/sam/latest_alpha/"
 f95_login_page          = f95_host + "/login/"
@@ -73,8 +77,8 @@ f95_latest_endpoint     = f95_host + "/sam/latest_alpha/latest_data.php?cmd={cmd
 f95_ddl_endpoint        = f95_host + "/sam/dddl.php"
 f95_attachments_hosts = (
     f"https://attachments.{f95_domain}/",
-    "https://attachments.f95zone.com/",
-    f95_attachments_rocks := "https://attachments.f95zone.rocks/",
+    f"https://attachments.{f95_domain_com}/",
+    f95_attachments_host_ninja := f"https://attachments.{f95_domain_ninja}/",
 )
 f95_no_ratelimit_urls = (
     f95_check_login_fast,
@@ -115,7 +119,7 @@ api_fast_check_max_ids = 10
 app_update_endpoint = "https://api.github.com/repos/WillyJL/F95Checker/releases/latest"
 
 insecure_ssl_allowed_hosts = (
-    f95_attachments_rocks,  # Invalid SSL cert but still works and is ran by F95zone
+    f95_attachments_host_ninja,  # Invalid SSL cert but still works and is ran by F95zone
 )
 
 updating = False
@@ -231,7 +235,7 @@ def get_url_domain(url: str):
 
 
 def is_f95zone_url(url: str):
-    return bool(re.search(r"^https?://[^/]*\.?" + re.escape(f95_domain) + r"/", url))
+    return bool(re.search(r"^https?://[^/]*\.?(" + r"|".join(re.escape(domain) for domain in f95_domains) + r")/", url))
 
 
 def cookiedict(cookies: http.cookies.SimpleCookie):

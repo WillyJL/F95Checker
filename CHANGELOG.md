@@ -26,6 +26,7 @@
 - Redraw UI when popups are opened/closed (by @WillyJL)
 - Donor DDL downloads can now be aborted correctly when stuck (by @WillyJL)
 - Limit image downloads to 2 per second just in case (by @WillyJL)
+- Fix image downloads in censorship regimes (by @WillyJL)
 
 ### Removed:
 - Collection and SiteRip thread types are gone, these are now detected as the appropriate animation/comic/game type
