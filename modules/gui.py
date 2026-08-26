@@ -2297,8 +2297,8 @@ class MainGUI():
                     # the row in a child with an explicit horizontal bar.
                     # Without a child, ImGui clips same-line items at the
                     # popup boundary and the parent only scrolls vertically.
-                    preview_width = max(self.scaled(240), (out_width - imgui.style.item_spacing.x) / 2)
-                    preview_height = preview_width / (16 / 9)
+                    max_preview_width = max(self.scaled(240), (out_width - imgui.style.item_spacing.x) / 2)
+                    max_preview_height = self.scaled(260)
                     horizontal_flags = (
                         imgui.WINDOW_HORIZONTAL_SCROLLING_BAR |
                         imgui.WINDOW_ALWAYS_HORIZONTAL_SCROLLBAR |
@@ -2307,18 +2307,29 @@ class MainGUI():
                     imgui.begin_child(
                         "###game_previews_gallery",
                         width=out_width,
-                        height=preview_height + 2 * imgui.style.window_padding.y,
+                        height=max_preview_height + 2 * imgui.style.window_padding.y,
                         flags=horizontal_flags,
                     )
                     first = True
                     for preview in game.preview_images:
                         if not first:
                             imgui.same_line()
+                        # Fit each preview inside a bounding box without
+                        # cropping or stretching portrait/tall images.
+                        aspect_ratio = (
+                            preview.width / preview.height
+                            if preview.loaded and preview.width > 0 and preview.height > 0
+                            else 16 / 9
+                        )
+                        preview_width = max_preview_width
+                        preview_height = preview_width / aspect_ratio
+                        if preview_height > max_preview_height:
+                            preview_height = max_preview_height
+                            preview_width = preview_height * aspect_ratio
                         if preview.error:
                             self.draw_game_image_error(game, preview, preview_width, preview_height)
                         else:
-                            crop = preview.crop_to_ratio(preview_width / preview_height, fit=globals.settings.fit_images)
-                            preview.render(preview_width, preview_height, *crop, rounding=rounding)
+                            preview.render(preview_width, preview_height, rounding=rounding)
                         first = False
                     imgui.end_child()
             imgui.push_text_wrap_pos()
