@@ -750,8 +750,24 @@ class MainGUI():
 
     def load_filters(self):
         try:
+            # TODO: replace this with a better system, pickle is a disaster waiting to happen (and already kinda did, hence matching by IDs below)
             with open(globals.data_path / "filters.pkl", "rb") as file:
                 self.filters = pickle.load(file)
+                for flt in self.filters:
+                    try:
+                        match flt.mode:
+                            case FilterMode.Exe_State:
+                                flt.match = ExeState(flt.match.value)
+                            case FilterMode.Label:
+                                flt.match = Label.get(flt.match.id)
+                            case FilterMode.Status:
+                                flt.match = Status(flt.match.value)
+                            case FilterMode.Tag:
+                                flt.match = Tag(flt.match.value)
+                            case FilterMode.Type:
+                                flt.match = Type(flt.match.value)
+                    except Exception:
+                        self.filters.remove(flt)
         except Exception:
             self.filters = []
 
@@ -991,7 +1007,7 @@ class MainGUI():
                             text = "Checking for updates..."
                         elif (count := imagehelper.compress_counter) > 0:
                             text = "Compressing images..." if count == 1 else f"Compressing {count} frames..."
-                        elif api.f95_ratelimit._waiters or api.f95_ratelimit_sleeping.count:
+                        elif api.f95_ratelimit_forum._waiters or api.f95_ratelimit_attachments._waiters or api.f95_ratelimit_sleeping.count:
                             text = f"Waiting for F95zone ratelimit..."
                         else:
                             text = self.watermark_text
@@ -1770,11 +1786,13 @@ class MainGUI():
 
     def draw_game_notes_widget(self, game: Game, multiline=True, width: int | float = None):
         if multiline:
+            available_height = imgui.get_content_region_available().y - imgui.style.item_spacing.y
+            content_height = imgui.get_text_line_height() * game.notes.count("\n") + imgui.get_frame_height_with_spacing() + imgui.style.frame_padding.y * 4
             changed, value = imgui.input_text_multiline(
                 f"###{game.id}_notes",
                 value=game.notes,
                 width=width or imgui.get_content_region_available_width(),
-                height=self.scaled(450)
+                height=max(available_height, content_height)
             )
             if changed:
                 game.notes = value
@@ -2137,8 +2155,8 @@ class MainGUI():
             globals.updated_games.clear()
         return opened, closed
 
-    def draw_game_image_error(self, game: Game, width: float, height: float):
-        if game.image.error == "Image file missing":
+    def draw_game_image_error(self, game: Game, image: imagehelper.ImageHelper, width: float, height: float):
+        if image is game.image and image.error == "Image file missing":
             text = "Image missing!"
             if game.custom:
                 hover_text = "Right click in More Info popup to add an image."
@@ -2151,7 +2169,7 @@ class MainGUI():
                 )
         else:
             text = "Image error!"
-            hover_text = game.image.error or "Unknown error"
+            hover_text = image.error or "Unknown error"
 
         text_size = imgui.calc_text_size(text)
         if text_size.x >= width:
@@ -2168,6 +2186,7 @@ class MainGUI():
     def draw_game_info_popup(self, game: Game, carousel_ids: list = None, popup_uuid: str = ""):
         def popup_content():
             # Image
+            fullscreen_viewer_start = False
             imgui.indent(imgui.style.scrollbar_size)
             image = game.image
             avail = imgui.get_content_region_available()
@@ -2176,10 +2195,11 @@ class MainGUI():
                 avail = avail._replace(x=avail.x - imgui.style.scrollbar_size)
             close_image = False
             zoom_popup = False
+            rounding = self.scaled(globals.settings.style_corner_radius)
             out_height = (min(avail.y, self.scaled(690)) * self.scaled(0.4)) or 1
             out_width = avail.x or 1
             if image.error:
-                self.draw_game_image_error(game, out_width, out_height)
+                self.draw_game_image_error(game, game.image, out_width, out_height)
             else:
                 aspect_ratio = image.height / image.width
                 if aspect_ratio > (out_height / out_width):
@@ -2200,26 +2220,14 @@ class MainGUI():
                 imgui.dummy(width + 2.0, height)
                 imgui.set_scroll_x(1.0)
                 imgui.set_cursor_screen_pos(image_pos)
-                rounding = self.scaled(globals.settings.style_corner_radius)
                 image.render(width, height, rounding=rounding)
-                if imgui.is_item_hovered():
-                    # Image popup
-                    if imgui.is_mouse_down():
-                        size = imgui.io.display_size
-                        if aspect_ratio > size.y / size.x:
-                            height = size.y - self.scaled(10)
-                            width = height / aspect_ratio
-                        else:
-                            width = size.x - self.scaled(10)
-                            height = width * aspect_ratio
-                        x = (size.x - width) / 2
-                        y = (size.y - height) / 2
-                        flags = imgui.DRAW_ROUND_CORNERS_ALL
-                        pos2 = (x + width, y + height)
-                        fg_draw_list = imgui.get_foreground_draw_list()
-                        fg_draw_list.add_image_rounded(image.texture_id, (x, y), pos2, rounding=rounding, flags=flags)
-                    # Zoom
-                    elif globals.settings.zoom_enabled:
+                if imgui.is_item_clicked():
+                    # Images popup
+                    fullscreen_viewer_start = True
+                    self.fullscreen_viewer_i = 0
+                elif imgui.is_item_hovered():
+                    if globals.settings.zoom_enabled:
+                        # Zoom
                         if int(imgui.get_scroll_x() - 1.0):
                             if globals.settings.scroll_smooth:
                                 diff = imgui.io.delta_time * self.scroll_energy * 30
@@ -2261,7 +2269,97 @@ class MainGUI():
                 imgui.set_cursor_pos(prev_pos)
                 imgui.dummy(out_width, out_height)
             imgui.unindent(imgui.style.scrollbar_size)
+
+            # The indexer stores these URLs separately from the cover image.
+            # Load them lazily so opening an info popup does not slow startup
+            # or download images for games the user never inspects.
+            if globals.settings.previews_enabled and game.previews_urls:
+                if not game.previews_loaded and not game.previews_loading:
+                    game.preview_load_future = async_thread.run(game.load_previews_async())
+                if (count := imagehelper.compress_counter) > 0:
+                    loading_text = " · Compressing images..." if count == 1 else f" · Compressing {count} frames..."
+                elif game.previews_loading and (count := api.images_counter.count) > 0:
+                    loading_text = f" · Downloading {count} image{'s' if count > 1 else ''}..."
+                else:
+                    loading_text = ""
+                imgui.text(f"Previews ({len(game.preview_images)}/{len(game.previews_urls)}){loading_text}")
+                if game.preview_images:
+                    # Keep each preview at a useful thumbnail size and put
+                    # the row in a child with an explicit horizontal bar.
+                    # Without a child, ImGui clips same-line items at the
+                    # popup boundary and the parent only scrolls vertically.
+                    preview_height = self.scaled(200)
+                    horizontal_flags = (
+                        imgui.WINDOW_HORIZONTAL_SCROLLING_BAR |
+                        imgui.WINDOW_ALWAYS_HORIZONTAL_SCROLLBAR |
+                        imgui.WINDOW_NO_SCROLLBAR
+                    )
+                    imgui.begin_child(
+                        "###game_previews_gallery",
+                        width=out_width,
+                        height=preview_height + 2 * imgui.style.window_padding.y,
+                        flags=horizontal_flags,
+                    )
+                    first = True
+                    for preview_i, preview in enumerate(game.preview_images):
+                        if not first:
+                            imgui.same_line()
+                        if preview.width != 1 or preview.height != 1:
+                            aspect_ratio = preview.width / preview.height
+                        else:
+                            # Most images are 16:9, so use this as placeholder while images are loading
+                            aspect_ratio = 16 / 9
+                        preview_width = preview_height * aspect_ratio
+                        if preview.error:
+                            self.draw_game_image_error(game, preview, preview_width, preview_height)
+                        else:
+                            preview.render(preview_width, preview_height, rounding=rounding)
+                            if imgui.is_item_clicked():
+                                fullscreen_viewer_start = True
+                                self.fullscreen_viewer_i = preview_i + 1
+                        first = False
+                    imgui.end_child()
             imgui.push_text_wrap_pos()
+
+            # Fullscreen image viewer
+            fullscreen_viewer_id = f"###fullscreen_viewer_{game.id}"
+            fullscreen_viewer_closed = False
+            if imgui.is_key_pressed(glfw.KEY_SPACE) and not imgui.is_popup_open(fullscreen_viewer_id):
+                fullscreen_viewer_start = True
+                self.fullscreen_viewer_i = 0
+            if fullscreen_viewer_start:
+                imgui.open_popup(fullscreen_viewer_id)
+            if imgui.is_popup_open(fullscreen_viewer_id):
+                size = imgui.io.display_size
+                imgui.set_next_window_position(0, 0)
+                imgui.set_next_window_size(*imgui.io.display_size)
+                imgui.set_next_window_bg_alpha(0.75)
+                imgui.push_style_var(imgui.STYLE_POPUP_BORDERSIZE, 0)
+                if imgui.begin_popup(fullscreen_viewer_id, imgui.WINDOW_NO_SCROLLBAR | imgui.WINDOW_NO_SCROLL_WITH_MOUSE):
+                    if imgui.is_topmost() and not imgui.is_any_item_active():
+                        if imgui.is_key_pressed(glfw.KEY_LEFT, repeat=True):
+                            self.fullscreen_viewer_i = (self.fullscreen_viewer_i - 1) % (len(game.preview_images) + 1)
+                        if imgui.is_key_pressed(glfw.KEY_RIGHT, repeat=True):
+                            self.fullscreen_viewer_i = (self.fullscreen_viewer_i + 1) % (len(game.preview_images) + 1)
+                        if imgui.is_key_pressed(glfw.KEY_ESCAPE) or (imgui.is_key_pressed(glfw.KEY_SPACE) and not fullscreen_viewer_start):
+                            imgui.close_current_popup()
+                            fullscreen_viewer_closed = True
+                    if self.fullscreen_viewer_i:
+                        image = game.preview_images[self.fullscreen_viewer_i - 1]
+                    else:
+                        image = game.image
+                    imgui.set_cursor_pos((0, 0))
+                    if not image.loaded:
+                        # Don't show image but force it to load
+                        _ = image.texture_id
+                    else:
+                        crop = image.crop_to_ratio(size.x / size.y, fit=True)
+                        image.render(*size, *crop)
+                        if imgui.is_item_clicked():
+                            imgui.close_current_popup()
+                            fullscreen_viewer_closed = True
+                    imgui.end_popup()
+                imgui.pop_style_var(1)
 
             imgui.push_font(imgui.fonts.big)
             self.draw_game_name_text(game)
@@ -2371,39 +2469,6 @@ class MainGUI():
 
                 imgui.table_next_column()
                 imgui.align_text_to_frame_padding()
-                imgui.text_disabled("Executables:")
-                imgui.same_line()
-                self.draw_game_add_exe_button(game, f"{icons.folder_edit_outline} Add")
-                imgui.same_line()
-                self.draw_game_open_folder_button(game, f"{icons.folder_open_outline} Open Folder")
-                imgui.same_line()
-                self.draw_game_clear_exes_button(game, f"{icons.folder_remove_outline} Clear")
-
-                imgui.table_next_column()
-                imgui.text_disabled("Tab:")
-                imgui.same_line()
-                self.draw_game_tab_widget(game)
-
-                imgui.table_next_row()
-
-                # Draw labels on right first, so executables on left can then overflow below to right
-                imgui.table_set_column_index(1)
-                imgui.begin_group()
-                imgui.align_text_to_frame_padding()
-                imgui.text_disabled("Labels:")
-                imgui.same_line()
-                if game.labels:
-                    self.draw_game_labels_widget(game)
-                else:
-                    imgui.button("Right click to add")
-                imgui.end_group()
-                labels_end_y = imgui.get_cursor_pos_y()
-                if imgui.begin_popup_context_item(f"###{game.id}_context_labels"):
-                    self.draw_game_labels_select_widget(game)
-                    imgui.end_popup()
-
-                imgui.table_set_column_index(0)
-                imgui.align_text_to_frame_padding()
                 imgui.text_disabled("Exe Wrapper:")
                 imgui.same_line()
                 imgui.set_next_item_width(-1)
@@ -2430,6 +2495,39 @@ class MainGUI():
                     "This is a game-specific override. You can setup default wrappers in Settings > Manage > Exe Wrappers, which will also auto-detect Wine/Proton runners on Linux/macOS.",
                     text=None,
                 )
+
+                imgui.table_next_column()
+                imgui.text_disabled("Tab:")
+                imgui.same_line()
+                self.draw_game_tab_widget(game)
+
+                imgui.table_next_row()
+
+                # Draw labels on right first, so executables on left can then overflow below to right
+                imgui.table_set_column_index(1)
+                imgui.begin_group()
+                imgui.align_text_to_frame_padding()
+                imgui.text_disabled("Labels:")
+                imgui.same_line()
+                if game.labels:
+                    self.draw_game_labels_widget(game)
+                else:
+                    imgui.button("Right click to add")
+                imgui.end_group()
+                labels_end_y = imgui.get_cursor_pos_y()
+                if imgui.begin_popup_context_item(f"###{game.id}_context_labels"):
+                    self.draw_game_labels_select_widget(game)
+                    imgui.end_popup()
+
+                imgui.table_set_column_index(0)
+                imgui.align_text_to_frame_padding()
+                imgui.text_disabled("Executables:")
+                imgui.same_line()
+                self.draw_game_add_exe_button(game, f"{icons.folder_edit_outline} Add")
+                imgui.same_line()
+                self.draw_game_open_folder_button(game, f"{icons.folder_open_outline} Open Folder")
+                imgui.same_line()
+                self.draw_game_clear_exes_button(game, f"{icons.folder_remove_outline} Clear")
                 ended_table = False
                 for executable in game.executables:
                     if not ended_table and (pos_y := imgui.get_cursor_pos_y()) >= labels_end_y:
@@ -2805,13 +2903,25 @@ class MainGUI():
                             idx = 0
                         change_id = carousel_ids[idx]
             if change_id is not None:
+                # Swiping to another game closes this popup's gallery. Keep
+                # the downloaded files, but release decoded/GPU image data.
+                game.cancel_preview_loading()
+                game.unload_previews()
                 utils.push_popup(self.draw_game_info_popup, globals.games[change_id], carousel_ids).uuid = popup_uuid
                 return True
-            elif utils.close_weak_popup():
-                    return True
+            elif not fullscreen_viewer_closed and utils.close_weak_popup():
+                return True
         if game.id not in globals.games:
+            game.cancel_preview_loading()
+            game.unload_previews()
             return 0, True
-        return utils.popup(game.name, popup_content, closable=True, outside=False, resize=False, popup_uuid=popup_uuid)
+        result = utils.popup(game.name, popup_content, closable=True, outside=False, resize=False, popup_uuid=popup_uuid)
+        if result[1]:
+            # A closed info popup is no longer a visible owner of its
+            # textures. The URL cache stays on disk for cheap reopening.
+            game.cancel_preview_loading()
+            game.unload_previews()
+        return result
 
     def draw_about_popup(self, popup_uuid: str = ""):
         def popup_content():
@@ -3597,7 +3707,7 @@ class MainGUI():
         # Image
         if game.image.error:
             showed_img = imgui.is_rect_visible(cell_width, img_height)
-            self.draw_game_image_error(game, cell_width, img_height)
+            self.draw_game_image_error(game, game.image, cell_width, img_height)
         else:
             crop = game.image.crop_to_ratio(globals.settings.cell_image_ratio, fit=globals.settings.fit_images)
             showed_img = game.image.render(cell_width, img_height, *crop, rounding=rounding, flags=imgui.DRAW_ROUND_CORNERS_TOP)
@@ -4516,6 +4626,14 @@ class MainGUI():
             if not set.zoom_enabled:
                 imgui.pop_disabled()
 
+            draw_settings_label(
+                "Preview images:",
+                "Downloads preview images when opening the More Info popup for games and shows them below the main image. They are "
+                "saved to disk too, and as such it can start taking up a lot of space. Disabling this option will not delete "
+                "previously downloaded preview images from disk. Default is off."
+            )
+            draw_settings_checkbox("previews_enabled")
+
             draw_settings_label("Play GIFs:")
             if draw_settings_checkbox("play_gifs"):
                 for image in imagehelper.ImageHelper.instances:
@@ -4736,11 +4854,35 @@ class MainGUI():
             imgui.spacing()
 
         if draw_settings_section("Labels"):
-            buttons_offset = right_width - (3 * frame_height + 2 * imgui.style.item_spacing.x)
-            for label in Label.instances:
+            swap = None
+            for label_i, label in enumerate(Label.instances):
                 imgui.table_next_row()
                 imgui.table_next_column()
-                imgui.set_next_item_width(imgui.get_content_region_available_width() + buttons_offset + imgui.style.cell_padding.x)
+                if imgui.button(icons.filter_plus_outline, width=frame_height):
+                    flt = Filter(FilterMode.Label)
+                    flt.match = label
+                    self.filters.append(flt)
+                imgui.same_line()
+                if label_i == 0:
+                    imgui.push_disabled()
+                if imgui.button(icons.arrow_up, width=frame_height):
+                    swap = (label_i, label_i - 1)
+                if label_i == 0:
+                    imgui.pop_disabled()
+                imgui.same_line()
+                if label_i == len(Label.instances) - 1:
+                    imgui.push_disabled()
+                if imgui.button(icons.arrow_down, width=frame_height):
+                    swap = (label_i, label_i + 1)
+                if label_i == len(Label.instances) - 1:
+                    imgui.pop_disabled()
+                imgui.same_line()
+                changed, value = imgui.color_edit3(f"###label_color_{label.id}", *label.color[:3], flags=imgui.COLOR_EDIT_NO_INPUTS)
+                if changed:
+                    label.color = (*value, 1.0)
+                    async_thread.run(db.update_label(label, "color"))
+                imgui.same_line()
+                imgui.set_next_item_width(width - frame_height * 5 - imgui.style.cell_padding.x * 5 - imgui.style.scrollbar_size * (imgui.get_scroll_max_y() > 0.0))
                 changed, value = imgui.input_text_with_hint(f"###label_name_{label.id}", "Label name", label.name)
                 setter_extra = lambda _=None: async_thread.run(db.update_label(label, "name"))
                 if changed:
@@ -4749,20 +4891,16 @@ class MainGUI():
                 if imgui.begin_popup_context_item(f"###label_name_{label.id}_context"):
                     utils.text_context(label, "name", setter_extra)
                     imgui.end_popup()
-                imgui.table_next_column()
-                imgui.set_cursor_pos_x(imgui.get_cursor_pos_x() + buttons_offset)
-                changed, value = imgui.color_edit3(f"###label_color_{label.id}", *label.color[:3], flags=imgui.COLOR_EDIT_NO_INPUTS)
-                if changed:
-                    label.color = (*value, 1.0)
-                    async_thread.run(db.update_label(label, "color"))
-                imgui.same_line()
-                if imgui.button(icons.filter_plus_outline, width=frame_height):
-                    flt = Filter(FilterMode.Label)
-                    flt.match = label
-                    self.filters.append(flt)
                 imgui.same_line()
                 if imgui.button(icons.trash_can_outline, width=frame_height):
                     async_thread.run(db.delete_label(label))
+
+            if swap:
+                Label.instances[swap[0]], Label.instances[swap[1]] = Label.instances[swap[1]], Label.instances[swap[0]]
+                Label.update_positions()
+                for game in globals.games.values():
+                    game.labels.sort(key=lambda label: label.position)
+                async_thread.run(db.update_label_positions())
 
             draw_settings_label("New label:")
             if imgui.button("Add", width=right_width):
@@ -5473,6 +5611,13 @@ class MainGUI():
                     if not errored:
                         if imgui.button(icons.open_in_app):
                             async_thread.run(callbacks.default_open(download.path))
+                        imgui.same_line()
+                    else:
+                        if imgui.button(icons.refresh):
+                            async def _retry(download):
+                                await download.delete()
+                                async_thread.run(api.download_file(download))
+                            async_thread.run(_retry(download))
                         imgui.same_line()
                     space_after = (
                         2 * (

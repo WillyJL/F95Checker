@@ -59,7 +59,11 @@ from modules import (
     webview,
 )
 
-f95_domain = "f95zone.to"
+f95_domains = (
+    f95_domain := "f95zone.to",
+    f95_domain_com := "f95zone.com",
+    f95_domain_ninja := "f95zone.ninja"
+)
 f95_host = "https://" + f95_domain
 f95_check_login_fast    = f95_host + "/sam/latest_alpha/"
 f95_login_page          = f95_host + "/login/"
@@ -73,8 +77,8 @@ f95_latest_endpoint     = f95_host + "/sam/latest_alpha/latest_data.php?cmd={cmd
 f95_ddl_endpoint        = f95_host + "/sam/dddl.php"
 f95_attachments_hosts = (
     f"https://attachments.{f95_domain}/",
-    "https://attachments.f95zone.com/",
-    f95_attachments_rocks := "https://attachments.f95zone.rocks/",
+    f"https://attachments.{f95_domain_com}/",
+    f95_attachments_host_ninja := f"https://attachments.{f95_domain_ninja}/",
 )
 f95_no_ratelimit_urls = (
     f95_check_login_fast,
@@ -115,14 +119,15 @@ api_fast_check_max_ids = 10
 app_update_endpoint = "https://api.github.com/repos/WillyJL/F95Checker/releases/latest"
 
 insecure_ssl_allowed_hosts = (
-    f95_attachments_rocks,  # Invalid SSL cert but still works and is ran by F95zone
+    f95_attachments_host_ninja,  # Invalid SSL cert but still works and is ran by F95zone
 )
 
 updating = False
 session: aiohttp.ClientSession = None
 ssl_context: ssl.SSLContext = None
 temp_prefix = "F95Checker-Temp-"
-f95_ratelimit = aiolimiter.AsyncLimiter(max_rate=1, time_period=2)
+f95_ratelimit_forum = aiolimiter.AsyncLimiter(max_rate=1, time_period=2)
+f95_ratelimit_attachments = aiolimiter.AsyncLimiter(max_rate=2, time_period=1)
 f95_ratelimit_sleeping = CounterContext()
 fast_checks_sem: asyncio.Semaphore = None
 full_checks_sem: asyncio.Semaphore = None
@@ -230,7 +235,7 @@ def get_url_domain(url: str):
 
 
 def is_f95zone_url(url: str):
-    return bool(re.search(r"^https?://[^/]*\.?" + re.escape(f95_domain) + r"/", url))
+    return bool(re.search(r"^https?://[^/]*\.?(" + r"|".join(re.escape(domain) for domain in f95_domains) + r")/", url))
 
 
 def cookiedict(cookies: http.cookies.SimpleCookie):
@@ -255,10 +260,12 @@ async def request(method: str, url: str, read=True, cookies: dict = True, **kwar
         cookies = globals.cookies
     elif cookies is False:
         cookies = {}
-    is_ratelimit_request = url.startswith(f95_host) and not url.startswith(f95_no_ratelimit_urls)
+    is_forum_request = url.startswith(f95_host) and not url.startswith(f95_no_ratelimit_urls)
+    is_attachments_request = url.startswith(f95_attachments_hosts)
+    if_ratelimit_request = is_forum_request or is_attachments_request
     ratelimit_retries = 10
     ratelimit_sleep = 0
-    _can_ratelimit = lambda: is_ratelimit_request and ratelimit_retries > 1
+    _can_ratelimit = lambda: if_ratelimit_request and ratelimit_retries > 1
     async def _do_ratelimit():
         nonlocal ratelimit_retries, ratelimit_sleep
         ratelimit_retries -= 1
@@ -268,10 +275,15 @@ async def request(method: str, url: str, read=True, cookies: dict = True, **kwar
     while retries and ratelimit_retries:
         try:
             # Only ratelimit when connecting to F95zone
-            maybe_ratelimit = f95_ratelimit if is_ratelimit_request else contextlib.nullcontext()
-            if not is_ratelimit_request and url.startswith(f95_host):
+            if is_forum_request:
+                maybe_ratelimit = f95_ratelimit_forum
+            elif is_attachments_request:
+                maybe_ratelimit = f95_ratelimit_attachments
+            else:
+                maybe_ratelimit = contextlib.nullcontext()
+            if not if_ratelimit_request and url.startswith(f95_host):
                 # Don't ratelimit before request, but allow detecting and retrying if ratelimit happens
-                is_ratelimit_request = True
+                if_ratelimit_request = True
             async with maybe_ratelimit, session.request(
                 method,
                 url,
@@ -472,6 +484,43 @@ async def download_webpage(url: str):
     with tempfile.NamedTemporaryFile("wb", prefix=temp_prefix, suffix=".html", delete=False) as f:
         f.write(html.prettify(encoding="utf-8"))
     return pathlib.Path(f.name).as_uri()
+
+
+async def download_image(url: str):
+    with images_counter:
+        while True:
+            try:
+                res = await fetch("GET", url, timeout=globals.settings.request_timeout * 4, raise_for_status=True)
+            except aiohttp.ClientResponseError as exc:
+                if exc.status < 400:
+                    raise  # Not error status
+                if url.startswith("https://i.imgur.com"):
+                    url = "blocked"
+                else:
+                    url = "dead"
+                res = b""
+            except aiohttp.ClientConnectorError as exc:
+                # Try alternative F95zone hosts (-1 because we're checking to then use the next link)
+                changed_host = False
+                for host_i in range(len(f95_attachments_hosts) - 1):
+                    if url.startswith(f95_attachments_hosts[host_i]):
+                        url = f95_attachments_hosts[host_i + 1] + url.removeprefix(f95_attachments_hosts[host_i])
+                        changed_host = True
+                        break
+                if changed_host:
+                    continue
+                if not isinstance(exc.os_error, socket.gaierror):
+                    raise  # Not a dead host
+                if is_f95zone_url(url):
+                    raise  # Not a foreign host, raise normal connection error message
+                if (await check_host(f95_domain)) and not (await check_host(get_url_domain(url))):
+                    # Link is actually dead
+                    url = "dead"
+                    res = b""
+                else:
+                    raise  # Foreign host might not actually be dead
+            break  # Loop is only to retry with `continue`
+    return res, url
 
 
 def cleanup_temp_files():
@@ -1004,44 +1053,11 @@ async def full_check(game: Game, last_changed: int):
                 globals.new_updated_games[game.id] = old_game
 
         if fetch_image and thread["image_url"] and thread["image_url"].startswith("http"):
-            with images_counter:
-                image_url = thread["image_url"]
-                while True:
-                    try:
-                        res = await fetch("GET", image_url, timeout=globals.settings.request_timeout * 4, raise_for_status=True)
-                    except aiohttp.ClientResponseError as exc:
-                        if exc.status < 400:
-                            raise  # Not error status
-                        if image_url.startswith("https://i.imgur.com"):
-                            thread["image_url"] = "blocked"
-                        else:
-                            thread["image_url"] = "dead"
-                        res = b""
-                    except aiohttp.ClientConnectorError as exc:
-                        # Try alternative F95zone hosts (-1 because we're checking to then use the next link)
-                        changed_host = False
-                        for host_i in range(len(f95_attachments_hosts) - 1):
-                            if image_url.startswith(f95_attachments_hosts[host_i]):
-                                image_url = f95_attachments_hosts[host_i + 1] + image_url.removeprefix(f95_attachments_hosts[host_i])
-                                changed_host = True
-                                break
-                        if changed_host:
-                            continue
-                        if not isinstance(exc.os_error, socket.gaierror):
-                            raise  # Not a dead host
-                        if is_f95zone_url(image_url):
-                            raise  # Not a foreign host, raise normal connection error message
-                        if (await check_host(f95_domain)) and not (await check_host(get_url_domain(image_url))):
-                            # Link is actually dead
-                            thread["image_url"] = "dead"
-                            res = b""
-                        else:
-                            raise  # Foreign host might not actually be dead
-                    break  # Loop is only to retry with `continue`
-                async def set_image_and_update_game():
-                    await game.set_image_async(res)
-                    await update_game()
-                await asyncio.shield(set_image_and_update_game())
+            data, thread["image_url"] = await download_image(thread["image_url"])
+            async def set_image_and_update_game():
+                await game.set_image_async(data)
+                await update_game()
+            await asyncio.shield(set_image_and_update_game())
         else:
             await asyncio.shield(update_game())
         globals.refresh_progress += 1
@@ -1417,6 +1433,11 @@ async def download_file(download: FileDownload):
     try:
         download.path.parent.mkdir(parents=True, exist_ok=True)
         async with aiofiles.open(download.path, "wb") as file:
+            download.progress = 0
+            download.total = None
+            download.cancel = False
+            download.error = None
+            download.traceback = None
             download.state = download.State.Downloading
             download.start = time.time()
 
@@ -1440,7 +1461,14 @@ async def download_file(download: FileDownload):
                         download.total = req.content_length
 
                     try:
-                        async for (chunk, _) in req.content.iter_chunks():
+                        while True:
+                            try:
+                                rv = await asyncio.wait_for(req.content.readchunk(), timeout=0.25)
+                                if rv == (b"", False):
+                                    break
+                                (chunk, _) = rv
+                            except (asyncio.TimeoutError, TimeoutError):
+                                chunk = None
                             if download.cancel:
                                 download.error = "Interrupted by user"
                                 return

@@ -218,7 +218,7 @@ def constrain_next_window():
 def close_weak_popup():
     if imgui.is_topmost():
         # This is the topmost popup
-        if imgui.io.keys_down[glfw.KEY_ESCAPE]:
+        if imgui.is_key_pressed(glfw.KEY_ESCAPE):
             # Escape is pressed
             imgui.close_current_popup()
             return True

@@ -8,6 +8,7 @@ import json
 import os
 import pathlib
 import shutil
+import string
 import sys
 import time
 import typing
@@ -711,6 +712,7 @@ class Label:
     id: int
     name: str
     color: tuple[float]
+    position: int
     instances: typing.ClassVar = []
 
     @property
@@ -737,6 +739,16 @@ class Label:
     def remove(cls, self):
         while self in cls.instances:
             cls.instances.remove(self)
+
+    @classmethod
+    def update_positions(cls):
+        for self_i, self in enumerate(cls.instances):
+            self.position = self_i
+
+    @classmethod
+    def sort_instances(cls):
+        cls.instances.sort(key=lambda self: self.position)
+        cls.update_positions()
 
 
 @dataclasses.dataclass(slots=True)
@@ -935,6 +947,7 @@ class Settings:
     play_gifs                   : bool
     play_gifs_unfocused         : bool
     preload_nearby_images       : bool
+    previews_enabled            : bool
     proxy_type                  : ProxyType
     proxy_host                  : str
     proxy_port                  : int
@@ -1028,6 +1041,10 @@ class Game:
     launch_flushed     : float = 0.0
     launch_process     : typing.Any = None
     image              : "imagehelper.ImageHelper" = None
+    preview_images     : list["imagehelper.ImageHelper"] = dataclasses.field(default_factory=list)
+    previews_loading   : bool = False
+    previews_loaded    : bool = False
+    preview_load_future: typing.Any = dataclasses.field(default=None, init=False, repr=False, compare=False)
     executables_valids : list[bool] = None
     executables_valid  : bool = None
     timeline_events    : list[TimelineEvent] = dataclasses.field(default_factory=list)
@@ -1035,6 +1052,7 @@ class Game:
 
     def __post_init__(self):
         self._did_init = True
+        self.labels.sort(key=lambda label: label.position)
         if self.custom is None:
             self.custom = bool(self.status is Status.Custom)
         if self.id < 0:
@@ -1050,15 +1068,98 @@ class Game:
         from external import imagehelper
         from modules import globals
         self.image = imagehelper.ImageHelper(globals.images_path, glob=f"{self.id}.*")
+        self.preview_images = []
         self.validate_executables()
 
-    def delete_images(self):
+    async def load_previews_async(self):
+        """Download and cache the indexer's preview URLs on first use.
+
+        Preview URLs are intentionally not part of the cover-image cache: the
+        latter uses ``<id>.*`` and is replaced during refreshes.  Keeping the
+        preview cache under a separate prefix prevents a cover reset from
+        deleting the gallery.
+        """
+        if self.previews_loading or self.previews_loaded or not self.previews_urls:
+            return
+        self.previews_loading = True
+        try:
+            from external import imagehelper
+            from modules import api, globals, utils
+            import aiofiles
+            # A retry or resumed load may already have partially populated
+            # this list. Use the normal cleanup path so existing textures and
+            # decoded image data are released before rebuilding it.
+            self.unload_previews()
+            preview_dir = globals.images_path / f"previews/{self.id}"
+            async def _maybe_fetch_preview(url: str, digest: str):
+                if not url.startswith(("http://", "https://")):
+                    return
+                glob = f"{digest}.*"
+                paths = list(preview_dir.glob(glob))
+                if not paths:
+                    try:
+                        data, _ = await api.download_image(url)
+                        if data:
+                            preview_dir.mkdir(parents=True, exist_ok=True)
+                            path = preview_dir / f"{digest}.{utils.image_ext(data)}"
+                            async with aiofiles.open(path, "wb") as f:
+                                await f.write(data)
+                    except Exception:
+                        return
+                self.preview_images.append(imagehelper.ImageHelper(preview_dir, glob=glob))
+            digests = [hashlib.sha1(url.encode("utf-8")).hexdigest() for url in self.previews_urls]
+            for img in preview_dir.glob("*"):
+                digest = img.stem
+                if len(digest) != 40 or not all(c in string.hexdigits for c in digest):
+                    # Not a digest
+                    continue
+                if digest not in digests:
+                    # Old preview
+                    try:
+                        img.unlink()
+                    except Exception:
+                        pass
+            await asyncio.gather(*(_maybe_fetch_preview(url, digest) for url, digest in zip(self.previews_urls, digests)))
+            self.previews_loaded = True
+        finally:
+            self.previews_loading = False
+
+    def cancel_preview_loading(self):
+        """Cancel an in-flight preview request when its popup is dismissed."""
+        future = self.preview_load_future
+        if future is not None and not future.done():
+            future.cancel()
+        self.preview_load_future = None
+        self.previews_loading = False
+
+    def delete_images(self, cover_only=True):
         from modules import globals
         for img in globals.images_path.glob(f"{self.id}.*"):
             try:
                 img.unlink()
             except Exception:
                 pass
+        if not cover_only:
+            self.cancel_preview_loading()
+            self.unload_previews()
+            preview_dir = globals.images_path / "previews" / str(self.id)
+            for img in preview_dir.glob("*"):
+                try:
+                    img.unlink()
+                except Exception:
+                    pass
+            try:
+                preview_dir.rmdir()
+            except OSError:
+                pass
+
+    def unload_previews(self):
+        """Release decoded preview data and GPU textures, keeping disk cache."""
+        from external import imagehelper
+        for image in self.preview_images:
+            imagehelper.unload_queue.append(image)
+        self.preview_images.clear()
+        self.previews_loaded = False
 
     def refresh_image(self):
         self.image.glob = f"{self.id}.*"
@@ -1153,7 +1254,7 @@ class Game:
     def add_label(self, label: Label):
         if label not in self.labels:
             self.labels.append(label)
-        self.labels.sort(key=lambda label: Label.instances.index(label))
+        self.labels.sort(key=lambda label: label.position)
         from external import async_thread
         from modules import db, globals
         async_thread.run(db.update_game(self, "labels"))

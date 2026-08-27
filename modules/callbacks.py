@@ -497,7 +497,9 @@ async def _open_folder(executable: str):
     exe = pathlib.Path(executable)
     if globals.settings.default_exe_dir.get(globals.os) and not exe.is_absolute():
         exe = pathlib.Path(globals.settings.default_exe_dir.get(globals.os)) / exe
-    folder = exe.parent
+    folder = exe
+    if not folder.is_dir():
+        folder = exe.parent
     if not folder.is_dir():
         raise FileNotFoundError()
 
@@ -716,7 +718,7 @@ def remove_game(*games: list[Game], bypass_confirm=False):
     def remove_callback():
         for game in games:
             id = game.id
-            game.delete_images()
+            game.delete_images(cover_only=False)
             del globals.games[id]
             globals.gui.recalculate_ids = True
             async_thread.run(db.delete_game(id))

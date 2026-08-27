@@ -284,7 +284,10 @@ class ImageHelper:
         self._error = None
         self.animated = False
         self.durations.clear()
-        self.width, self.height = (1, 1)
+        # Don't reset width and height, keep ones from prior load (if any)
+        # If this is first load, they're already (1, 1)
+        # If this is a reload, they're unlikely to have changed, and even if they did there is no harm in giving the old size while loading the new image
+        # Actually, it helps with dynamically sized layouts: in the case where unload_offscreen_images is on, this keeps the layout from jumping around
 
         def set_invalid(err):
             self._error = err
