@@ -887,10 +887,14 @@ async def full_check(game: Game, last_changed: int):
             raise_api_error(res)
             if req.status in (403, 404):
                 if not game.archived:
+                    def _archive_game(game: Game):
+                        game.archived = True
+                        game.updated = False
                     buttons = {
                         f"{icons.cancel} Do nothing": None,
                         f"{icons.trash_can_outline} Remove": lambda: callbacks.remove_game(game, bypass_confirm=True),
-                        f"{icons.puzzle_outline} Convert": lambda: callbacks.convert_f95zone_to_custom(game)
+                        f"{icons.puzzle_outline} Convert": lambda: callbacks.convert_f95zone_to_custom(game),
+                        f"{icons.archive_outline} Archive": lambda: _archive_game(game),
                     }
                     utils.push_popup(
                         msgbox.msgbox, "Thread not found",
@@ -898,10 +902,11 @@ async def full_check(game: Game, last_changed: int):
                         f"{game.name}\n"
                         "It might have been privated, moved or deleted, maybe for breaking forum rules.\n"
                         "\n"
-                        "You can remove this game from your library, or convert it to a custom game.\n"
-                        "Custom games are untied from F95zone and are not checked for updates, so\n"
-                        "you won't get this error anymore. You can later convert it back to an F95zone\n"
-                        "game from its info popup. You can also find more details there.",
+                        "You can remove this game from your library, convert it to a custom game, or archive it.\n"
+                        "Custom games are untied from F95zone and are not checked for updates, so you won't\n"
+                        "get this error anymore. You can later convert it back to an F95zone game from its info\n"
+                        "popup. You can also find more details there.\n"
+                        "Archiving the game will mute this error, but it will come back if you unarchive later on.",
                         MsgBox.error,
                         buttons=buttons
                     )
@@ -1491,7 +1496,7 @@ async def download_file(download: FileDownload):
                 download.error = f"{download.checksum[0].upper()} checksum mismatch"
                 return
 
-        if archive_format := shutil._find_unpack_format(str(download.path)):
+        if globals.settings.downloads_extract and (archive_format := shutil._find_unpack_format(str(download.path))):
             download.state = download.State.Extracting
             download.extracted = download.path.with_suffix("")
             await asyncio.get_event_loop().run_in_executor(

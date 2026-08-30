@@ -925,6 +925,7 @@ class Settings:
     display_mode                : DisplayMode
     display_tab                 : Tab.get
     downloads_dir               : dict[Os, str]
+    downloads_extract           : bool
     ext_background_add          : bool
     ext_highlight_tags          : bool
     ext_icon_glow               : bool
@@ -1091,22 +1092,17 @@ class Game:
             # decoded image data are released before rebuilding it.
             self.unload_previews()
             preview_dir = globals.images_path / f"previews/{self.id}"
-            async def _maybe_fetch_preview(url: str, digest: str):
-                if not url.startswith(("http://", "https://")):
+            preview_dir.mkdir(parents=True, exist_ok=True)
+            async def _fetch_preview(preview_i: int, url: str, digest: str, glob: str):
+                try:
+                    data, _ = await api.download_image(url)
+                    if data:
+                        path = preview_dir / f"{digest}.{utils.image_ext(data)}"
+                        async with aiofiles.open(path, "wb") as f:
+                            await f.write(data)
+                except Exception:
                     return
-                glob = f"{digest}.*"
-                paths = list(preview_dir.glob(glob))
-                if not paths:
-                    try:
-                        data, _ = await api.download_image(url)
-                        if data:
-                            preview_dir.mkdir(parents=True, exist_ok=True)
-                            path = preview_dir / f"{digest}.{utils.image_ext(data)}"
-                            async with aiofiles.open(path, "wb") as f:
-                                await f.write(data)
-                    except Exception:
-                        return
-                self.preview_images.append(imagehelper.ImageHelper(preview_dir, glob=glob))
+                self.preview_images[preview_i] = imagehelper.ImageHelper(preview_dir, glob=glob)
             digests = [hashlib.sha1(url.encode("utf-8")).hexdigest() for url in self.previews_urls]
             for img in preview_dir.glob("*"):
                 digest = img.stem
@@ -1119,7 +1115,18 @@ class Game:
                         img.unlink()
                     except Exception:
                         pass
-            await asyncio.gather(*(_maybe_fetch_preview(url, digest) for url, digest in zip(self.previews_urls, digests)))
+            fetch_preview_tasks = []
+            for preview_i, (url, digest) in enumerate(zip(self.previews_urls, digests)):
+                if not url.startswith(("http://", "https://")):
+                    continue
+                glob = f"{digest}.*"
+                paths = list(preview_dir.glob(glob))
+                if not paths:
+                    fetch_preview_tasks.append(_fetch_preview(preview_i, url, digest, glob))
+                    self.preview_images.append(None)
+                else:
+                    self.preview_images.append(imagehelper.ImageHelper(preview_dir, glob=glob))
+            await asyncio.gather(*fetch_preview_tasks)
             self.previews_loaded = True
         finally:
             self.previews_loading = False
@@ -1157,7 +1164,8 @@ class Game:
         """Release decoded preview data and GPU textures, keeping disk cache."""
         from external import imagehelper
         for image in self.preview_images:
-            imagehelper.unload_queue.append(image)
+            if image is not None:
+                imagehelper.unload_queue.append(image)
         self.preview_images.clear()
         self.previews_loaded = False
 

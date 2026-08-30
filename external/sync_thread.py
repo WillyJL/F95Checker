@@ -30,6 +30,13 @@ def queue(fn: typing.Callable):
         _condition.notify()
 
 
+def unqueue(fn: typing.Callable):
+    try:
+        stack.remove(fn)
+    except ValueError:
+        pass
+
+
 # Example usage
 if __name__ == "__main__":
     import sync_thread  # This script is designed as a module you import

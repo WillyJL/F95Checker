@@ -1,23 +1,10 @@
 # OpenGL + glfw
-PyOpenGL==3.1.7
-glfw==2.8.0
+PyOpenGL==3.1.10
+glfw==2.10.2
 
 # Interface stuff
 imgui==2.0.0
-desktop-notifier==6.0.0
-# https://github.com/samschott/desktop-notifier/issues/216
-# https://github.com/AuroraWright/owocr/issues/9
-winrt-runtime==2.3.0 ; sys_platform == "win32"
-winrt-Windows.ApplicationModel.Core==2.3.0 ; sys_platform == "win32"
-winrt-Windows.Data.Xml.Dom==2.3.0 ; sys_platform == "win32"
-winrt-Windows.Foundation==2.3.0 ; sys_platform == "win32"
-winrt-Windows.Foundation.Collections==2.3.0 ; sys_platform == "win32"
-winrt-Windows.Foundation.Interop==2.3.0 ; sys_platform == "win32"
-winrt-Windows.Globalization==2.3.0 ; sys_platform == "win32"
-winrt.Windows.Graphics.Imaging==2.3.0 ; sys_platform == "win32"
-winrt.Windows.Media.Ocr==2.3.0 ; sys_platform == "win32"
-winrt-Windows.Storage.Streams==2.3.0 ; sys_platform == "win32"
-winrt-Windows.UI.Notifications==2.3.0 ; sys_platform == "win32"
+desktop-notifier==6.2.0
 # https://github.com/WillyJL/F95Checker/pull/87
 PyQt6-WebEngine==6.7.0 ; sys_platform != "darwin"
 PyQt6==6.7.1 ; sys_platform != "darwin"
@@ -25,32 +12,31 @@ PyQt6-WebEngine==6.4.0 ; sys_platform == "darwin"
 PyQt6==6.4.2 ; sys_platform == "darwin"
 
 # Async goodness
-uvloop==0.21.0 ; sys_platform != "win32"
-rubicon-objc==0.5.0 ; sys_platform == "darwin"
-aiolimiter==1.2.0
-aiosqlite==0.20.0
-aiofiles==24.1.0
-aiohttp==3.11.11
+uvloop==0.22.1 ; sys_platform != "win32"
+rubicon-objc==0.5.6 ; sys_platform == "darwin"
+aiolimiter==1.2.1
+aiosqlite==0.22.1
+aiofiles==25.1.0
+aiohttp==3.14.3
 certifi
 
 # Archive extract
-py7zr==0.22.0
-rarfile==4.2
+py7zr==1.1.3
+rarfile==4.5
 zipfile-deflate64==0.2.0 ; sys_platform != "darwin"
 zipfile-deflate64-macos==0.1.0 ; sys_platform == "darwin"
 
 # BeautifulSoup
-beautifulsoup4==4.12.3
-lxml==5.3.0
+beautifulsoup4==4.15.0
+lxml==6.1.2
 
 # Misc
 psutil==7.2.2
-pywin32==308 ; sys_platform == "win32"
-bencode2==0.3.17
-pillow==11.0.0
-pillow-avif-plugin==1.4.6
-zstd==1.5.6.2
+pywin32==312 ; sys_platform == "win32"
+bencode2==0.3.33
+pillow==12.3.0
+zstd==1.5.7.2
 
 # Proxy support
-python-socks[asyncio]==2.5.3
-aiohttp-socks==0.9.1
+python-socks[asyncio]==3.0.0
+aiohttp_socks==0.12.0

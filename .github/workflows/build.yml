@@ -14,10 +14,10 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { os: "windows-2022",   python: "3.12.4", cx-freeze: "7.0.0", cx-logging: "v3.2.0", astcenc: "5.1.0", compressonator: "4.5.52", artifact: "Windows" }
-          - { os: "ubuntu-22.04",   python: "3.12.4", cx-freeze: "7.0.0", cx-logging: "",       astcenc: "5.1.0", compressonator: "4.5.52", artifact: "Linux" }
-          - { os: "macos-15-intel", python: "3.12.4", cx-freeze: "7.0.0", cx-logging: "",       astcenc: "5.1.0", compressonator: "",       artifact: "macOS-x64" }
-          - { os: "macos-15",       python: "3.12.4", cx-freeze: "7.0.0", cx-logging: "",       astcenc: "5.1.0", compressonator: "",       artifact: "macOS-arm64" }
+          - { os: "windows-2022",   python: "3.12.10", cx-freeze: "8.7.0", cx-logging: "v3.2.1", astcenc: "5.7.0", compressonator: "4.5.52", artifact: "Windows" }
+          - { os: "ubuntu-22.04",   python: "3.12.14", cx-freeze: "8.7.0", cx-logging: "",       astcenc: "5.7.0", compressonator: "4.5.52", artifact: "Linux" }
+          - { os: "macos-15-intel", python: "3.12.10", cx-freeze: "8.7.0", cx-logging: "",       astcenc: "5.7.0", compressonator: "",       artifact: "macOS-x64" }
+          - { os: "macos-15",       python: "3.12.10", cx-freeze: "8.7.0", cx-logging: "",       astcenc: "5.7.0", compressonator: "",       artifact: "macOS-arm64" }
     name: "${{ matrix.config.os }}"
     runs-on: "${{ matrix.config.os }}"
     if: "github.event_name != 'push' || contains(github.event.head_commit.message, '+ BUILD')"

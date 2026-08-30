@@ -213,6 +213,7 @@ async def connect():
             "display_mode":                f'INTEGER DEFAULT {DisplayMode.list}',
             "display_tab":                 f'INTEGER DEFAULT NULL',
             "downloads_dir":               f'TEXT    DEFAULT "{{}}"',
+            "downloads_extract":           f'INTEGER DEFAULT {int(True)}',
             "ext_background_add":          f'INTEGER DEFAULT {int(True)}',
             "ext_highlight_tags":          f'INTEGER DEFAULT {int(True)}',
             "ext_icon_glow":               f'INTEGER DEFAULT {int(True)}',

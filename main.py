@@ -26,6 +26,9 @@ def main():
     from modules import api, db
     with db.setup(), api.setup():
 
+        from external import imagehelper
+        imagehelper.setup()
+
         from modules import gui
         globals.gui = gui.MainGUI()
 

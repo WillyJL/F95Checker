@@ -26,7 +26,7 @@ An update checker and library tool for (NSFW) games on the [F95zone](https://f95
   - Status (completed / on hold / abandoned)
   - Last update, last launched and added on dates
   - Description / overview and changelog
-  - Header images (including gifs)
+  - Cover images (including gifs)
   - Download links, F95zone Donor DDL and RPDL.net support
   - Forum tags and personal labels
   - Forum score (value out of 5) and personal rating (5 stars)
