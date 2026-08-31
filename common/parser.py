@@ -417,7 +417,8 @@ def thread(res: bytes) -> ParsedThread | ParserError:
             if (link := img.find_parent("a")) is not None and (href := link.get("href") or "").startswith("https://attachments."):
                 url = href
             url = url.replace("/thumb/", "/", 1)
-            if url not in previews_urls:
+            # Skip the cover image and duplicates
+            if url != image_url and url not in previews_urls:
                 previews_urls.append(url)
 
         downloads = get_game_downloads("downloads", "download")
