@@ -397,6 +397,7 @@ class MainGUI():
         glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
         glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, gl.GL_TRUE)  # OS X supports only forward-compatible core profiles from 3.2
         glfw.window_hint(glfw.VISIBLE, False)
+        glfw.window_hint_string(glfw.WAYLAND_APP_ID, "F95Checker")
 
         # Create a windowed mode window and its OpenGL context
         self.window: glfw._GLFWwindow = glfw.create_window(*size, "F95Checker", None, None)
@@ -4724,6 +4725,8 @@ class MainGUI():
                 async_thread.run(db.update_settings("tex_compress"))
                 for image in imagehelper.ImageHelper.instances:
                     image.reload()
+                with imagehelper.compress_thread_condition:
+                    imagehelper.compress_thread_condition.notify()
 
             if set.tex_compress is TexCompress.Disabled:
                 imgui.push_disabled()

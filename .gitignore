@@ -1,6 +1,7 @@
 .idea/
 .vscode/
 .venv/
+.zed/
 venv/
 __pycache__/
 build/

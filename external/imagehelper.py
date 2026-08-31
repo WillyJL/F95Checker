@@ -38,7 +38,8 @@ redraw = False
 apply_queue = []
 unload_queue = []
 compress_counter = 0
-compress_thread = None
+compress_thread: threading.Thread = None
+compress_thread_condition: threading.Condition = None
 _dummy_texture_id = None
 
 ktx_durations = b"durationsms\0"
@@ -60,8 +61,9 @@ compressonator = None
 
 
 def setup():
-    global compress_thread
+    global compress_thread_condition, compress_thread
 
+    compress_thread_condition = threading.Condition()
     compress_thread = threading.Thread(target=_compress_thread, daemon=True)
     compress_thread.start()
 
@@ -135,12 +137,12 @@ def post_draw(draw_time: float):
     if globals.settings.unload_offscreen_images:
         hidden = globals.gui.minimized or globals.gui.hidden
         for image in ImageHelper.instances:
-            if image.loaded and (hidden or not image.shown):
+            if image.loaded and (hidden or not image._shown):
                 unload_queue.append(image)
             else:
-                image.shown = False
+                image._shown = False
     for image in reversed(unload_queue):
-        image.unload()
+        image._unload()
         unload_queue.remove(image)
     # At least 1 apply per frame
     # Apply more based on how much delta time and draw time we have
@@ -151,7 +153,7 @@ def post_draw(draw_time: float):
         apply_time_max = apply_time_max_total / apply_parallel
         apply_idx = 0
         for _ in range(apply_parallel):
-            if apply_queue[apply_idx].apply(apply_time_max):
+            if apply_queue[apply_idx]._apply(apply_time_max):
                 apply_queue.pop(apply_idx)
             else:
                 apply_idx += 1
@@ -162,7 +164,8 @@ def post_draw(draw_time: float):
 def _compress_thread():
     while True:
         if globals.settings.tex_compress is TexCompress.Disabled:
-            time.sleep(5)
+            with compress_thread_condition:
+                compress_thread_condition.wait()
             continue
 
         # Iterating over ImageHelper.instances (WeakerSet) holds a lock over it, blocking the main loop
@@ -172,11 +175,12 @@ def _compress_thread():
         # That could mean there are since-deleted ImageHelper instances in our iterator copy, which we don't want to compress
         # So break after each lengthy operation to update our iterator
         for image in list(ImageHelper.instances):
-            if image._maybe_compress():
+            if image._compress():
                 time.sleep(0)
                 break
         else:  # Didn't break
-            time.sleep(5)
+            with compress_thread_condition:
+                compress_thread_condition.wait()
 
 
 def dummy_texture_id():
@@ -216,57 +220,60 @@ class ImageHelper:
     instances = weakerset.WeakerSet()
 
     __slots__ = (
+        "path",
+        "glob",
         "width",
         "height",
+        "animated",
         "frame",
-        "glob",
-        "elapsed",
+        "frame_durations",
+        "frame_elapsed",
         "loaded",
         "loading",
         "applied",
+        "_resolve_lock",
+        "_resolved_path",
         "_missing",
-        "prev_time",
-        "animated",
         "_load_error",
         "_compress_error",
+        "_textures",
+        "_texture_ids",
         "_pending_reload",
-        "textures",
-        "durations",
-        "texture_ids",
-        "resolved_path",
-        "path",
-        "shown",
-        "lock",
+        "_seamless_reload",
+        "_prev_time",
+        "_shown",
         "__weakref__",
     )
 
     def __init__(self, path: str | pathlib.Path, glob=""):
+        self.path: pathlib.Path = pathlib.Path(path)
+        self.glob = glob
         self.width = 1
         self.height = 1
+        self.animated = False
         self.frame = 0
-        self.glob = glob
-        self.elapsed = 0.0
+        self.frame_durations: list[float] = []
+        self.frame_elapsed = 0.0
         self.loaded = False
         self.loading = False
         self.applied = False
+        self._resolve_lock = threading.Lock()
+        self._resolved_path: pathlib.Path = None
         self._missing = None
-        self.prev_time = 0.0
-        self.animated = False
         self._load_error: str = None
         self._compress_error: str = None
-        self.textures: list[bytes] = []
-        self.durations: list[float] = []
-        self.texture_ids: list[int] = []
-        self.resolved_path: pathlib.Path = None
-        self.path: pathlib.Path = pathlib.Path(path)
-        self.shown = False
-        self.lock = threading.RLock()
+        self._textures: list[bytes] = []
+        self._texture_ids: list[int] = []
+        self._pending_reload = False
+        self._seamless_reload = False
+        self._prev_time = 0.0
+        self._shown = False
         type(self).instances.add(self)
 
     @property
     def missing(self):
         if self._missing is None:
-            self.resolve()
+            self._resolve()
         return self._missing
 
     @property
@@ -277,15 +284,15 @@ class ImageHelper:
             return self._load_error
         return None
 
-    def resolve(self):
-        with self.lock:
+    def _resolve(self):
+        with self._resolve_lock:
             if self._missing is not None:
                 return
 
-            self.resolved_path = self.path
+            self._resolved_path = self.path
 
             if self.glob:
-                paths = list(self.resolved_path.glob(self.glob))
+                paths = list(self._resolved_path.glob(self.glob))
                 if not paths:
                     self._missing = True
                     return
@@ -299,15 +306,15 @@ class ImageHelper:
                     # Prefer .gif files, avoid compressed files unless nothing else available
                     sorting = lambda path: 1 if path.suffix == ".gif" else 2 if path.suffix == ".zst" else 3
                 paths.sort(key=sorting)
-                self.resolved_path = paths[0]
+                self._resolved_path = paths[0]
 
             # Choose compressed file by same name if not already using it
-            if globals.settings.tex_compress is not TexCompress.Disabled and self.resolved_path.suffix != ".zst":
-                ktx_path = self.resolved_path.with_suffix(f".{globals.settings.tex_compress.name.lower()}.ktx.zst")
+            if globals.settings.tex_compress is not TexCompress.Disabled and self._resolved_path.suffix != ".zst":
+                ktx_path = self._resolved_path.with_suffix(f".{globals.settings.tex_compress.name.lower()}.ktx.zst")
                 if ktx_path.is_file():
-                    self.resolved_path = ktx_path
+                    self._resolved_path = ktx_path
 
-            self._missing = not self.resolved_path.is_file()
+            self._missing = not self._resolved_path.is_file()
 
     def _compress_set_invalid(self, err: str):
         if self.loading:
@@ -317,7 +324,7 @@ class ImageHelper:
             unload_queue.append(self)
 
     @classmethod
-    def _build_ktx(cls, tex_format: int, tex_pixfmt: int, width: int, height: int, frames: list[tuple[bytes, int]]):
+    def _compress_ktx_encode(cls, tex_format: int, tex_pixfmt: int, width: int, height: int, frames: list[tuple[bytes, int]]):
         ktx = bytearray(ktx_magic)  # identifier
         ktx += struct.pack("<I", ktx_endianness)  # endianness
         ktx += struct.pack("<I", 0)  # glType
@@ -361,7 +368,7 @@ class ImageHelper:
         texture_pixfmt: int,
         format_name: str,
     ):
-        path = self.resolved_path
+        path = self._resolved_path
         if path.suffix == ".zst":
             self._compress_set_invalid(
                 f"No source image available to compress to {format_name}!\n"
@@ -453,7 +460,7 @@ class ImageHelper:
                         frames.append((bytes(texture), duration))
                         frames_remaining -= 1
                         compress_counter -= 1
-                    ktx = self._build_ktx(texture_format, texture_pixfmt, pix_w, pix_h, frames)
+                    ktx = self._compress_ktx_encode(texture_format, texture_pixfmt, pix_w, pix_h, frames)
                 except Exception:
                     self._compress_set_invalid(f"Failed {compressor_name} intermediary step:\n{error.text()}")
                     return
@@ -470,13 +477,14 @@ class ImageHelper:
 
         # Discard the result if source image was changed/deleted during compression
         try:
-            if self.resolved_path != path or self.missing or self.resolved_path.read_bytes() != data:
+            if self._resolved_path != path or self.missing or self._resolved_path.read_bytes() != data:
                 return
         except FileNotFoundError:
             return
 
         ktx_path.write_bytes(ktx)
-        self.reload()
+        # Mark for reload without fully unloading, this prevents flickering
+        self.reload(unload=False)
 
     def _compress_astc(self):
         # Compress to ASTC
@@ -527,19 +535,21 @@ class ImageHelper:
             format_name="BC7",
         )
 
-    def _maybe_compress(self):
+    def _compress(self):
         if self._compress_error or self.loading or self.missing:
             return False
-        if globals.images_path / "previews" in self.resolved_path.parents:
+        if globals.images_path / "previews" in self._resolved_path.parents:
             return False
 
-        if globals.settings.tex_compress is TexCompress.ASTC and not self.resolved_path.name.endswith(".astc.ktx.zst"):
+        if globals.settings.tex_compress is TexCompress.ASTC and not self._resolved_path.name.endswith(".astc.ktx.zst"):
             self._compress_astc()
             return True
 
-        if globals.settings.tex_compress is TexCompress.BC7 and not self.resolved_path.name.endswith(".bc7.ktx.zst"):
+        if globals.settings.tex_compress is TexCompress.BC7 and not self._resolved_path.name.endswith(".bc7.ktx.zst"):
             self._compress_bc7()
             return True
+
+        return False
 
     def _load_set_invalid(self, err: str):
         self._load_error = err
@@ -548,14 +558,14 @@ class ImageHelper:
 
     def _load_ktx_zst(self):
         # Load compressed KTX
-        if not self.resolved_path.name.endswith((".astc.ktx.zst", ".bc7.ktx.zst")):
+        if not self._resolved_path.name.endswith((".astc.ktx.zst", ".bc7.ktx.zst")):
             self._load_set_invalid(
                 "Unknown KTX texture format!\n"
                 "Reset image in order to re-compress it"
             )
             return
 
-        ktx = self.resolved_path.read_bytes()
+        ktx = self._resolved_path.read_bytes()
         magic = ktx[0:4]
         if magic != zstd_magic:
             self._load_set_invalid(f"KTX malformed:\nWrong ZSTD magic, {magic} != {zstd_magic}")
@@ -627,17 +637,17 @@ class ImageHelper:
         frames_data = ktx[64 + kv_len:]
         data_pos = 0
         first_frame = True
-        while len(self.textures) < array_len and data_pos < len(frames_data):
+        while len(self._textures) < array_len and data_pos < len(frames_data):
             texture_len = struct.unpack(fmt, frames_data[data_pos:data_pos + 4])[0]
             data_pos += 4
             texture = bytes(frames_data[data_pos:data_pos + texture_len])
             data_pos += texture_len
-            self.textures.append((texture, gl_internal_format))
-            if len(durations) < len(self.textures):
+            self._textures.append((texture, gl_internal_format))
+            if len(durations) < len(self._textures):
                 duration = 100
             else:
-                duration = durations[len(self.textures) - 1]
-            self.durations.append(duration / 1000)
+                duration = durations[len(self._textures) - 1]
+            self.frame_durations.append(duration / 1000)
             if first_frame:
                 apply_queue.append(self)
                 first_frame = False
@@ -651,7 +661,7 @@ class ImageHelper:
             if len(paths) > 1:
                 try:
                     for path in paths:
-                        if path != self.resolved_path:
+                        if path != self._resolved_path:
                             path.unlink(missing_ok=True)
                 except Exception:
                     pass
@@ -662,7 +672,7 @@ class ImageHelper:
     def _load_rgba(self):
         # Fallback to RGBA loading
         try:
-            image = Image.open(self.resolved_path)
+            image = Image.open(self._resolved_path)
         except UnidentifiedImageError:
             self._load_set_invalid(f"Pillow does not recognize this image format!")
             return
@@ -677,11 +687,11 @@ class ImageHelper:
                     texture = frame.tobytes("raw", "RGBA")
                 else:
                     texture = frame.convert("RGBA").tobytes("raw", "RGBA")
-                self.textures.append((texture, gl.GL_RGBA))
+                self._textures.append((texture, gl.GL_RGBA))
                 duration = frame.info.get("duration", 0)
                 if duration < 1:
                     duration = 100
-                self.durations.append(duration / 1000)
+                self.frame_durations.append(duration / 1000)
                 if first_frame:
                     apply_queue.append(self)
                     first_frame = False
@@ -693,7 +703,7 @@ class ImageHelper:
         self.loaded = True
         self.loading = False
 
-    def load(self):
+    def _load(self):
         self._pending_reload = False
         self.loading = True
 
@@ -702,16 +712,16 @@ class ImageHelper:
             return
 
         self.frame = 0
-        self.elapsed = 0.0
-        self.textures.clear()
+        self.frame_elapsed = 0.0
+        self._textures.clear()
         self.animated = False
-        self.durations.clear()
+        self.frame_durations.clear()
         # Don't reset width and height, keep ones from prior load (if any)
         # If this is first load, they're already (1, 1)
         # If this is a reload, they're unlikely to have changed, and even if they did there is no harm in giving the old size while loading the new image
         # Actually, it helps with dynamically sized layouts: in the case where unload_offscreen_images is on, this keeps the layout from jumping around
 
-        if self.resolved_path.name.endswith(".ktx.zst"):
+        if self._resolved_path.name.endswith(".ktx.zst"):
             self._load_ktx_zst()
         else:
             self._load_rgba()
@@ -719,12 +729,12 @@ class ImageHelper:
         if self._pending_reload:
             self.reload()
 
-    def apply(self, apply_time_max: float):
+    def _apply(self, apply_time_max: float):
         apply_start = time.perf_counter()
-        for i in range(len(self.texture_ids), len(self.textures)):
-            (texture, texture_format) = self.textures[i]
+        for i in range(len(self._texture_ids), len(self._textures)):
+            (texture, texture_format) = self._textures[i]
             texture_id = gl.glGenTextures(1)
-            self.texture_ids.extend([texture_id])
+            self._texture_ids.extend([texture_id])
             gl.glBindTexture(gl.GL_TEXTURE_2D, texture_id)
             gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
             gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
@@ -740,64 +750,71 @@ class ImageHelper:
                 break
             if time.perf_counter() - apply_start > apply_time_max:
                 break
-        if not self.loading and len(self.texture_ids) == len(self.textures):
-            self.textures.clear()
+        if not self.loading and len(self._texture_ids) == len(self._textures):
+            self._textures.clear()
             self.applied = True
             return True
         else:
             return False
 
-    def unload(self):
-        sync_thread.unqueue(self.load)
+    def _unload(self):
+        sync_thread.unqueue(self._load)
         if self.loaded:
-            if self.texture_ids:
-                gl.glDeleteTextures(self.texture_ids)
-                self.texture_ids.clear()
-            if self.textures:
+            if self._texture_ids:
+                gl.glDeleteTextures(self._texture_ids)
+                self._texture_ids.clear()
+            if self._textures:
                 apply_queue.remove(self)
-                self.textures.clear()
+                self._textures.clear()
             if not self._missing and not self._load_error:
                 self.loaded = False
 
-    def reload(self):
+    def reload(self, unload=True):
         self._missing = None
         self._load_error = None
         self._compress_error = None
         self._pending_reload = True
-        unload_queue.append(self)
+        if unload:
+            unload_queue.append(self)
+        elif self.loaded or self.loading:
+            self._seamless_reload = True
+        with compress_thread_condition:
+            compress_thread_condition.notify()
 
     @property
     def texture_id(self):
-        self.shown = True
+        self._shown = True
 
-        if not self.loaded:
+        if not self.loaded or self._seamless_reload:
             if not self.loading:
+                if self._seamless_reload:
+                    self._seamless_reload = False
                 self.loading = True
                 self.applied = False
-                # This next self.load() actually loads the image and does all the conversion. It takes time and resources!
-                # self.load()
-                # You can (and maybe should) run this in a thread! threading.Thread(target=self.load, daemon=True).start()
+                # This next self._load() actually loads the image and does all the conversion. It takes time and resources!
+                # self._load()
+                # You can (and maybe should) run this in a thread! threading.Thread(target=self._load, daemon=True).start()
                 # Or maybe setup an image thread and queue images to load one by one?
                 # You could do this with https://gist.github.com/WillyJL/bb410bcc761f8bf5649180f22b7f3b44 like so:
-                sync_thread.queue(self.load)
+                sync_thread.queue(self._load)
         else:
             if self._missing or self._load_error:
                 return dummy_texture_id()
 
-        if not self.texture_ids:
+        if not self._texture_ids:
             return dummy_texture_id()
 
         if self.animated and globals.settings.play_gifs and (globals.gui.focused or globals.settings.play_gifs_unfocused):
-            if self.prev_time != (new_time := imgui.get_time()):
-                self.prev_time = new_time
-                self.elapsed += imgui.get_io().delta_time
-                while self.frame < (len(self.texture_ids) - 1) and (excess := self.elapsed - self.durations[max(self.frame, 0)]) > 0:
-                    self.elapsed = excess
+            if self._prev_time != (new_time := imgui.get_time()):
+                self._prev_time = new_time
+                self.frame_elapsed += imgui.get_io().delta_time
+                while self.frame < (len(self._texture_ids) - 1) and (excess := self.frame_elapsed - self.frame_durations[max(self.frame, 0)]) > 0:
+                    self.frame_elapsed = excess
                     self.frame += 1
-                    if self.frame == len(self.durations) - 1:
+                    if self.frame == len(self.frame_durations) - 1:
                         self.frame = 0
 
-        return self.texture_ids[self.frame]
+        return self._texture_ids[self.frame]
 
     def render(self, width: int, height: int, *args, **kwargs):
         if globals.settings.preload_nearby_images:

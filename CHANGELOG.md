@@ -46,6 +46,8 @@
 - Limit image downloads to 2 per second just in case (by @WillyJL)
 - Fix image downloads in censorship regimes (by @WillyJL)
 - Drastically improved stutters during image compression, most noticeable in (what used to be) catastrophic cases with 5-10MB+ GIFs (by @WillyJL)
+- Fix missing icon on Wayland (#297 by @phubhunter)
+- Handle Cloudflare capcthas as 'F95zone unavailable' warnings (by @WillyJL)
 
 ### Removed:
 - Collection and SiteRip thread types are gone, these are now detected as the appropriate animation/comic/game type
