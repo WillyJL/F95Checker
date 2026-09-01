@@ -26,17 +26,11 @@
 
 ### Updated:
 - Tex Compress transparently in background (by @WillyJL):
-  - If Settings > Images > Tex Compress is enabled, images are now compressed in background
-  - The uncompressed copy of an image is visible on screen while it is being / waiting to be compressed
+  - If Settings > Images > Tex Compress is enabled, images are compressed in the background
+  - The uncompressed copy remains visible while it is waiting to be compressed
   - Other images can be loaded while compression is running
-  - Overall substancially improves usability of Tex Compress option
-  - Only "downside" is all images will be compressed and in "random" order, instead of only compressing images when they are shown on screen
-  - But once enabled and the backlog of existing images are compressed, future image additions/updates in your library will be compressed quicker and unobtrusively
 - Animations (Video and GIF) and Comics (CG, Comics, Manga and Pinup) thread types are detected properly now, "Collection" and "SiteRip" prefixes are now ignored (by @WillyJL)
 - Notes textbox now resizes with how many lines are in the notes, so it is not the textbox that scrolls but rather the info popup (by @WillyJL)
-- Updated dependencies (by @WillyJL):
-  - New cx-Freeze version skips unused PyQt6 .dll/.so/.dylib libraries, Windows/Linux install sizes reduced by 70-100MB
-  - Possibly better Linux support with GLFW and desktop-notifier updates
 
 ### Fixed:
 - Fix window show/hide from other threads and from tray icon (#286 by @cicklolwut & @WillyJL)
@@ -46,8 +40,9 @@
 - Limit image downloads to 2 per second just in case (by @WillyJL)
 - Fix image downloads in censorship regimes (by @WillyJL)
 - Drastically improved stutters during image compression, most noticeable in (what used to be) catastrophic cases with 5-10MB+ GIFs (by @WillyJL)
+- Pending image loads are cancelled if Settings > Images > Unload off-screen is enabled and an image is no longer visible, so visible images can load sooner (by @WillyJL)
 - Fix missing icon on Wayland (#297 by @phubhunter)
-- Handle Cloudflare capcthas as 'F95zone unavailable' warnings (by @WillyJL)
+- Handle Cloudflare captchas as 'F95zone unavailable' warnings (by @WillyJL)
 
 ### Removed:
 - Collection and SiteRip thread types are gone, these are now detected as the appropriate animation/comic/game type

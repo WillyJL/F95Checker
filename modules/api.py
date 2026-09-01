@@ -892,6 +892,7 @@ async def full_check(game: Game, last_changed: int):
                     def _archive_game(game: Game):
                         game.archived = True
                         game.updated = False
+
                     buttons = {
                         f"{icons.cancel} Do nothing": None,
                         f"{icons.trash_can_outline} Remove": lambda: callbacks.remove_game(game, bypass_confirm=True),

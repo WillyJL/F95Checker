@@ -5,10 +5,8 @@ import enum
 import functools
 import hashlib
 import json
-import os
 import pathlib
 import shutil
-import string
 import sys
 import time
 import typing
@@ -622,6 +620,11 @@ TexCompress = IntEnumHack("TexCompress", [
     ("BC7",      3),
 ])
 
+PreviewWebMCodec = IntEnumHack("PreviewWebMCodec", [
+    ("VP8", 1),
+    ("VP9", 2),
+])
+
 
 @dataclasses.dataclass(slots=True)
 class Filter:
@@ -912,6 +915,14 @@ class Settings:
     play_gifs_unfocused         : bool
     preload_nearby_images       : bool
     previews_enabled            : bool
+    preview_jpeg_quality        : int
+    preview_preserve_animation  : bool
+    preview_webm_codec          : PreviewWebMCodec
+    preview_webm_quality        : int
+    preview_webm_speed          : int
+    preview_max_animation_frames: int
+    preview_max_animation_duration: int
+    
     proxy_type                  : ProxyType
     proxy_host                  : str
     proxy_port                  : int
@@ -1006,6 +1017,7 @@ class Game:
     launch_process     : typing.Any = None
     image              : "imagehelper.ImageHelper" = None
     preview_images     : list["imagehelper.ImageHelper"] = dataclasses.field(default_factory=list)
+    preview_processing_errors: dict[str, str] = dataclasses.field(default_factory=dict)
     previews_loading   : bool = False
     previews_loaded    : bool = False
     preview_load_future: typing.Any = dataclasses.field(default=None, init=False, repr=False, compare=False)
@@ -1036,60 +1048,34 @@ class Game:
         self.validate_executables()
 
     async def load_previews_async(self):
-        """Download and cache the indexer's preview URLs on first use.
-
-        Preview URLs are intentionally not part of the cover-image cache: the
-        latter uses ``<id>.*`` and is replaced during refreshes.  Keeping the
-        preview cache under a separate prefix prevents a cover reset from
-        deleting the gallery.
-        """
+        """Load previews while preserving their URL order and cache state."""
         if self.previews_loading or self.previews_loaded or not self.previews_urls:
             return
         self.previews_loading = True
         try:
             from external import imagehelper
+            from common.preview_cache import PreviewCache
             from modules import api, globals, utils
-            import aiofiles
-            # A retry or resumed load may already have partially populated
-            # this list. Use the normal cleanup path so existing textures and
-            # decoded image data are released before rebuilding it.
+
             self.unload_previews()
-            preview_dir = globals.images_path / f"previews/{self.id}"
-            preview_dir.mkdir(parents=True, exist_ok=True)
-            async def _fetch_preview(preview_i: int, url: str, digest: str, glob: str):
-                try:
-                    data, _ = await api.download_image(url)
-                    if data:
-                        path = preview_dir / f"{digest}.{utils.image_ext(data)}"
-                        async with aiofiles.open(path, "wb") as f:
-                            await f.write(data)
-                except Exception:
-                    return
-                self.preview_images[preview_i] = imagehelper.ImageHelper(preview_dir, glob=glob)
-            digests = [hashlib.sha1(url.encode("utf-8")).hexdigest() for url in self.previews_urls]
-            for img in preview_dir.glob("*"):
-                digest = img.stem
-                if len(digest) != 40 or not all(c in string.hexdigits for c in digest):
-                    # Not a digest
-                    continue
-                if digest not in digests:
-                    # Old preview
-                    try:
-                        img.unlink()
-                    except Exception:
-                        pass
-            fetch_preview_tasks = []
-            for preview_i, (url, digest) in enumerate(zip(self.previews_urls, digests)):
-                if not url.startswith(("http://", "https://")):
-                    continue
-                glob = f"{digest}.*"
-                paths = list(preview_dir.glob(glob))
-                if not paths:
-                    fetch_preview_tasks.append(_fetch_preview(preview_i, url, digest, glob))
-                    self.preview_images.append(None)
-                else:
-                    self.preview_images.append(imagehelper.ImageHelper(preview_dir, glob=glob))
-            await asyncio.gather(*fetch_preview_tasks)
+            self.preview_processing_errors.clear()
+            preview_dir = globals.images_path / "previews" / str(self.id)
+            cache = PreviewCache(preview_dir, globals.settings, api, utils.image_ext)
+            digests = [cache.digest(url) for url in self.previews_urls]
+            cache.cleanup(set(digests))
+            # Keep slots aligned with URLs while work completes asynchronously.
+            self.preview_images = [None] * len(self.previews_urls)
+
+            async def load_one(preview_i, url):
+                path, error = await cache.resolve(url)
+                if error:
+                    self.preview_processing_errors[digests[preview_i]] = error
+                if path is not None:
+                    self.preview_images[preview_i] = imagehelper.ImageHelper(
+                        preview_dir, glob=f"{digests[preview_i]}.*"
+                    )
+
+            await asyncio.gather(*(load_one(i, url) for i, url in enumerate(self.previews_urls)))
             self.previews_loaded = True
         finally:
             self.previews_loading = False

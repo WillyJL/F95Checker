@@ -33,7 +33,7 @@ def queue(fn: typing.Callable):
 def unqueue(fn: typing.Callable):
     try:
         stack.remove(fn)
-    except ValueError:
+    except (ValueError, AttributeError):
         pass
 
 

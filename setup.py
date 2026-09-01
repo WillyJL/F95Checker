@@ -1,6 +1,8 @@
 from ctypes.util import find_library
+import pathlib
 import setuptools
 import sys
+import sysconfig
 
 from common import meta
 
@@ -49,6 +51,19 @@ include_files = [
     (meta.self_path / "resources/",            "resources/"),
     (meta.self_path / "LICENSE",               "LICENSE"),
 ]
+
+# PyAV contains native extension modules and bundled FFmpeg DLLs. cx-Freeze's
+# module finder cannot reliably analyze this package, especially when it is
+# imported lazily by the preview worker. Copy it verbatim and keep it outside
+# the zip archive so its native modules can load using the wheel's layout.
+site_packages = pathlib.Path(sysconfig.get_paths()["purelib"])
+av_package = site_packages / "av"
+if av_package.is_dir():
+    include_files.append((av_package, "lib/av"))
+    av_libs = site_packages / "av.libs"
+    if av_libs.is_dir():
+        include_files.append((av_libs, "lib/av.libs"))
+
 platform_qt_plugins = {
     "linux": [
         "wayland-decoration-client",
@@ -62,6 +77,7 @@ zip_exclude_packages = [
     "bencode2",
     "desktop_notifier",
     "glfw",
+    "av",
 ] + (["PyQt6"] if sys.platform.startswith("win") else [])
 optimize = 2
 silent_level = 0
