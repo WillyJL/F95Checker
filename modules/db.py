@@ -55,6 +55,14 @@ label_positions_lock: asyncio.Lock = None
 def setup():
     async_thread.wait(connect())
     async_thread.wait(load())
+    from common.preview_cache import PreviewCache
+    settings = globals.settings
+    PreviewCache.cleanup_expanded_cache(
+        globals.images_path,
+        globals.games,
+        ttl_days=settings.preview_cache_ttl_days if settings.preview_cleanup_ttl_enabled else None,
+        max_size_mb=settings.preview_cache_max_size_mb if settings.preview_cleanup_max_size_enabled else None,
+    )
     loop = async_thread.run(save_loop())
     try:
         yield
@@ -245,6 +253,11 @@ async def connect():
             "preview_webm_speed":          f'INTEGER DEFAULT 4',
             "preview_max_animation_frames": f'INTEGER DEFAULT 0',
             "preview_max_animation_duration": f'INTEGER DEFAULT 0',
+            "preview_cleanup_on_refresh": f'INTEGER DEFAULT {int(True)}',
+            "preview_cleanup_ttl_enabled": f'INTEGER DEFAULT {int(False)}',
+            "preview_cleanup_max_size_enabled": f'INTEGER DEFAULT {int(False)}',
+            "preview_cache_ttl_days": f'INTEGER DEFAULT 7',
+            "preview_cache_max_size_mb": f'INTEGER DEFAULT 2048',
             "proxy_type":                  f'INTEGER DEFAULT {ProxyType.Disabled}',
             "proxy_host":                  f'TEXT    DEFAULT ""',
             "proxy_port":                  f'INTEGER DEFAULT 8080',

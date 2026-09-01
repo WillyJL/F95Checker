@@ -11,6 +11,8 @@ import io
 import itertools
 import os
 import pathlib
+import shutil
+import time
 from fractions import Fraction
 
 import aiofiles
@@ -219,3 +221,142 @@ class PreviewCache:
                 continue
             if path.is_file() and len(path.stem) == 40:
                 path.unlink(missing_ok=True)
+
+    @staticmethod
+    def expanded_cache_stats(images_path: pathlib.Path) -> tuple[int, int]:
+        """Return (file count, bytes) for expanded-original cache files."""
+        root = images_path / "previews"
+        count = 0
+        size = 0
+        if not root.is_dir():
+            return count, size
+        for cache_dir in root.glob("*/cached"):
+            if not cache_dir.is_dir():
+                continue
+            for path in cache_dir.iterdir():
+                if path.is_file():
+                    count += 1
+                    try:
+                        size += path.stat().st_size
+                    except OSError:
+                        pass
+        return count, size
+
+    @staticmethod
+    def cleanup_expanded_cache(
+        images_path: pathlib.Path,
+        games,
+        *,
+        ttl_days: int | None = None,
+        max_size_mb: int | None = None,
+        protected_paths: set[pathlib.Path] | None = None,
+    ) -> tuple[int, int]:
+        """Clean expanded originals, preserving active and referenced files.
+
+        Orphan cleanup is always safe. TTL and size eviction are opt-in via
+        the non-None arguments. Files are ordered by their most recent access
+        or modification time, so a cache hit refreshes their eviction age.
+        """
+        root = images_path / "previews"
+        active = {
+            str(game_id): {PreviewCache.digest(url) for url in game.previews_urls}
+            for game_id, game in games.items()
+        }
+        removed_files = 0
+        removed_bytes = 0
+        protected = {path.resolve() for path in (protected_paths or set())}
+        candidates: list[tuple[pathlib.Path, int, float]] = []
+        if not root.is_dir():
+            return removed_files, removed_bytes
+        for game_dir in root.iterdir():
+            cache_dir = game_dir / "cached"
+            if not cache_dir.is_dir():
+                continue
+            valid_digests = active.get(game_dir.name, set())
+            for path in cache_dir.iterdir():
+                if not path.is_file():
+                    continue
+                try:
+                    resolved = path.resolve()
+                except OSError:
+                    resolved = path
+                if path.name.startswith(".") or path.stem not in valid_digests:
+                    if resolved in protected:
+                        continue
+                    try:
+                        removed_bytes += path.stat().st_size
+                    except OSError:
+                        pass
+                    path.unlink(missing_ok=True)
+                    removed_files += 1
+                    continue
+                try:
+                    stat = path.stat()
+                    candidates.append((path, stat.st_size, max(stat.st_atime, stat.st_mtime)))
+                except OSError:
+                    continue
+            try:
+                cache_dir.rmdir()
+            except OSError:
+                pass
+
+        now = time.time()
+        if ttl_days is not None:
+            cutoff = now - max(1, int(ttl_days)) * 86400
+            for path, size, last_used in list(candidates):
+                if last_used < cutoff and path.resolve() not in protected:
+                    try:
+                        path.unlink(missing_ok=True)
+                        removed_files += 1
+                        removed_bytes += size
+                        candidates.remove((path, size, last_used))
+                    except OSError:
+                        pass
+
+        if max_size_mb is not None:
+            limit = max(10, min(int(max_size_mb), 10240)) * 1024 * 1024
+            total = sum(size for _, size, _ in candidates)
+            for path, size, last_used in sorted(candidates, key=lambda item: item[2]):
+                if total <= limit:
+                    break
+                if path.resolve() in protected:
+                    continue
+                try:
+                    path.unlink(missing_ok=True)
+                    total -= size
+                    removed_files += 1
+                    removed_bytes += size
+                except OSError:
+                    pass
+
+        for cache_dir in root.glob("*/cached"):
+            try:
+                cache_dir.rmdir()
+            except OSError:
+                pass
+        return removed_files, removed_bytes
+
+    @staticmethod
+    def clear_expanded_cache(images_path: pathlib.Path) -> tuple[int, int]:
+        """Delete all expanded originals; persistent gallery previews remain."""
+        root = images_path / "previews"
+        removed_files = 0
+        removed_bytes = 0
+        if not root.is_dir():
+            return removed_files, removed_bytes
+        for cache_dir in root.glob("*/cached"):
+            if not cache_dir.is_dir():
+                continue
+            count = 0
+            size = 0
+            for path in cache_dir.iterdir():
+                if path.is_file():
+                    count += 1
+                    try:
+                        size += path.stat().st_size
+                    except OSError:
+                        pass
+            shutil.rmtree(cache_dir, ignore_errors=True)
+            removed_files += count
+            removed_bytes += size
+        return removed_files, removed_bytes

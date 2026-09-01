@@ -2389,6 +2389,12 @@ class MainGUI():
                     expanded_loading = False
                     if 0 <= expanded_preview_i < len(game.preview_images):
                         fallback_image = game.preview_images[expanded_preview_i]
+                        # An off-screen gallery item may have been unloaded
+                        # from GPU memory. Start its processed preview again
+                        # immediately so fullscreen has a useful fallback
+                        # while the original is being downloaded.
+                        if fallback_image is not None:
+                            fallback_image.prioritize()
                         expanded_future = game.expanded_load_futures.get(expanded_preview_i)
                         if expanded_future is not None and expanded_future.done():
                             game.expanded_load_futures.pop(expanded_preview_i, None)
@@ -4870,6 +4876,69 @@ class MainGUI():
                 "best together with Tex compress, so image load times are very short and completely unnoticeable due to preloading."
             )
             draw_settings_checkbox("preload_nearby_images")
+
+            imgui.end_table()
+            imgui.spacing()
+
+        if draw_settings_section("Optimization"):
+            from common.preview_cache import PreviewCache
+            expanded_count, expanded_size = PreviewCache.expanded_cache_stats(globals.images_path)
+            draw_settings_label("Cache:")
+            imgui.text_disabled(
+                f"{expanded_count} file{'s' if expanded_count != 1 else ''}, "
+                f"{expanded_size / (1024 ** 2):.1f} MiB"
+            )
+
+            draw_settings_label(
+                "Refresh:",
+                "Delete all expanded, full-size preview originals when api.refresh() completes. "
+                "Processed gallery previews are not affected."
+            )
+            draw_settings_checkbox("preview_cleanup_on_refresh")
+
+            draw_settings_label(
+                "TTL cleanup:",
+                "Remove expanded originals that have not been viewed or modified for the configured number of days."
+            )
+            draw_settings_checkbox("preview_cleanup_ttl_enabled")
+            if not set.preview_cleanup_ttl_enabled:
+                imgui.push_disabled()
+            draw_settings_label("TTL days:", "Expanded-original inactivity period before cleanup (1–30 days).")
+            changed, value = imgui.drag_int(
+                "###preview_cache_ttl_days", set.preview_cache_ttl_days,
+                change_speed=0.2, min_value=1, max_value=30, format="%d days"
+            )
+            set.preview_cache_ttl_days = min(max(value, 1), 30)
+            if changed:
+                async_thread.run(db.update_settings("preview_cache_ttl_days"))
+            if not set.preview_cleanup_ttl_enabled:
+                imgui.pop_disabled()
+
+            draw_settings_label(
+                "Size cleanup:",
+                "Evict the least recently viewed/modified expanded originals when the cache exceeds its limit."
+            )
+            draw_settings_checkbox("preview_cleanup_max_size_enabled")
+            if not set.preview_cleanup_max_size_enabled:
+                imgui.push_disabled()
+            draw_settings_label("Max size:", "Expanded-original cache limit (10 MB–10 GB).")
+            changed, value = imgui.drag_int(
+                "###preview_cache_max_size_mb", set.preview_cache_max_size_mb,
+                change_speed=10, min_value=10, max_value=10240, format="%d MB"
+            )
+            set.preview_cache_max_size_mb = min(max(value, 10), 10240)
+            if changed:
+                async_thread.run(db.update_settings("preview_cache_max_size_mb"))
+            if not set.preview_cleanup_max_size_enabled:
+                imgui.pop_disabled()
+
+            draw_settings_label("Manual:")
+            if imgui.button("Clear cache", width=right_width):
+                for cached_game in globals.games.values():
+                    cached_game.unload_expanded_images()
+                async_thread.run(asyncio.to_thread(
+                    PreviewCache.clear_expanded_cache, globals.images_path
+                ))
 
             imgui.end_table()
             imgui.spacing()

@@ -1435,6 +1435,24 @@ async def refresh(*games: list[Game], full=False, notifs=True, force_archived=Fa
     if not games:
         globals.settings.last_successful_refresh.update(time.time())
         await db.update_settings("last_successful_refresh")
+    from common.preview_cache import PreviewCache
+    settings = globals.settings
+    if settings.preview_cleanup_on_refresh:
+        # This is optional because refresh can also run automatically. Only
+        # expanded originals are removed; processed gallery previews remain.
+        for game in globals.games.values():
+            game.unload_expanded_images()
+        await asyncio.to_thread(PreviewCache.clear_expanded_cache, globals.images_path)
+    else:
+        # The policy cleanups remain independent from the explicit refresh
+        # cleanup switch.
+        await asyncio.to_thread(
+            PreviewCache.cleanup_expanded_cache,
+            globals.images_path,
+            globals.games,
+            ttl_days=settings.preview_cache_ttl_days if settings.preview_cleanup_ttl_enabled else None,
+            max_size_mb=settings.preview_cache_max_size_mb if settings.preview_cleanup_max_size_enabled else None,
+        )
 
 
 async def download_file(download: FileDownload):

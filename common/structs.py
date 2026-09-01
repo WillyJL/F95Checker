@@ -922,6 +922,11 @@ class Settings:
     preview_webm_speed          : int
     preview_max_animation_frames: int
     preview_max_animation_duration: int
+    preview_cleanup_on_refresh  : bool
+    preview_cleanup_ttl_enabled : bool
+    preview_cleanup_max_size_enabled: bool
+    preview_cache_ttl_days       : int
+    preview_cache_max_size_mb    : int
     
     proxy_type                  : ProxyType
     proxy_host                  : str
@@ -1185,6 +1190,21 @@ class Game:
                     webm_path = cached_path.with_suffix(".webm")
                     cached_path.replace(webm_path)
                     cached_path = webm_path
+            # A cache hit is a view/use of the original. Keep this timestamp
+            # separate from the persistent processed-preview cache policy.
+            try:
+                await asyncio.to_thread(cached_path.touch, exist_ok=True)
+            except OSError:
+                pass
+            if globals.settings.preview_cleanup_max_size_enabled:
+                from common.preview_cache import PreviewCache
+                await asyncio.to_thread(
+                    PreviewCache.cleanup_expanded_cache,
+                    globals.images_path,
+                    globals.games,
+                    max_size_mb=globals.settings.preview_cache_max_size_mb,
+                    protected_paths={cached_path},
+                )
             image = imagehelper.ImageHelper(cached_dir, glob=f"{digest}.*")
             self.expanded_images[preview_i] = image
             self.expanded_errors.pop(preview_i, None)
