@@ -3968,7 +3968,16 @@ class MainGUI():
         imgui.push_style_var(imgui.STYLE_CELL_PADDING, (padding, padding))
         img_height = cell_width / globals.settings.cell_image_ratio
         cells_per_column = 1
-        column_count = len(Label.instances) + 1
+        labels_used = []
+        tab_games_ids = self.show_games_ids[self.current_tab]
+        for label in Label.instances:
+            count = 0
+            for id in tab_games_ids:
+                if label in globals.games[id].labels:
+                    count += 1
+            if count > 0:
+                labels_used.append((label, count))
+        column_count = len(labels_used) + 1
         avail = imgui.get_content_region_available_width()
         table_width = lambda: (padding * 2 + (cell_width + imgui.style.item_spacing.x) * cells_per_column + imgui.style.scrollbar_size) * column_count
         while table_width() < avail:
@@ -3983,22 +3992,17 @@ class MainGUI():
             outer_size_height=-imgui.get_frame_height_with_spacing()  # Bottombar
         ):
             # Setup columns
-            not_labelled = len(Label.instances)
-            for label in Label.instances:
-                imgui.table_setup_column(label.name, imgui.TABLE_COLUMN_WIDTH_STRETCH)
+            not_labelled = len(labels_used)
+            for _, label in enumerate(labels_used):
+                imgui.table_setup_column(label[0].name, imgui.TABLE_COLUMN_WIDTH_STRETCH)
             imgui.table_setup_column("Not Labelled", imgui.TABLE_COLUMN_WIDTH_STRETCH)
-            tab_games_ids = self.show_games_ids[self.current_tab]
 
             # Column headers
             imgui.table_setup_scroll_freeze(0, 1)  # Sticky column headers
             imgui.table_next_row(imgui.TABLE_ROW_HEADERS)
-            for label_i, label in enumerate(Label.instances):
+            for label_i, label in enumerate(labels_used):
                 imgui.table_set_column_index(label_i)
-                count = 0
-                for id in tab_games_ids:
-                    if label in globals.games[id].labels:
-                        count += 1
-                imgui.table_header(f"{label.name} ({count})")
+                imgui.table_header(f"{label[0].name} ({label[1]})")
             imgui.table_set_column_index(not_labelled)
             count = 0
             for id in tab_games_ids:
@@ -4007,7 +4011,7 @@ class MainGUI():
             imgui.table_header(f"Not Labelled ({count})")
 
             # Loop cells
-            for label_i, label in (*enumerate(Label.instances), (not_labelled, None)):
+            for label_i, label in (*enumerate(labels_used), (not_labelled, None)):
                 imgui.table_next_column()
                 imgui.begin_child(f"###game_kanban_{label_i}", height=-padding)
                 draw_list = imgui.get_window_draw_list()
@@ -4018,7 +4022,7 @@ class MainGUI():
                     if label_i == not_labelled:
                         if game.labels:
                             continue
-                    elif label not in game.labels:
+                    elif label[0] not in game.labels:
                         continue
                     self.draw_game_cell(game, False, draw_list, cell_width, False, img_height, cell_config)
                     wrap -= 1
