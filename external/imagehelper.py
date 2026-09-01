@@ -762,7 +762,10 @@ class ImageHelper:
                 gl.glDeleteTextures(self.texture_ids)
                 self.texture_ids.clear()
             if self.textures:
-                apply_queue.remove(self)
+                try:
+                    apply_queue.remove(self)
+                except ValueError:
+                    pass
                 self.textures.clear()
             if not self._missing and not self._error:
                 self.loaded = False
@@ -771,6 +774,18 @@ class ImageHelper:
         self._missing = None
         self._error = None
         unload_queue.append(self)
+
+    def prioritize(self):
+        """Move a pending decode ahead of normal image work."""
+        if self.loaded:
+            return
+        if self.loading:
+            sync_thread.promote(self._load)
+            return
+        self._load_cancelled = False
+        self.loading = True
+        self.applied = False
+        sync_thread.queue_front(self._load)
 
     @property
     def texture_id(self):

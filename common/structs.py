@@ -1020,7 +1020,11 @@ class Game:
     preview_processing_errors: dict[str, str] = dataclasses.field(default_factory=dict)
     previews_loading   : bool = False
     previews_loaded    : bool = False
+    previews_paused    : bool = dataclasses.field(default=False, init=False, repr=False, compare=False)
     preview_load_future: typing.Any = dataclasses.field(default=None, init=False, repr=False, compare=False)
+    expanded_images    : dict[int, "imagehelper.ImageHelper"] = dataclasses.field(default_factory=dict, init=False, repr=False, compare=False)
+    expanded_load_futures: dict[int, typing.Any] = dataclasses.field(default_factory=dict, init=False, repr=False, compare=False)
+    expanded_errors    : dict[int, str] = dataclasses.field(default_factory=dict, init=False, repr=False, compare=False)
     executables_valids : list[bool] = None
     executables_valid  : bool = None
     timeline_events    : list[TimelineEvent] = dataclasses.field(default_factory=list)
@@ -1049,7 +1053,7 @@ class Game:
 
     async def load_previews_async(self):
         """Load previews while preserving their URL order and cache state."""
-        if self.previews_loading or self.previews_loaded or not self.previews_urls:
+        if self.previews_paused or self.previews_loading or self.previews_loaded or not self.previews_urls:
             return
         self.previews_loading = True
         try:
@@ -1057,17 +1061,34 @@ class Game:
             from common.preview_cache import PreviewCache
             from modules import api, globals, utils
 
-            self.unload_previews()
+            # Keep one immutable batch view. The popup can close or a game can
+            # refresh while individual preview requests are still running.
+            urls = tuple(self.previews_urls)
+            if not urls:
+                return
+            if len(self.preview_images) != len(self.previews_urls):
+                self.unload_previews()
             self.preview_processing_errors.clear()
             preview_dir = globals.images_path / "previews" / str(self.id)
             cache = PreviewCache(preview_dir, globals.settings, api, utils.image_ext)
-            digests = [cache.digest(url) for url in self.previews_urls]
+            digests = [cache.digest(url) for url in urls]
             cache.cleanup(set(digests))
             # Keep slots aligned with URLs while work completes asynchronously.
-            self.preview_images = [None] * len(self.previews_urls)
+            # A paused batch may already contain completed slots; preserve
+            # them when fullscreen releases the gallery to continue loading.
+            if len(self.preview_images) != len(urls):
+                self.preview_images = [None] * len(urls)
 
             async def load_one(preview_i, url):
+                if preview_i >= len(self.preview_images) or tuple(self.previews_urls) != urls:
+                    return
+                if self.preview_images[preview_i] is not None:
+                    return
                 path, error = await cache.resolve(url)
+                # Cleanup, refresh, or cancellation may have replaced the
+                # indexed list while this request was in flight.
+                if preview_i >= len(self.preview_images) or tuple(self.previews_urls) != urls:
+                    return
                 if error:
                     self.preview_processing_errors[digests[preview_i]] = error
                 if path is not None:
@@ -1075,8 +1096,8 @@ class Game:
                         preview_dir, glob=f"{digests[preview_i]}.*"
                     )
 
-            await asyncio.gather(*(load_one(i, url) for i, url in enumerate(self.previews_urls)))
-            self.previews_loaded = True
+            await asyncio.gather(*(load_one(i, url) for i, url in enumerate(urls)))
+            self.previews_loaded = tuple(self.previews_urls) == urls and len(self.preview_images) == len(urls)
         finally:
             self.previews_loading = False
 
@@ -1088,6 +1109,14 @@ class Game:
         self.preview_load_future = None
         self.previews_loading = False
 
+    def pause_preview_loading(self):
+        """Stop queued gallery requests while fullscreen needs priority."""
+        self.cancel_preview_loading()
+        self.previews_paused = True
+
+    def resume_preview_loading(self):
+        self.previews_paused = False
+
     def delete_images(self, cover_only=True):
         from modules import globals
         for img in globals.images_path.glob(f"{self.id}.*"):
@@ -1098,16 +1127,9 @@ class Game:
         if not cover_only:
             self.cancel_preview_loading()
             self.unload_previews()
+            self.unload_expanded_images()
             preview_dir = globals.images_path / "previews" / str(self.id)
-            for img in preview_dir.glob("*"):
-                try:
-                    img.unlink()
-                except Exception:
-                    pass
-            try:
-                preview_dir.rmdir()
-            except OSError:
-                pass
+            shutil.rmtree(preview_dir, ignore_errors=True)
 
     def unload_previews(self):
         """Release decoded preview data and GPU textures, keeping disk cache."""
@@ -1117,6 +1139,72 @@ class Game:
                 imagehelper.unload_queue.append(image)
         self.preview_images.clear()
         self.previews_loaded = False
+
+    async def load_expanded_image_async(self, preview_i: int):
+        """Download and cache an original preview for fullscreen viewing."""
+        if not 0 <= preview_i < len(self.previews_urls):
+            return
+        url = self.previews_urls[preview_i]
+        digest = hashlib.sha1(url.encode("utf-8")).hexdigest()
+        from external import imagehelper
+        from modules import api, globals, utils
+        import aiofiles
+        cached_dir = globals.images_path / "previews" / str(self.id) / "cached"
+        cached_dir.mkdir(parents=True, exist_ok=True)
+        cached_paths = list(cached_dir.glob(f"{digest}.*"))
+        cached_path = next(
+            (path for path in cached_paths if path.suffix.lower() in (".webm", ".gif")),
+            cached_paths[0] if cached_paths else None,
+        )
+        try:
+            if cached_path is None:
+                data, _ = await api.download_image(url)
+                if not data:
+                    raise ValueError("Original preview download returned no data")
+                # Pillow does not identify WebM, so detect its EBML
+                # signature before falling back to the normal image helper.
+                url_path = url.lower().split("?", 1)[0]
+                if url_path.endswith(".webm") or data.startswith(b"\x1a\x45\xdf\xa3"):
+                    extension = "webm"
+                elif data.startswith((b"GIF87a", b"GIF89a")):
+                    extension = "gif"
+                else:
+                    extension = utils.image_ext(data)
+                cached_path = cached_dir / f"{digest}.{extension}"
+                temporary = cached_path.with_name(f".{cached_path.name}.tmp")
+                try:
+                    async with aiofiles.open(temporary, "wb") as file:
+                        await file.write(data)
+                    temporary.replace(cached_path)
+                finally:
+                    temporary.unlink(missing_ok=True)
+            elif cached_path.suffix.lower() == ".img":
+                # Repair cache entries created before WebM extension detection.
+                header = await asyncio.to_thread(cached_path.read_bytes)
+                if header.startswith(b"\x1a\x45\xdf\xa3"):
+                    webm_path = cached_path.with_suffix(".webm")
+                    cached_path.replace(webm_path)
+                    cached_path = webm_path
+            image = imagehelper.ImageHelper(cached_dir, glob=f"{digest}.*")
+            self.expanded_images[preview_i] = image
+            self.expanded_errors.pop(preview_i, None)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self.expanded_errors[preview_i] = str(exc)
+
+    def cancel_expanded_loading(self):
+        for future in self.expanded_load_futures.values():
+            if future is not None and not future.done():
+                future.cancel()
+        self.expanded_load_futures.clear()
+
+    def unload_expanded_images(self):
+        from external import imagehelper
+        self.cancel_expanded_loading()
+        for image in self.expanded_images.values():
+            imagehelper.unload_queue.append(image)
+        self.expanded_images.clear()
 
     def refresh_image(self):
         self.image.glob = f"{self.id}.*"

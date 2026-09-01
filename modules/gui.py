@@ -2367,9 +2367,11 @@ class MainGUI():
                 if imgui.begin_popup(fullscreen_viewer_id, imgui.WINDOW_NO_SCROLLBAR):
                     if imgui.is_topmost() and not imgui.is_any_item_active():
                         if imgui.is_key_pressed(glfw.KEY_LEFT, repeat=True):
+                            game.unload_expanded_images()
                             self.fullscreen_viewer_i = (self.fullscreen_viewer_i - 1) % (len(game.preview_images) + 1)
                             self.fullscreen_viewer_zoom = 1.0
                         if imgui.is_key_pressed(glfw.KEY_RIGHT, repeat=True):
+                            game.unload_expanded_images()
                             self.fullscreen_viewer_i = (self.fullscreen_viewer_i + 1) % (len(game.preview_images) + 1)
                             self.fullscreen_viewer_zoom = 1.0
                         if imgui.is_key_pressed(glfw.KEY_ESCAPE) or (imgui.is_key_pressed(glfw.KEY_SPACE) and not fullscreen_viewer_start):
@@ -2382,8 +2384,41 @@ class MainGUI():
                         else:
                             diff = imgui.io.mouse_wheel / 2.5
                         self.fullscreen_viewer_zoom = max(self.fullscreen_viewer_zoom + diff, 1.0)
-                    if self.fullscreen_viewer_i and self.fullscreen_viewer_i - 1 < len(game.preview_images):
-                        image = game.preview_images[self.fullscreen_viewer_i - 1]
+                    expanded_preview_i = self.fullscreen_viewer_i - 1
+                    fallback_image = None
+                    expanded_loading = False
+                    if 0 <= expanded_preview_i < len(game.preview_images):
+                        fallback_image = game.preview_images[expanded_preview_i]
+                        expanded_future = game.expanded_load_futures.get(expanded_preview_i)
+                        if expanded_future is not None and expanded_future.done():
+                            game.expanded_load_futures.pop(expanded_preview_i, None)
+                            expanded_future = None
+                        image = game.expanded_images.get(expanded_preview_i)
+                        if image is None:
+                            if (
+                                expanded_preview_i not in game.expanded_errors
+                                and expanded_preview_i not in game.expanded_load_futures
+                            ):
+                                game.pause_preview_loading()
+                                game.expanded_load_futures[expanded_preview_i] = async_thread.run(
+                                    game.load_expanded_image_async(expanded_preview_i)
+                                )
+                            expanded_loading = expanded_preview_i not in game.expanded_errors
+                            image = fallback_image
+                        else:
+                            image.prioritize()
+                            if image.error:
+                                game.resume_preview_loading()
+                                image = fallback_image
+                            elif image.texture_id == imagehelper.dummy_texture_id():
+                                # Keep the processed preview visible while the
+                                # original attachment is loading.
+                                expanded_loading = True
+                                image = fallback_image
+                            else:
+                                expanded_loading = image.loading
+                                if image.applied:
+                                    game.resume_preview_loading()
                     else:
                         image = game.image
                     imgui.set_cursor_screen_pos((0, 0))
@@ -2409,11 +2444,20 @@ class MainGUI():
                             (crop[1][0] / zoom, crop[1][1] / zoom),
                         )
                         image.render(*size, *crop)
+                    if expanded_loading:
+                        imgui.set_cursor_screen_pos((self.scaled(12), size.y - self.scaled(32)))
+                        imgui.text_disabled("Loading original preview...")
+                    if expanded_preview_i >= 0 and expanded_preview_i in game.expanded_errors:
+                        if imgui.is_item_hovered():
+                            imgui.set_tooltip(f"Original preview unavailable: {game.expanded_errors[expanded_preview_i]}")
                     if imgui.is_item_clicked():
                         imgui.close_current_popup()
                         fullscreen_viewer_closed = True
                     imgui.end_popup()
                 imgui.pop_style_var(1)
+                if fullscreen_viewer_closed:
+                    game.unload_expanded_images()
+                    game.resume_preview_loading()
 
             imgui.push_font(imgui.fonts.big)
             self.draw_game_name_text(game)
@@ -2960,21 +3004,27 @@ class MainGUI():
                 # Swiping to another game closes this popup's gallery. Keep
                 # the downloaded files, but release decoded/GPU image data.
                 game.cancel_preview_loading()
+                game.resume_preview_loading()
                 game.unload_previews()
+                game.unload_expanded_images()
                 utils.push_popup(self.draw_game_info_popup, globals.games[change_id], carousel_ids).uuid = popup_uuid
                 return True
             elif not fullscreen_viewer_closed and utils.close_weak_popup():
                 return True
         if game.id not in globals.games:
             game.cancel_preview_loading()
+            game.resume_preview_loading()
             game.unload_previews()
+            game.unload_expanded_images()
             return 0, True
         result = utils.popup(game.name, popup_content, closable=True, outside=False, resize=False, popup_uuid=popup_uuid)
         if result[1]:
             # A closed info popup is no longer a visible owner of its
             # textures. The URL cache stays on disk for cheap reopening.
             game.cancel_preview_loading()
+            game.resume_preview_loading()
             game.unload_previews()
+            game.unload_expanded_images()
         return result
 
     def draw_about_popup(self, popup_uuid: str = ""):
