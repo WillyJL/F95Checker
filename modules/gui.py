@@ -336,6 +336,7 @@ class MainGUI():
         self.dragging_tab: Tab = None
         self.game_hitbox_click = False
         self.hovered_game: Game = None
+        self.dragging_previews = False
         self.filters: list[Filter] = []
         self.poll_chars: list[int] = []
         self.refresh_ratio_smooth = 0.0
@@ -2314,19 +2315,30 @@ class MainGUI():
                         # Most images are 16:9, so use this as placeholder while images are loading
                         aspect_ratio = 16 / 9
                     preview_width = preview_height * aspect_ratio
+                    preview_pos = imgui.get_cursor_pos()
                     if preview is None:
                         # Wait for preview to download
-                        imgui.dummy(preview_width, preview_height)
+                        pass
                     elif preview.error:
                         self.draw_game_image_error(game, preview, preview_width, preview_height)
                     elif not cover_loaded:
                         # Wait for cover image to (start to) be loaded, trying to render previews would prioritize them
-                        imgui.dummy(preview_width, preview_height)
+                        pass
                     else:
                         preview.render(preview_width, preview_height, rounding=rounding)
-                    if imgui.is_item_clicked():
-                        fullscreen_viewer_start = True
-                        self.fullscreen_viewer_i = preview_i + 1
+                    imgui.set_cursor_pos(preview_pos)
+                    imgui.invisible_button(f"###game_preview_{preview_i}", preview_width, preview_height)
+                    if imgui.is_item_active():
+                        if drag_x := imgui.get_mouse_drag_delta(imgui.MOUSE_BUTTON_LEFT, 0.0 if self.dragging_previews else -1.0).x:
+                            self.dragging_previews = True
+                            # Scrolling twice as fast as mouse is moving doesn't feel natural, but would be too much scrolling otherwise
+                            imgui.set_scroll_x(imgui.get_scroll_x() - drag_x * 2)
+                            imgui.reset_mouse_drag_delta(imgui.MOUSE_BUTTON_LEFT)
+                    elif imgui.is_item_deactivated():
+                        if not self.dragging_previews:
+                            fullscreen_viewer_start = True
+                            self.fullscreen_viewer_i = preview_i + 1
+                        self.dragging_previews = False
                     first = False
                 imgui.end_child()
             imgui.push_text_wrap_pos()
