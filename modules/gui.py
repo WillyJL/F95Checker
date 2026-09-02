@@ -2357,13 +2357,23 @@ class MainGUI():
                         if imgui.is_key_pressed(glfw.KEY_ESCAPE) or (imgui.is_key_pressed(glfw.KEY_SPACE) and not fullscreen_viewer_start):
                             imgui.close_current_popup()
                             fullscreen_viewer_closed = True
+                    imgui.set_scroll_x(1.0)
                     imgui.set_scroll_y(1.0)
-                    if int(imgui.get_scroll_y() - 1.0):
-                        if globals.settings.scroll_smooth:
-                            diff = imgui.io.delta_time * self.scroll_energy * 4
-                        else:
-                            diff = imgui.io.mouse_wheel / 2.5
-                        self.fullscreen_viewer_zoom = max(self.fullscreen_viewer_zoom + diff, 1.0)
+                    if not imgui.is_window_appearing():
+                        if int(imgui.get_scroll_x() - 1.0):
+                            if globals.settings.scroll_smooth:
+                                diff = -1 if self.scroll_energy > 0 else +1
+                                self.scroll_energy = 0.0
+                            else:
+                                diff = -1 if imgui.io.mouse_wheel > 0 else +1
+                            self.fullscreen_viewer_i = (self.fullscreen_viewer_i + diff) % (len(game.preview_images) + 1)
+                            self.fullscreen_viewer_zoom = 1.0
+                        if int(imgui.get_scroll_y() - 1.0):
+                            if globals.settings.scroll_smooth:
+                                diff = imgui.io.delta_time * self.scroll_energy * 4
+                            else:
+                                diff = imgui.io.mouse_wheel / 2.5
+                            self.fullscreen_viewer_zoom = max(self.fullscreen_viewer_zoom + diff, 1.0)
                     if self.fullscreen_viewer_i:
                         image = game.preview_images[self.fullscreen_viewer_i - 1]
                     else:
