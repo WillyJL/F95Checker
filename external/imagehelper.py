@@ -137,8 +137,11 @@ def post_draw(draw_time: float):
     if globals.settings.unload_offscreen_images:
         hidden = globals.gui.minimized or globals.gui.hidden
         for image in ImageHelper.instances:
-            if image.loaded and (hidden or not image._shown):
-                unload_queue.append(image)
+            if (image.loaded or image.loading) and (hidden or not image._shown):
+                if image.loaded:
+                    unload_queue.append(image)
+                else:
+                    image._load_cancelled = True
             else:
                 image._shown = False
     for image in reversed(unload_queue):
@@ -234,6 +237,7 @@ class ImageHelper:
         "_resolve_lock",
         "_resolved_path",
         "_missing",
+        "_load_cancelled",
         "_load_error",
         "_compress_error",
         "_textures",
@@ -260,6 +264,7 @@ class ImageHelper:
         self._resolve_lock = threading.Lock()
         self._resolved_path: pathlib.Path = None
         self._missing = None
+        self._load_cancelled = False
         self._load_error: str = None
         self._compress_error: str = None
         self._textures: list[bytes] = []
@@ -304,7 +309,7 @@ class ImageHelper:
                     sorting = lambda path: 1 if path.name.endswith(".bc7.ktx.zst") else 2 if path.suffix == ".gif" else 3 if not path.name.endswith(".astc.ktx.zst") else 4
                 else:
                     # Prefer .gif files, avoid compressed files unless nothing else available
-                    sorting = lambda path: 1 if path.suffix == ".gif" else 2 if path.suffix == ".zst" else 3
+                    sorting = lambda path: 1 if path.suffix == ".gif" else 2 if path.suffix != ".zst" else 3
                 paths.sort(key=sorting)
                 self._resolved_path = paths[0]
 
@@ -565,7 +570,11 @@ class ImageHelper:
             )
             return
 
+        if self._load_cancelled:
+            self.loading = False
+            return
         ktx = self._resolved_path.read_bytes()
+        time.sleep(0)
         magic = ktx[0:4]
         if magic != zstd_magic:
             self._load_set_invalid(f"KTX malformed:\nWrong ZSTD magic, {magic} != {zstd_magic}")
@@ -638,6 +647,11 @@ class ImageHelper:
         data_pos = 0
         first_frame = True
         while len(self._textures) < array_len and data_pos < len(frames_data):
+            if self._load_cancelled:
+                self.loading = False
+                self._textures.clear()
+                self.frame_durations.clear()
+                return
             texture_len = struct.unpack(fmt, frames_data[data_pos:data_pos + 4])[0]
             data_pos += 4
             texture = bytes(frames_data[data_pos:data_pos + texture_len])
@@ -655,6 +669,7 @@ class ImageHelper:
                 self.animated = True
             if not globals.settings.play_gifs:
                 break
+            time.sleep(0)
 
         if self.glob and globals.settings.tex_compress is not TexCompress.Disabled and globals.settings.tex_compress_replace:
             paths = list(self.path.glob(self.glob))
@@ -671,16 +686,26 @@ class ImageHelper:
 
     def _load_rgba(self):
         # Fallback to RGBA loading
+        if self._load_cancelled:
+            self.loading = False
+            return
         try:
             image = Image.open(self._resolved_path)
+            image.load()
         except UnidentifiedImageError:
             self._load_set_invalid(f"Pillow does not recognize this image format!")
             return
+        time.sleep(0)
 
         with image:
             self.width, self.height = image.size
             first_frame = True
             for frame in ImageSequence.Iterator(image):
+                if self._load_cancelled:
+                    self.loading = False
+                    self._textures.clear()
+                    self.frame_durations.clear()
+                    return
                 if frame.mode == "RGB":
                     texture = frame.tobytes("raw", "RGBX")
                 elif frame.mode == "RGBA":
@@ -699,11 +724,15 @@ class ImageHelper:
                     self.animated = True
                 if not globals.settings.play_gifs:
                     break
+                time.sleep(0)
 
         self.loaded = True
         self.loading = False
 
     def _load(self):
+        if self._load_cancelled:
+            self.loading = False
+            return
         self._pending_reload = False
         self.loading = True
 
@@ -725,14 +754,32 @@ class ImageHelper:
             self._load_ktx_zst()
         else:
             self._load_rgba()
+        time.sleep(0)
 
         if self._pending_reload:
             self.reload()
 
     def _apply(self, apply_time_max: float):
+        if not self._textures:
+            # Loading was cancelled
+            if self._texture_ids:
+                gl.glDeleteTextures(self._texture_ids)
+                self._texture_ids.clear()
+            self.loaded = False
+            return True
+
         apply_start = time.perf_counter()
         for i in range(len(self._texture_ids), len(self._textures)):
-            (texture, texture_format) = self._textures[i]
+            try:
+                (texture, texture_format) = self._textures[i]
+            except IndexError:
+                if not self._textures:
+                    # Loading was cancelled
+                    if self._texture_ids:
+                        gl.glDeleteTextures(self._texture_ids)
+                        self._texture_ids.clear()
+                    self.loaded = False
+                    return True
             texture_id = gl.glGenTextures(1)
             self._texture_ids.extend([texture_id])
             gl.glBindTexture(gl.GL_TEXTURE_2D, texture_id)
@@ -789,6 +836,7 @@ class ImageHelper:
             if not self.loading:
                 if self._seamless_reload:
                     self._seamless_reload = False
+                self._load_cancelled = False
                 self.loading = True
                 self.applied = False
                 # This next self._load() actually loads the image and does all the conversion. It takes time and resources!
@@ -808,13 +856,20 @@ class ImageHelper:
             if self._prev_time != (new_time := imgui.get_time()):
                 self._prev_time = new_time
                 self.frame_elapsed += imgui.get_io().delta_time
-                while self.frame < (len(self._texture_ids) - 1) and (excess := self.frame_elapsed - self.frame_durations[max(self.frame, 0)]) > 0:
+                try:
+                    duration = self.frame_durations[max(self.frame, 0)]
+                except IndexError:
+                    duration = 100
+                while self.frame < (len(self._texture_ids) - 1) and (excess := self.frame_elapsed - duration) > 0:
                     self.frame_elapsed = excess
                     self.frame += 1
                     if self.frame == len(self.frame_durations) - 1:
                         self.frame = 0
 
-        return self._texture_ids[self.frame]
+        try:
+            return self._texture_ids[self.frame]
+        except IndexError:
+            return dummy_texture_id()
 
     def render(self, width: int, height: int, *args, **kwargs):
         if globals.settings.preload_nearby_images:

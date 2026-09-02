@@ -46,6 +46,7 @@
 - Limit image downloads to 2 per second just in case (by @WillyJL)
 - Fix image downloads in censorship regimes (by @WillyJL)
 - Drastically improved stutters during image compression, most noticeable in (what used to be) catastrophic cases with 5-10MB+ GIFs (by @WillyJL)
+- Pending image loads are cancelled if Settings > Images > Unload off-screen is enabled and image is no longer visible, so visible images can load sooner (by @WillyJL)
 - Fix missing icon on Wayland (#297 by @phubhunter)
 - Handle Cloudflare capcthas as 'F95zone unavailable' warnings (by @WillyJL)
 
