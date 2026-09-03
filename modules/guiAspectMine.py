@@ -337,7 +337,6 @@ class MainGUI():
         self.dragging_tab: Tab = None
         self.game_hitbox_click = False
         self.hovered_game: Game = None
-        self.dragging_previews = False
         self.filters: list[Filter] = []
         self.poll_chars: list[int] = []
         self.refresh_ratio_smooth = 0.0
@@ -398,7 +397,6 @@ class MainGUI():
         glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
         glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, gl.GL_TRUE)  # OS X supports only forward-compatible core profiles from 3.2
         glfw.window_hint(glfw.VISIBLE, False)
-        glfw.window_hint_string(glfw.WAYLAND_APP_ID, "F95Checker")
 
         # Create a windowed mode window and its OpenGL context
         self.window: glfw._GLFWwindow = glfw.create_window(*size, "F95Checker", None, None)
@@ -1007,10 +1005,10 @@ class MainGUI():
                             text = f"Validating {count} cached item{'s' if count > 1 else ''}..."
                         elif globals.last_update_check is None:
                             text = "Checking for updates..."
-                        elif api.f95_ratelimit_forum._waiters or api.f95_ratelimit_attachments._waiters or api.f95_ratelimit_sleeping.count:
-                            text = f"Waiting for F95zone ratelimit..."
                         elif (count := imagehelper.compress_counter) > 0:
                             text = "Compressing images..." if count == 1 else f"Compressing {count} frames..."
+                        elif api.f95_ratelimit_forum._waiters or api.f95_ratelimit_attachments._waiters or api.f95_ratelimit_sleeping.count:
+                            text = f"Waiting for F95zone ratelimit..."
                         else:
                             text = self.watermark_text
                         _3 = self.scaled(3)
@@ -2188,7 +2186,6 @@ class MainGUI():
     def draw_game_info_popup(self, game: Game, carousel_ids: list = None, popup_uuid: str = ""):
         def popup_content():
             # Image
-            fullscreen_viewer_start = False
             imgui.indent(imgui.style.scrollbar_size)
             image = game.image
             avail = imgui.get_content_region_available()
@@ -2201,7 +2198,7 @@ class MainGUI():
             out_height = (min(avail.y, self.scaled(690)) * self.scaled(0.4)) or 1
             out_width = avail.x or 1
             if image.error:
-                self.draw_game_image_error(game, image, out_width, out_height)
+                self.draw_game_image_error(game, game.image, out_width, out_height)
             else:
                 aspect_ratio = image.height / image.width
                 if aspect_ratio > (out_height / out_width):
@@ -2223,13 +2220,24 @@ class MainGUI():
                 imgui.set_scroll_x(1.0)
                 imgui.set_cursor_screen_pos(image_pos)
                 image.render(width, height, rounding=rounding)
-                if imgui.is_item_clicked():
-                    # Images popup
-                    fullscreen_viewer_start = True
-                    self.fullscreen_viewer_i = 0
-                elif imgui.is_item_hovered():
-                    if globals.settings.zoom_enabled:
-                        # Zoom
+                if imgui.is_item_hovered():
+                    # Image popup
+                    if imgui.is_mouse_down():
+                        size = imgui.io.display_size
+                        if aspect_ratio > size.y / size.x:
+                            height = size.y - self.scaled(10)
+                            width = height / aspect_ratio
+                        else:
+                            width = size.x - self.scaled(10)
+                            height = width * aspect_ratio
+                        x = (size.x - width) / 2
+                        y = (size.y - height) / 2
+                        flags = imgui.DRAW_ROUND_CORNERS_ALL
+                        pos2 = (x + width, y + height)
+                        fg_draw_list = imgui.get_foreground_draw_list()
+                        fg_draw_list.add_image_rounded(image.texture_id, (x, y), pos2, rounding=rounding, flags=flags)
+                    # Zoom
+                    elif globals.settings.zoom_enabled:
                         if int(imgui.get_scroll_x() - 1.0):
                             if globals.settings.scroll_smooth:
                                 diff = imgui.io.delta_time * self.scroll_energy * 30
@@ -2282,214 +2290,50 @@ class MainGUI():
                     loading_text = " · Compressing images..." if count == 1 else f" · Compressing {count} frames..."
                 elif game.previews_loading and (count := api.images_counter.count) > 0:
                     loading_text = f" · Downloading {count} image{'s' if count > 1 else ''}..."
-                elif game.preview_processing_errors:
-                    error_count = len(game.preview_processing_errors)
-                    first_error = next(iter(game.preview_processing_errors.values())).replace("\n", " ")
-                    loading_text = f" · {error_count} animation conversion error{'s' if error_count > 1 else ''}: {first_error[:120]}"
                 else:
                     loading_text = ""
                 imgui.text(f"Previews ({len(game.preview_images)}/{len(game.previews_urls)}){loading_text}")
-                # Reserve the gallery space immediately so it does not pop in
-                # after the asynchronous preview list is initialized.
-                # Keep each preview at a useful thumbnail size and put the row
-                # in a child with an explicit horizontal bar.
-                preview_height = self.scaled(200)
-                horizontal_flags = (
-                    imgui.WINDOW_HORIZONTAL_SCROLLING_BAR |
-                    imgui.WINDOW_ALWAYS_HORIZONTAL_SCROLLBAR |
-                    imgui.WINDOW_NO_SCROLLBAR
-                )
-                imgui.begin_child(
-                    "###game_previews_gallery",
-                    width=out_width,
-                    height=preview_height + 2 * imgui.style.window_padding.y,
-                    flags=horizontal_flags,
-                )
-                # Load the cover first. Starting preview texture loads in
-                # the same frame can otherwise make the cover appear late.
-                cover_loaded = game.image.error or game.image.texture_id != imagehelper.dummy_texture_id()
-                if cover_loaded:
-                    # Reverse queue order so the first preview is loaded first.
-                    for preview in reversed(game.preview_images):
-                        if preview is not None:
-                            _ = preview.texture_id
-                first = True
-                for preview_i, preview in enumerate(game.preview_images):
-                    if not first:
-                        imgui.same_line()
-                    if preview is None:
-                        # The cache loader keeps URL order and leaves a
-                        # placeholder until that preview finishes.
-                        aspect_ratio = 16 / 9
-                        imgui.begin_child(
-                            f"###preview_placeholder_{game.id}_{preview_i}",
-                            self.scaled(280), preview_height,
-                            border=True,
+                if game.preview_images:
+                    # Keep each preview at a useful thumbnail size and put
+                    # the row in a child with an explicit horizontal bar.
+                    # Without a child, ImGui clips same-line items at the
+                    # popup boundary and the parent only scrolls vertically.
+                    max_preview_width = max(self.scaled(240), (out_width - imgui.style.item_spacing.x) / 2)
+                    max_preview_height = self.scaled(260)
+                    horizontal_flags = (
+                        imgui.WINDOW_HORIZONTAL_SCROLLING_BAR |
+                        imgui.WINDOW_ALWAYS_HORIZONTAL_SCROLLBAR |
+                        imgui.WINDOW_NO_SCROLLBAR
+                    )
+                    imgui.begin_child(
+                        "###game_previews_gallery",
+                        width=out_width,
+                        height=max_preview_height + 2 * imgui.style.window_padding.y,
+                        flags=horizontal_flags,
+                    )
+                    first = True
+                    for preview in game.preview_images:
+                        if not first:
+                            imgui.same_line()
+                        # Fit each preview inside a bounding box without
+                        # cropping or stretching portrait/tall images.
+                        aspect_ratio = (
+                            preview.width / preview.height
+                            if preview.loaded and preview.width > 0 and preview.height > 0
+                            else 16 / 9
                         )
-                        imgui.text("Loading preview...")
-                        imgui.end_child()
-                    elif preview is not None and (preview.width != 1 or preview.height != 1):
-                        aspect_ratio = preview.width / preview.height
-                    else:
-                        # Most images are 16:9, so use this as placeholder while images are loading
-                        aspect_ratio = 16 / 9
-                    preview_width = preview_height * aspect_ratio
-                    preview_pos = imgui.get_cursor_pos()
-                    if preview is None:
-                        # The loading placeholder above remains visible while
-                        # the invisible button below owns mouse interaction.
-                        pass
-                    elif preview.error:
-                        self.draw_game_image_error(game, preview, preview_width, preview_height)
-                    elif not cover_loaded:
-                        # Do not prioritize previews over the cover.
-                        imgui.dummy(preview_width, preview_height)
-                    else:
-                        preview.render(preview_width, preview_height, rounding=rounding)
-                    imgui.set_cursor_pos(preview_pos)
-                    imgui.invisible_button(f"###game_preview_{game.id}_{preview_i}", preview_width, preview_height)
-                    if imgui.is_item_active():
-                        if drag_x := imgui.get_mouse_drag_delta(
-                            imgui.MOUSE_BUTTON_LEFT,
-                            0.0 if self.dragging_previews else -1.0,
-                        ).x:
-                            self.dragging_previews = True
-                            imgui.set_scroll_x(imgui.get_scroll_x() - drag_x * 2)
-                            imgui.reset_mouse_drag_delta(imgui.MOUSE_BUTTON_LEFT)
-                    elif imgui.is_item_deactivated():
-                        if not self.dragging_previews:
-                            fullscreen_viewer_start = True
-                            self.fullscreen_viewer_i = preview_i + 1
-                        self.dragging_previews = False
-                    first = False
-                imgui.end_child()
-            imgui.push_text_wrap_pos()
-
-            # Fullscreen image viewer
-            fullscreen_viewer_id = f"###fullscreen_viewer_{game.id}"
-            fullscreen_viewer_closed = False
-            if imgui.is_key_pressed(glfw.KEY_SPACE) and not imgui.is_popup_open(fullscreen_viewer_id) and imgui.is_topmost() and not imgui.is_any_item_active():
-                fullscreen_viewer_start = True
-                self.fullscreen_viewer_i = 0
-            if fullscreen_viewer_start:
-                self.fullscreen_viewer_zoom = 1.0
-                imgui.open_popup(fullscreen_viewer_id)
-            if imgui.is_popup_open(fullscreen_viewer_id):
-                size = imgui.io.display_size
-                imgui.set_next_window_position(0, 0)
-                imgui.set_next_window_size(*imgui.io.display_size)
-                imgui.set_next_window_bg_alpha(0.75)
-                imgui.push_style_var(imgui.STYLE_POPUP_BORDERSIZE, 0)
-                if imgui.begin_popup(fullscreen_viewer_id, imgui.WINDOW_NO_SCROLLBAR):
-                    if imgui.is_topmost() and not imgui.is_any_item_active():
-                        if imgui.is_key_pressed(glfw.KEY_LEFT, repeat=True):
-                            game.unload_expanded_images()
-                            self.fullscreen_viewer_i = (self.fullscreen_viewer_i - 1) % (len(game.preview_images) + 1)
-                            self.fullscreen_viewer_zoom = 1.0
-                        if imgui.is_key_pressed(glfw.KEY_RIGHT, repeat=True):
-                            game.unload_expanded_images()
-                            self.fullscreen_viewer_i = (self.fullscreen_viewer_i + 1) % (len(game.preview_images) + 1)
-                            self.fullscreen_viewer_zoom = 1.0
-                        if imgui.is_key_pressed(glfw.KEY_ESCAPE) or (imgui.is_key_pressed(glfw.KEY_SPACE) and not fullscreen_viewer_start):
-                            imgui.close_current_popup()
-                            fullscreen_viewer_closed = True
-                    imgui.set_scroll_x(1.0)
-                    imgui.set_scroll_y(1.0)
-                    if not imgui.is_window_appearing():
-                        if int(imgui.get_scroll_x() - 1.0):
-                            if globals.settings.scroll_smooth:
-                                diff = -1 if self.scroll_energy > 0 else +1
-                                self.scroll_energy = 0.0
-                            else:
-                                diff = -1 if imgui.io.mouse_wheel > 0 else +1
-                            self.fullscreen_viewer_i = (self.fullscreen_viewer_i + diff) % (len(game.preview_images) + 1)
-                            self.fullscreen_viewer_zoom = 1.0
-                        if int(imgui.get_scroll_y() - 1.0):
-                            if globals.settings.scroll_smooth:
-                                diff = imgui.io.delta_time * self.scroll_energy * 4
-                            else:
-                                diff = imgui.io.mouse_wheel / 2.5
-                            self.fullscreen_viewer_zoom = max(self.fullscreen_viewer_zoom + diff, 1.0)
-                    expanded_preview_i = self.fullscreen_viewer_i - 1
-                    fallback_image = None
-                    expanded_loading = False
-                    if 0 <= expanded_preview_i < len(game.preview_images):
-                        fallback_image = game.preview_images[expanded_preview_i]
-                        # An off-screen gallery item may have been unloaded
-                        # from GPU memory. Start its processed preview again
-                        # immediately so fullscreen has a useful fallback
-                        # while the original is being downloaded.
-                        if fallback_image is not None:
-                            fallback_image.prioritize()
-                        expanded_future = game.expanded_load_futures.get(expanded_preview_i)
-                        if expanded_future is not None and expanded_future.done():
-                            game.expanded_load_futures.pop(expanded_preview_i, None)
-                            expanded_future = None
-                        image = game.expanded_images.get(expanded_preview_i)
-                        if image is None:
-                            if (
-                                expanded_preview_i not in game.expanded_errors
-                                and expanded_preview_i not in game.expanded_load_futures
-                            ):
-                                game.pause_preview_loading()
-                                game.expanded_load_futures[expanded_preview_i] = async_thread.run(
-                                    game.load_expanded_image_async(expanded_preview_i)
-                                )
-                            expanded_loading = expanded_preview_i not in game.expanded_errors
-                            image = fallback_image
+                        preview_width = max_preview_width
+                        preview_height = preview_width / aspect_ratio
+                        if preview_height > max_preview_height:
+                            preview_height = max_preview_height
+                            preview_width = preview_height * aspect_ratio
+                        if preview.error:
+                            self.draw_game_image_error(game, preview, preview_width, preview_height)
                         else:
-                            image.prioritize()
-                            if image.error:
-                                game.resume_preview_loading()
-                                image = fallback_image
-                            elif image.texture_id == imagehelper.dummy_texture_id():
-                                # Keep the processed preview visible while the
-                                # original attachment is loading.
-                                expanded_loading = True
-                                image = fallback_image
-                            else:
-                                expanded_loading = image.loading
-                                if image.applied:
-                                    game.resume_preview_loading()
-                    else:
-                        image = game.image
-                    imgui.set_cursor_screen_pos((0, 0))
-                    if image is None:
-                        imgui.text("Loading preview...")
-                    elif image.error:
-                        self.draw_game_image_error(game, image, *size)
-                    elif image.texture_id == imagehelper.dummy_texture_id():
-                        # Don't show the dummy texture which is solid black
-                        imgui.dummy(*size)
-                    else:
-                        crop = image.crop_to_ratio(size.x / size.y, fit=True)
-                        zoom = self.fullscreen_viewer_zoom
-                        mouse_pos = imgui.io.mouse_pos
-                        off_x = utils.map_range(mouse_pos.x, 0.0, size.x, 0.0, 1.0) * (zoom - 1)
-                        off_y = utils.map_range(mouse_pos.y, 0.0, size.y, 0.0, 1.0) * (zoom - 1)
-                        crop = (
-                            (crop[0][0] + off_x, crop[0][1] + off_y),
-                            (crop[1][0] + off_x, crop[1][1] + off_y),
-                        )
-                        crop = (
-                            (crop[0][0] / zoom, crop[0][1] / zoom),
-                            (crop[1][0] / zoom, crop[1][1] / zoom),
-                        )
-                        image.render(*size, *crop)
-                    if expanded_loading:
-                        imgui.set_cursor_screen_pos((self.scaled(12), size.y - self.scaled(32)))
-                        imgui.text_disabled("Loading original preview...")
-                    if expanded_preview_i >= 0 and expanded_preview_i in game.expanded_errors:
-                        if imgui.is_item_hovered():
-                            imgui.set_tooltip(f"Original preview unavailable: {game.expanded_errors[expanded_preview_i]}")
-                    if imgui.is_item_clicked():
-                        imgui.close_current_popup()
-                        fullscreen_viewer_closed = True
-                    imgui.end_popup()
-                imgui.pop_style_var(1)
-                if fullscreen_viewer_closed:
-                    game.unload_expanded_images()
-                    game.resume_preview_loading()
+                            preview.render(preview_width, preview_height, rounding=rounding)
+                        first = False
+                    imgui.end_child()
+            imgui.push_text_wrap_pos()
 
             imgui.push_font(imgui.fonts.big)
             self.draw_game_name_text(game)
@@ -3036,27 +2880,21 @@ class MainGUI():
                 # Swiping to another game closes this popup's gallery. Keep
                 # the downloaded files, but release decoded/GPU image data.
                 game.cancel_preview_loading()
-                game.resume_preview_loading()
                 game.unload_previews()
-                game.unload_expanded_images()
                 utils.push_popup(self.draw_game_info_popup, globals.games[change_id], carousel_ids).uuid = popup_uuid
                 return True
-            elif not fullscreen_viewer_closed and utils.close_weak_popup():
-                return True
+            elif utils.close_weak_popup():
+                    return True
         if game.id not in globals.games:
             game.cancel_preview_loading()
-            game.resume_preview_loading()
             game.unload_previews()
-            game.unload_expanded_images()
             return 0, True
         result = utils.popup(game.name, popup_content, closable=True, outside=False, resize=False, popup_uuid=popup_uuid)
         if result[1]:
             # A closed info popup is no longer a visible owner of its
             # textures. The URL cache stays on disk for cheap reopening.
             game.cancel_preview_loading()
-            game.resume_preview_loading()
             game.unload_previews()
-            game.unload_expanded_images()
         return result
 
     def draw_about_popup(self, popup_uuid: str = ""):
@@ -4723,7 +4561,7 @@ class MainGUI():
 
             draw_settings_label(
                 "Zoom on hover:",
-                "Allow zooming cover images inside info popups.\n"
+                "Allow zooming header images inside info popups.\n"
                 "Tip: hold shift and scroll while hovering the image to change the zoom amount, or hold shift and alt while "
                 "scrolling to change the zoom area."
             )
@@ -4761,9 +4599,19 @@ class MainGUI():
                 "previously downloaded preview images from disk. Default is off."
             )
             draw_settings_checkbox("previews_enabled")
-            
+
             if not set.previews_enabled:
                 imgui.push_disabled()
+
+            draw_settings_label(
+                "Preview max dimension:",
+                "Maximum width or height used for processed preview files. The original aspect ratio is preserved. "
+                "This setting will be applied by the preview-processing pipeline."
+            )
+            changed, value = imgui.drag_int("###preview_max_dimension", set.preview_max_dimension, change_speed=1, min_value=256, max_value=8192, format="%d px")
+            set.preview_max_dimension = min(max(value, 256), 8192)
+            if changed:
+                async_thread.run(db.update_settings("preview_max_dimension"))
 
             draw_settings_label(
                 "JPEG quality:",
@@ -4902,69 +4750,6 @@ class MainGUI():
                 "best together with Tex compress, so image load times are very short and completely unnoticeable due to preloading."
             )
             draw_settings_checkbox("preload_nearby_images")
-
-            imgui.end_table()
-            imgui.spacing()
-
-        if draw_settings_section("Optimization"):
-            from common.preview_cache import PreviewCache
-            expanded_count, expanded_size = PreviewCache.expanded_cache_stats(globals.images_path)
-            draw_settings_label("Cache:")
-            imgui.text_disabled(
-                f"{expanded_count} file{'s' if expanded_count != 1 else ''}, "
-                f"{expanded_size / (1024 ** 2):.1f} MiB"
-            )
-
-            draw_settings_label(
-                "Refresh:",
-                "Delete all expanded, full-size preview originals when api.refresh() completes. "
-                "Processed gallery previews are not affected."
-            )
-            draw_settings_checkbox("preview_cleanup_on_refresh")
-
-            draw_settings_label(
-                "TTL cleanup:",
-                "Remove expanded originals that have not been viewed or modified for the configured number of days."
-            )
-            draw_settings_checkbox("preview_cleanup_ttl_enabled")
-            if not set.preview_cleanup_ttl_enabled:
-                imgui.push_disabled()
-            draw_settings_label("TTL days:", "Expanded-original inactivity period before cleanup (1–30 days).")
-            changed, value = imgui.drag_int(
-                "###preview_cache_ttl_days", set.preview_cache_ttl_days,
-                change_speed=0.2, min_value=1, max_value=30, format="%d days"
-            )
-            set.preview_cache_ttl_days = min(max(value, 1), 30)
-            if changed:
-                async_thread.run(db.update_settings("preview_cache_ttl_days"))
-            if not set.preview_cleanup_ttl_enabled:
-                imgui.pop_disabled()
-
-            draw_settings_label(
-                "Size cleanup:",
-                "Evict the least recently viewed/modified expanded originals when the cache exceeds its limit."
-            )
-            draw_settings_checkbox("preview_cleanup_max_size_enabled")
-            if not set.preview_cleanup_max_size_enabled:
-                imgui.push_disabled()
-            draw_settings_label("Max size:", "Expanded-original cache limit (10 MB–10 GB).")
-            changed, value = imgui.drag_int(
-                "###preview_cache_max_size_mb", set.preview_cache_max_size_mb,
-                change_speed=10, min_value=10, max_value=10240, format="%d MB"
-            )
-            set.preview_cache_max_size_mb = min(max(value, 10), 10240)
-            if changed:
-                async_thread.run(db.update_settings("preview_cache_max_size_mb"))
-            if not set.preview_cleanup_max_size_enabled:
-                imgui.pop_disabled()
-
-            draw_settings_label("Manual:")
-            if imgui.button("Clear cache", width=right_width):
-                for cached_game in globals.games.values():
-                    cached_game.unload_expanded_images()
-                async_thread.run(asyncio.to_thread(
-                    PreviewCache.clear_expanded_cache, globals.images_path
-                ))
 
             imgui.end_table()
             imgui.spacing()
@@ -5513,12 +5298,6 @@ class MainGUI():
                     closable=True,
                     outside=True
                 )
-
-            draw_settings_label(
-                "Extract downloads:",
-                "Whether to extract downloads, if they are archives. Currently, only F95zone Donor DDL downloads are supported in F95Checker."
-            )
-            draw_settings_checkbox("downloads_extract")
 
             draw_settings_label(
                 "Downloads dir:",
