@@ -2,37 +2,47 @@
 import threading
 import typing
 
-stack: list = None
-thread: threading.Thread = None
+stack: list = []
+threads: list[threading.Thread] = []
+_lock: threading.Lock = None
 _condition: threading.Condition = None
 
 
-def setup():
-    global stack, thread, _condition
+def setup(count: int):
+    global _lock, _condition
 
-    stack = []
+    _lock = threading.Lock()
     _condition = threading.Condition()
 
     def run_loop():
         while True:
             while stack:
-                stack.pop()()
+                try:
+                    with _lock:
+                        fn = stack.pop()
+                except IndexError:
+                    continue
+                fn()
             with _condition:
                 _condition.wait()
 
-    thread = threading.Thread(target=run_loop, daemon=True)
-    thread.start()
+    for _ in range(count):
+        thread = threading.Thread(target=run_loop, daemon=True)
+        thread.start()
+        threads.append(thread)
 
 
 def queue(fn: typing.Callable):
-    stack.append(fn)
+    with _lock:
+        stack.append(fn)
     with _condition:
         _condition.notify()
 
 
 def unqueue(fn: typing.Callable):
     try:
-        stack.remove(fn)
+        with _lock:
+            stack.remove(fn)
     except ValueError:
         pass
 

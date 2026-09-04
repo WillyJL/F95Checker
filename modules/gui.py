@@ -4692,6 +4692,42 @@ class MainGUI():
                 imgui.pop_disabled()
 
             draw_settings_label(
+                "I/O threads:",
+                "How many threads will be used to fetch image files from disk. The optimal image I/O thread count will vary based on "
+                "HDD/SSD speed and affinity to random reads. Default is 4.\n"
+                "\n"
+                "Requires an app restart to take effect."
+            )
+            changed, value = imgui.drag_int("###image_io_threads", set.image_io_threads, change_speed=0.05, min_value=1, max_value=16)
+            set.image_io_threads = min(max(value, 1), 16)
+            if changed:
+                async_thread.run(db.update_settings("image_io_threads"))
+
+            draw_settings_label(
+                "Decode threads:",
+                "How many threads will be used to decode image files into pixels. The optimal image decode thread count will vary based "
+                "on CPU speed and core count. Default is 3.\n"
+                "\n"
+                "Requires an app restart to take effect."
+            )
+            changed, value = imgui.drag_int("###image_decode_threads", set.image_decode_threads, change_speed=0.05, min_value=1, max_value=16)
+            set.image_decode_threads = min(max(value, 1), 16)
+            if changed:
+                async_thread.run(db.update_settings("image_decode_threads"))
+
+            draw_settings_label(
+                "Decode GIFs:",
+                "Maximum number of GIFs that are allowed to be decode at the same time. Choosing a value lower than 'Decode threads' "
+                "will allow still images to load sooner and faster, without being obstructed by lengthy GIF decoding. Default is 2.\n"
+                "\n"
+                "Requires an app restart to take effect."
+            )
+            changed, value = imgui.drag_int("###image_decode_gif_max", set.image_decode_gif_max, change_speed=0.05, min_value=1, max_value=set.image_decode_threads)
+            set.image_decode_gif_max = min(max(value, 1), set.image_decode_threads)
+            if changed:
+                async_thread.run(db.update_settings("image_decode_gif_max"))
+
+            draw_settings_label(
                 "Tex compress:",
                 "Compress textures using ASTC (6x6/80) or BC7. If supported by GPU, results in dramatically faster image loading "
                 "with no perceptible loss in visual quality, at cost of much larger space usage (for BC7). Depending on GPU model "

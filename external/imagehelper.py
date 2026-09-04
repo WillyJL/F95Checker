@@ -1,4 +1,5 @@
 # https://gist.github.com/WillyJL/9c5116e5a11abd559c56f23aa1270de9
+import contextlib
 import functools
 import os
 import pathlib
@@ -40,6 +41,9 @@ unload_queue = []
 compress_counter = 0
 compress_thread: threading.Thread = None
 compress_thread_condition: threading.Condition = None
+_load_io_sem: threading.Semaphore = None
+_load_decode_sem: threading.Semaphore = None
+_load_decode_gif_sem: threading.Semaphore = None
 _dummy_texture_id = None
 
 ktx_durations = b"durationsms\0"
@@ -61,7 +65,11 @@ compressonator = None
 
 
 def setup():
-    global compress_thread_condition, compress_thread
+    global _load_io_sem, _load_decode_sem, _load_decode_gif_sem, compress_thread_condition, compress_thread
+
+    _load_io_sem = threading.Semaphore(globals.settings.image_io_threads)
+    _load_decode_sem = threading.Semaphore(globals.settings.image_decode_threads)
+    _load_decode_gif_sem = threading.Semaphore(globals.settings.image_decode_gif_max)
 
     compress_thread_condition = threading.Condition()
     compress_thread = threading.Thread(target=_compress_thread, daemon=True)
@@ -570,10 +578,11 @@ class ImageHelper:
             )
             return
 
-        if self._load_cancelled:
-            self.loading = False
-            return
-        ktx = self._resolved_path.read_bytes()
+        with _load_io_sem:
+            if self._load_cancelled:
+                self.loading = False
+                return
+            ktx = self._resolved_path.read_bytes()
         time.sleep(0)
         magic = ktx[0:4]
         if magic != zstd_magic:
@@ -643,33 +652,34 @@ class ImageHelper:
                     break
                 kv = kv[4 + kv_pair_len:]
 
-        frames_data = ktx[64 + kv_len:]
-        data_pos = 0
-        first_frame = True
-        while len(self._textures) < array_len and data_pos < len(frames_data):
-            if self._load_cancelled:
-                self.loading = False
-                self._textures.clear()
-                self.frame_durations.clear()
-                return
-            texture_len = struct.unpack(fmt, frames_data[data_pos:data_pos + 4])[0]
-            data_pos += 4
-            texture = bytes(frames_data[data_pos:data_pos + texture_len])
-            data_pos += texture_len
-            self._textures.append((texture, gl_internal_format))
-            if len(durations) < len(self._textures):
-                duration = 100
-            else:
-                duration = durations[len(self._textures) - 1]
-            self.frame_durations.append(duration / 1000)
-            if first_frame:
-                apply_queue.append(self)
-                first_frame = False
-            else:
-                self.animated = True
-            if not globals.settings.play_gifs:
-                break
-            time.sleep(0)
+        with (_load_decode_gif_sem if array_len > 1 else contextlib.nullcontext()), _load_decode_sem:
+            frames_data = ktx[64 + kv_len:]
+            data_pos = 0
+            first_frame = True
+            while len(self._textures) < array_len and data_pos < len(frames_data):
+                if self._load_cancelled:
+                    self.loading = False
+                    self._textures.clear()
+                    self.frame_durations.clear()
+                    return
+                texture_len = struct.unpack(fmt, frames_data[data_pos:data_pos + 4])[0]
+                data_pos += 4
+                texture = bytes(frames_data[data_pos:data_pos + texture_len])
+                data_pos += texture_len
+                self._textures.append((texture, gl_internal_format))
+                if len(durations) < len(self._textures):
+                    duration = 100
+                else:
+                    duration = durations[len(self._textures) - 1]
+                self.frame_durations.append(duration / 1000)
+                if first_frame:
+                    apply_queue.append(self)
+                    first_frame = False
+                else:
+                    self.animated = True
+                if not globals.settings.play_gifs:
+                    break
+                time.sleep(0)
 
         if self.glob and globals.settings.tex_compress is not TexCompress.Disabled and globals.settings.tex_compress_replace:
             paths = list(self.path.glob(self.glob))
@@ -686,18 +696,19 @@ class ImageHelper:
 
     def _load_rgba(self):
         # Fallback to RGBA loading
-        if self._load_cancelled:
-            self.loading = False
-            return
-        try:
-            image = Image.open(self._resolved_path)
-            image.load()
-        except UnidentifiedImageError:
-            self._load_set_invalid(f"Pillow does not recognize this image format!")
-            return
+        with _load_io_sem:
+            if self._load_cancelled:
+                self.loading = False
+                return
+            try:
+                image = Image.open(self._resolved_path)
+                image.load()
+            except UnidentifiedImageError:
+                self._load_set_invalid(f"Pillow does not recognize this image format!")
+                return
         time.sleep(0)
 
-        with image:
+        with (_load_decode_gif_sem if getattr(image, "n_frames", 1) > 1 else contextlib.nullcontext()), _load_decode_sem, image:
             self.width, self.height = image.size
             first_frame = True
             for frame in ImageSequence.Iterator(image):
