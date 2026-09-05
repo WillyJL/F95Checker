@@ -4923,31 +4923,27 @@ class MainGUI():
                     flt.match = label
                     self.filters.append(flt)
                 imgui.same_line()
-                if label_i == 0:
-                    imgui.push_disabled()
-                if imgui.button(icons.arrow_up, width=frame_height):
-                    swap = (label_i, label_i - 1)
-                if label_i == 0:
-                    imgui.pop_disabled()
-                imgui.same_line()
-                if label_i == len(Label.instances) - 1:
-                    imgui.push_disabled()
-                if imgui.button(icons.arrow_down, width=frame_height):
-                    swap = (label_i, label_i + 1)
-                if label_i == len(Label.instances) - 1:
-                    imgui.pop_disabled()
-                imgui.same_line()
                 changed, value = imgui.color_edit3(f"###label_color_{label.id}", *label.color[:3], flags=imgui.COLOR_EDIT_NO_INPUTS)
                 if changed:
                     label.color = (*value, 1.0)
                     async_thread.run(db.update_label(label, "color"))
                 imgui.same_line()
-                imgui.set_next_item_width(width - frame_height * 5 - imgui.style.cell_padding.x * 5 - imgui.style.scrollbar_size * (imgui.get_scroll_max_y() > 0.0))
+                imgui.set_next_item_width(width - frame_height * 3 - imgui.style.cell_padding.x * 3 - imgui.style.scrollbar_size * (imgui.get_scroll_max_y() > 0.0))
                 changed, value = imgui.input_text_with_hint(f"###label_name_{label.id}", "Label name", label.name)
                 setter_extra = lambda _=None: async_thread.run(db.update_label(label, "name"))
                 if changed:
                     label.name = value
                     setter_extra()
+                if imgui.is_item_active():
+                    mouse_pos = imgui.get_mouse_pos()
+                    if label_i > 0 and imgui.get_item_rect_min().y > 0 and mouse_pos.y < imgui.get_item_rect_min().y:
+                        if imgui.get_mouse_drag_delta().y < 0:
+                            swap = (label_i, label_i - 1)
+                        imgui.reset_mouse_drag_delta()
+                    elif label_i < len(Label.instances) - 1 and imgui.get_item_rect_max().y > 0 and mouse_pos.y > imgui.get_item_rect_max().y:
+                        if imgui.get_mouse_drag_delta().y > 0:
+                            swap = (label_i, label_i + 1)
+                        imgui.reset_mouse_drag_delta()
                 if imgui.begin_popup_context_item(f"###label_name_{label.id}_context"):
                     utils.text_context(label, "name", setter_extra)
                     imgui.end_popup()
