@@ -4949,7 +4949,21 @@ class MainGUI():
                     imgui.end_popup()
                 imgui.same_line()
                 if imgui.button(icons.trash_can_outline, width=frame_height):
-                    async_thread.run(db.delete_label(label))
+                    if set.confirm_on_remove:
+                        buttons = {
+                            f"{icons.check} Yes": lambda: async_thread.run(db.delete_label(label)),
+                            f"{icons.cancel} No": None
+                        }
+                        utils.push_popup(
+                            msgbox.msgbox, "Remove label",
+                            "You are removing this label from your list:\n" +
+                            f"{label.name}\n"
+                            "Are you sure you want to do this?",
+                            MsgBox.warn,
+                            buttons
+                        )
+                    else:
+                        async_thread.run(db.delete_label(label))
 
             if swap:
                 Label.instances[swap[0]], Label.instances[swap[1]] = Label.instances[swap[1]], Label.instances[swap[0]]

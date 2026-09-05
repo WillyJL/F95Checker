@@ -34,6 +34,7 @@
   - But once enabled and the backlog of existing images are compressed, future image additions/updates in your library will be compressed quicker and unobtrusively
 - Animations (Video and GIF) and Comics (CG, Comics, Manga and Pinup) thread types are detected properly now, "Collection" and "SiteRip" prefixes are now ignored (by @WillyJL)
 - Notes textbox now resizes with how many lines are in the notes, so it is not the textbox that scrolls but rather the info popup (by @WillyJL)
+- Removing labels now asks for confirmation if Settings > Manage > Confirm when removing is enabled (by @WillyJL)
 - Updated dependencies (by @WillyJL):
   - New cx-Freeze version skips unused PyQt6 .dll/.so/.dylib libraries, Windows/Linux install sizes reduced by 70-100MB
   - Possibly better Linux support with GLFW and desktop-notifier updates
