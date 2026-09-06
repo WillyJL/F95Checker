@@ -55,6 +55,8 @@ jobs:
       - name: "Install requirements"
         run: |
           python -m pip install -U -r ./requirements.txt
+          python -m pip install -U -i https://pypi.anaconda.org/scientific-python-nightly-wheels/simple pillow
+        # ^ While waiting for https://github.com/python-pillow/Pillow/pull/9930 to land in a release
 
       - name: "Mark as release"
         if: "github.event_name == 'release'"
