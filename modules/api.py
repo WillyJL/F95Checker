@@ -938,6 +938,12 @@ async def full_check(game: Game, last_changed: int):
                 thread["tags"][i] = Tag.unknown
         thread["tags"] = tuple(thread["tags"])
         thread["unknown_tags"] = json.loads(thread["unknown_tags"])
+        # Locally synced tags are still reported as unknown by older cache API
+        # versions. Keep them recognized once the user has added them.
+        custom_tags = [tag for tag in thread["unknown_tags"] if tag in Tag._member_map_]
+        if custom_tags:
+            thread["tags"] = tuple(sorted((*thread["tags"], *(Tag[tag] for tag in custom_tags)), key=lambda tag: tag.name))
+            thread["unknown_tags"] = [tag for tag in thread["unknown_tags"] if tag not in custom_tags]
         thread["downloads"] = json.loads(thread["downloads"])
         for _, links in thread["downloads"]:
             for link_i, link_pair in enumerate(links):
