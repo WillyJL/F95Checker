@@ -222,7 +222,7 @@ def thread(res: bytes) -> ParsedThread | ParserError:
         for elem in html.find(is_class("p-title-value")).children:
             if not is_class("labelLink")(elem) and not is_class("label-append")(elem):
                 name += elem.text
-        name = fixed_spaces(sanitize_whitespace(re.search(r"^\s*(.*?)(?:\s*\[.*?\]\s*)*$", name).group(1)))
+        name = fixed_spaces(sanitize_whitespace(re.search(r"^\s*(.*?)(?:\s*\[.*?\]\s*)*$", name, re.DOTALL).group(1)).replace("\n", " "))
 
         thread_version = get_game_attr("version", "mod version", "game version")
         if not thread_version:
@@ -405,8 +405,21 @@ def thread(res: bytes) -> ParsedThread | ParserError:
         else:
             image_url = "missing"
 
-        # FIXME: find preview images in thread
+        # Find all preview images in the starter post, prefer the full-size URL
         previews_urls = []
+        for img in post.find(is_class("bbWrapper")).find_all("img"):
+            if img.find_parent("noscript"):
+                continue
+            url = img.get("data-src") or img.get("src") or ""
+            if not url.startswith("https://attachments."):
+                continue
+            # The wrapper link points at the full-size image, the img at a thumbnail
+            if (link := img.find_parent("a")) is not None and (href := link.get("href") or "").startswith("https://attachments."):
+                url = href
+            url = url.replace("/thumb/", "/", 1)
+            # Skip the cover image and duplicates
+            if url != image_url and url not in previews_urls:
+                previews_urls.append(url)
 
         downloads = get_game_downloads("downloads", "download")
 
