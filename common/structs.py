@@ -371,6 +371,34 @@ class IntEnumHack(enum.IntEnum):
         if new_name != self._name_:
             setattr(cls, new_name, self)
 
+    @classmethod
+    def add(cls, name: str, value: int, attrs: dict = None):
+        """Add a member after an enum has been created.
+
+        This is used for forum tags discovered by the user, whose list can
+        change independently of a F95Checker release.
+        """
+        if name in cls._member_map_:
+            return cls._member_map_[name]
+        if value in cls._value2member_map_:
+            raise ValueError(f"{value} is already a value of {cls.__name__}")
+
+        member = int.__new__(cls, value)
+        member._name_ = name
+        member._value_ = value
+        member._index_ = len(cls._member_names_)
+        for key, attr_value in (attrs or {}).items():
+            setattr(member, key, attr_value)
+        setattr(cls, name, member)
+        cls._member_names_.append(name)
+        cls._member_map_[name] = member
+        cls._value2member_map_[value] = member
+
+        new_name = "_" * name[0].isdigit() + name.replace(" ", "_").replace("-", "__")
+        if new_name != name:
+            setattr(cls, new_name, member)
+        return member
+
 
 Os = IntEnumHack("Os", [
     ("Windows", 1),
@@ -881,6 +909,7 @@ class Settings:
     compact_timeline            : bool
     confirm_on_remove           : bool
     copy_urls_as_bbcode         : bool
+    custom_tags                 : dict[str, int]
     datestamp_format            : str
     default_exe_dir             : dict[Os, str]
     default_launch_wrapper      : dict[Os, dict[Type, str]]
@@ -942,6 +971,8 @@ class Settings:
     style_text_dim              : tuple[float]
     table_header_outside_list   : bool
     tags_highlights             : dict[Tag, TagHighlight]
+    tags_low_priority           : list[Tag]
+    tags_priority               : list[Tag]
     tex_compress                : TexCompress
     tex_compress_replace        : bool
     timestamp_format            : str

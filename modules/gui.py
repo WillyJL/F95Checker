@@ -185,6 +185,10 @@ class Columns:
             self, f"{icons.account} Developer",
             sortable=True,
         )
+        self.tags = self.Column(
+            self, f"{icons.tag_multiple_outline} Tags",
+            sortable=True,
+        )
         self.last_updated = self.Column(
             self, f"{icons.update} Last Updated",
             default=True,
@@ -325,6 +329,7 @@ class MainGUI():
         self.new_styles = False
         self.prev_size = (0, 0)
         self.screen_pos = (0, 0)
+        self.tag_priorities_search = ""
         self.repeat_chars = False
         self.scroll_percent = 0.0
         self.prev_manual_sort = 0
@@ -1188,7 +1193,7 @@ class MainGUI():
             self.filters.append(flt)
         self.end_framed_text(interaction=quick_filter)
 
-    def draw_tag_widget(self, tag: Tag, quick_filter=True, change_highlight=True):
+    def draw_tag_widget(self, tag: Tag, quick_filter=True, change_highlight=True, id: str = ""):
         quick_filter = quick_filter and globals.settings.quick_filters
         interaction = quick_filter or change_highlight
         color = (0.3, 0.3, 0.3, 1.0)
@@ -1196,7 +1201,8 @@ class MainGUI():
             if highlight := globals.settings.tags_highlights.get(tag):
                 color = highlight.color
         self.begin_framed_text(color, interaction=interaction)
-        if imgui.small_button(tag.text) and quick_filter:
+        label = f"{tag.text}###{id}_{tag.value}" if id else tag.text
+        if imgui.small_button(label) and quick_filter:
             flt = Filter(FilterMode.Tag)
             flt.match = tag
             self.filters.append(flt)
@@ -1929,6 +1935,62 @@ class MainGUI():
             self.draw_tag_widget(tag)
             imgui.same_line()
         imgui.dummy(0, 0)
+
+    def ordered_game_tags(self, game: Game):
+        priorities = {tag: index for index, tag in enumerate(globals.settings.tags_priority)}
+        low_priorities = {tag: index for index, tag in enumerate(globals.settings.tags_low_priority)}
+        return sorted(
+            game.tags,
+            key=lambda tag: (
+                0 if tag in priorities else 2 if tag in low_priorities else 1,
+                priorities.get(tag, low_priorities.get(tag, len(priorities))),
+                tag.text.casefold(),
+            ),
+        )
+
+    def draw_game_tags_column(self, game: Game):
+        tags = self.ordered_game_tags(game)
+        if not tags:
+            imgui.text_disabled("None")
+            return
+
+        spacing = imgui.style.item_spacing.x
+        padding = 2 * imgui.style.frame_padding.x
+        ellipsis_width = imgui.calc_text_size("...").x
+        widths = [imgui.calc_text_size(tag.text).x + padding for tag in tags]
+        available = imgui.get_content_region_available_width()
+        total_width = sum(widths) + spacing * (len(tags) - 1)
+
+        if total_width <= available:
+            visible_count = len(tags)
+        else:
+            visible_count = 0
+            used_width = 0
+            for width in widths:
+                needed_width = width + (spacing if visible_count else 0) + spacing + ellipsis_width
+                if used_width + needed_width > available:
+                    break
+                used_width += width + (spacing if visible_count else 0)
+                visible_count += 1
+
+        for index, tag in enumerate(tags[:visible_count]):
+            self.draw_tag_widget(tag, id=f"{game.id}_table_tag")
+            if index + 1 < len(tags) or visible_count < len(tags):
+                imgui.same_line()
+
+        if visible_count < len(tags):
+            imgui.text_disabled("...")
+            if imgui.is_item_hovered():
+                imgui.begin_tooltip()
+                imgui.text_disabled("All tags:")
+                for tag in tags:
+                    self.draw_tag_widget(
+                        tag,
+                        quick_filter=False,
+                        change_highlight=False,
+                        id=f"{game.id}_table_tag_tooltip",
+                    )
+                imgui.end_tooltip()
 
     def draw_game_labels_widget(self, game: Game, wrap=True, small=False, short=False, align=False):
         pad = 2 * imgui.style.frame_padding.x + imgui.style.item_spacing.x
@@ -3147,6 +3209,84 @@ class MainGUI():
             imgui.end_child()
         return utils.popup("Tag highlight preferences", popup_content, closable=True, outside=True, popup_uuid=popup_uuid)
 
+    def draw_tag_priorities_popup(self, popup_uuid: str = ""):
+        def popup_content():
+            priorities = globals.settings.tags_priority
+            low_priorities = globals.settings.tags_low_priority
+            changed = False
+
+            imgui.text_disabled("Left-click an available tag to prioritize it; right-click to deprioritize it.")
+            imgui.text_disabled("Priority lists are ordered from strongest to weakest.")
+            imgui.set_next_item_width(-imgui.FLOAT_MIN)
+            _, self.tag_priorities_search = imgui.input_text_with_hint(
+                "###tag_priorities_search",
+                "Search tags...",
+                self.tag_priorities_search,
+            )
+            search = self.tag_priorities_search.casefold()
+            matches_search = lambda tag: not search or search in tag.text.casefold() or search in tag.name.casefold()
+            if imgui.button("Clear all"):
+                priorities.clear()
+                low_priorities.clear()
+                changed = True
+
+            imgui.begin_child(
+                "###tag_priorities_frame",
+                width=min(imgui.io.display_size.x * 0.5, self.scaled(600)),
+                height=imgui.io.display_size.y * 0.5,
+            )
+            if priorities:
+                imgui.text("High priority (highest first):")
+                for index, tag in enumerate(priorities.copy()):
+                    if not matches_search(tag):
+                        continue
+                    if imgui.small_button(f"Up###{tag.value}_priority_up") and index:
+                        priorities[index - 1], priorities[index] = priorities[index], priorities[index - 1]
+                        changed = True
+                    imgui.same_line()
+                    if imgui.small_button(f"Down###{tag.value}_priority_down") and index + 1 < len(priorities):
+                        priorities[index + 1], priorities[index] = priorities[index], priorities[index + 1]
+                        changed = True
+                    imgui.same_line()
+                    if imgui.selectable(f"{tag.text}###{tag.value}_priority_remove", False)[0]:
+                        priorities.remove(tag)
+                        changed = True
+                imgui.separator()
+
+            if low_priorities:
+                imgui.text("Low priority (lowest first):")
+                for index, tag in enumerate(low_priorities.copy()):
+                    if not matches_search(tag):
+                        continue
+                    if imgui.small_button(f"Up###{tag.value}_low_priority_up") and index:
+                        low_priorities[index - 1], low_priorities[index] = low_priorities[index], low_priorities[index - 1]
+                        changed = True
+                    imgui.same_line()
+                    if imgui.small_button(f"Down###{tag.value}_low_priority_down") and index + 1 < len(low_priorities):
+                        low_priorities[index + 1], low_priorities[index] = low_priorities[index], low_priorities[index + 1]
+                        changed = True
+                    imgui.same_line()
+                    if imgui.selectable(f"{tag.text}###{tag.value}_low_priority_remove", False)[0]:
+                        low_priorities.remove(tag)
+                        changed = True
+                imgui.separator()
+
+            imgui.text("Available tags:")
+            for tag in Tag:
+                if tag not in priorities and tag not in low_priorities and matches_search(tag):
+                    if imgui.selectable(f"{tag.text}###{tag.value}_priority_add", False)[0]:
+                        priorities.append(tag)
+                        changed = True
+                    elif imgui.is_item_clicked(imgui.MOUSE_BUTTON_RIGHT):
+                        low_priorities.append(tag)
+                        changed = True
+            imgui.end_child()
+
+            if changed:
+                self.recalculate_ids = True
+                async_thread.run(db.update_settings("tags_priority", "tags_low_priority"))
+        return utils.popup("Tag display priority", popup_content, closable=True, outside=True, popup_uuid=popup_uuid)
+
     def draw_tabbar(self):
         display_tab = globals.settings.display_tab
         select_tab = self.current_tab is not display_tab
@@ -3386,6 +3526,17 @@ class MainGUI():
                             key = lambda id: globals.games[id].type.name
                         case cols.developer.index:
                             key = lambda id: globals.games[id].developer.lower()
+                        case cols.tags.index:
+                            priorities = {tag: index for index, tag in enumerate(globals.settings.tags_priority)}
+                            low_priorities = {tag: index for index, tag in enumerate(globals.settings.tags_low_priority)}
+                            key = lambda id: (
+                                -sum(tag in priorities for tag in globals.games[id].tags),
+                                tuple(sorted(priorities[tag] for tag in globals.games[id].tags if tag in priorities)),
+                                sum(tag in low_priorities for tag in globals.games[id].tags),
+                                tuple(sorted(-low_priorities[tag] for tag in globals.games[id].tags if tag in low_priorities)),
+                                globals.games[id].name.lower(),
+                                id,
+                            )
                         case cols.playtime.index:
                             key = lambda id: - globals.games[id].playtime
                         case cols.last_updated.index:
@@ -3605,6 +3756,8 @@ class MainGUI():
                                 imgui.text_disabled("  |  ".join(versions))
                         case cols.developer.index:
                             imgui.text(game.developer or "Unknown")
+                        case cols.tags.index:
+                            self.draw_game_tags_column(game)
                         case cols.playtime.index:
                             imgui.push_font(imgui.fonts.mono)
                             imgui.text(game.playtime_display or "None")
@@ -4851,12 +5004,55 @@ class MainGUI():
             draw_settings_label("Compact timeline:")
             draw_settings_checkbox("compact_timeline")
 
+            draw_settings_label(
+                "Sync available tags:",
+                "Add tags currently marked as unknown in your library to the available tag list."
+            )
+            if imgui.button("Sync", width=right_width):
+                missing_tags = sorted({
+                    tag
+                    for game in globals.games.values()
+                    for tag in game.unknown_tags
+                    if tag and tag not in Tag._member_map_
+                })
+                for tag in missing_tags:
+                    value = min((*Tag._value2member_map_, 0)) - 1
+                    Tag.add(tag, value, {"text": tag.replace("-", " ")})
+                    set.custom_tags[tag] = value
+
+                if missing_tags:
+                    for game in globals.games.values():
+                        additions = [Tag[tag] for tag in game.unknown_tags if tag in missing_tags]
+                        if not additions:
+                            continue
+                        game.tags = tuple(sorted((*game.tags, *additions), key=lambda tag: tag.name))
+                        game.unknown_tags = [tag for tag in game.unknown_tags if tag not in missing_tags]
+                        game.unknown_tags_flag = bool(game.unknown_tags)
+                    async_thread.run(db.update_settings("custom_tags"))
+
+                utils.push_popup(
+                    msgbox.msgbox, "Available tags synced",
+                    (
+                        f"Added {len(missing_tags)} tag{'s' if len(missing_tags) != 1 else ''}:\n"
+                        + ", ".join(missing_tags)
+                        if missing_tags else "No new tags found."
+                    ),
+                    MsgBox.info,
+                )
+
             draw_settings_label("Highlight tags:")
             draw_settings_checkbox("highlight_tags")
 
             draw_settings_label("Tags to highlight:")
             if imgui.button("Select", width=right_width):
                 utils.push_popup(self.draw_tag_highlights_popup)
+
+            draw_settings_label(
+                "Tag display priority:",
+                "Choose tags and arrange them in the order they should appear in the Tags table column. Tags not selected here are shown afterwards in alphabetical order."
+            )
+            if imgui.button("Select###tag_display_priority", width=right_width):
+                utils.push_popup(self.draw_tag_priorities_popup)
 
             draw_settings_label(
                 "Time format:",
