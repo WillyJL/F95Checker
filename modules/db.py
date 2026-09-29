@@ -25,6 +25,7 @@ from common.structs import (
     SearchResult,
     Settings,
     Status,
+    Tag,
     Tab,
     TexCompress,
     ThreadMatch,
@@ -206,6 +207,7 @@ async def connect():
             "compact_timeline":            f'INTEGER DEFAULT {int(False)}',
             "confirm_on_remove":           f'INTEGER DEFAULT {int(True)}',
             "copy_urls_as_bbcode":         f'INTEGER DEFAULT {int(False)}',
+            "custom_tags":                 f'TEXT    DEFAULT "{{}}"',
             "datestamp_format":            f'TEXT    DEFAULT "%b %d, %Y"',
             "default_exe_dir":             f'TEXT    DEFAULT "{{}}"',
             "default_launch_wrapper":      f'TEXT    DEFAULT "{{}}"',
@@ -267,6 +269,8 @@ async def connect():
             "style_text_dim":              f'TEXT    DEFAULT "{DefaultStyle.text_dim}"',
             "table_header_outside_list":   f'INTEGER DEFAULT {int(True)}',
             "tags_highlights":             f'TEXT    DEFAULT "{{}}"',
+            "tags_low_priority":           f'TEXT    DEFAULT "[]"',
+            "tags_priority":               f'TEXT    DEFAULT "[]"',
             "tex_compress":                f'INTEGER DEFAULT {TexCompress.Disabled}',
             "tex_compress_replace":        f'INTEGER DEFAULT {int(False)}',
             "timestamp_format":            f'TEXT    DEFAULT "%d/%m/%Y %H:%M"',
@@ -498,7 +502,14 @@ async def load():
         SELECT *
         FROM settings
     """)
-    globals.settings = row_to_cls(await cursor.fetchone(), Settings)
+    settings_row = await cursor.fetchone()
+    # Restore custom tags before decoding settings too: tag highlight and
+    # priority preferences can contain these enum values.
+    custom_tags = sql_to_py(settings_row["custom_tags"], dict[str, int])
+    for name, value in custom_tags.items():
+        if name not in Tag._member_map_:
+            Tag.add(name, value, {"text": name.replace("-", " ")})
+    globals.settings = row_to_cls(settings_row, Settings)
 
     # Games need Tabs and Labels to be loaded
     globals.games = {}
