@@ -4,7 +4,9 @@ import functools
 import io
 import random
 import re
+import socket
 import string
+import threading
 import time
 import typing
 
@@ -103,6 +105,31 @@ def is_refreshing():
     if globals.refresh_task and not globals.refresh_task.done():
         return True
     return False
+
+
+_network_available = True
+_network_check_thread: threading.Thread = None
+
+
+def is_network_available():
+    # Returns the last known connectivity state and kicks off a background DNS probe to refresh
+    # it, used to avoid firing background tasks (and their noisy error popups) right after waking
+    # from sleep, before the network is back up. Never blocks: DNS resolution can take multiple
+    # seconds and must not freeze the GUI main loop
+    global _network_check_thread
+    if _network_check_thread is None or not _network_check_thread.is_alive():
+        _network_check_thread = threading.Thread(target=_check_network_available, daemon=True)
+        _network_check_thread.start()
+    return _network_available
+
+
+def _check_network_available():
+    global _network_available
+    try:
+        socket.getaddrinfo("f95zone.to", 443)
+        _network_available = True
+    except OSError:
+        _network_available = False
 
 
 def start_update_check():
