@@ -614,8 +614,9 @@ def open_webpage(url: str):
     else:
         name = set.browser.name
         args = [*set.browser.args]
-        if set.browser_private:
-            args.extend(set.browser.private_arg)
+        if set.browser_private and set.browser.private_arg:
+            # Private mode needs the raw executable to pass command line flags
+            args = [*(set.browser.private_base_args or args), *set.browser.private_arg]
     async def _open_webpage(url: str):
         try:
             if set.browser.integrated:
