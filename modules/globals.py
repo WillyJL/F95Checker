@@ -137,7 +137,7 @@ def _():
                             name = parser["CFBundleName"]
                             args = [app / f"Contents/MacOS/{parser['CFBundleExecutable']}"]
                             if args and shutil.which(args[0]) and pathlib.Path(shutil.which(args[0])).exists():
-                                Browser.add(name, args=args)
+                                Browser.add(name, args=args, bundle_id=parser.get("CFBundleIdentifier"))
                             found = True
                             break
                     if found:

@@ -17,6 +17,7 @@ import glfw
 import imgui
 
 from common.structs import (
+    Browser,
     Category,
     Game,
     LaunchState,
@@ -604,6 +605,21 @@ def open_game_folder(game: Game, executable: str = None):
     )
 
 
+def _macos_default_browser():
+    try:
+        prefs = pathlib.Path.home() / "Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist"
+        for handler in plistlib.loads(prefs.read_bytes()).get("LSHandlers", []):
+            if handler.get("LSHandlerURLScheme") == "https":
+                # LaunchServices stores bundle ids lowercased
+                bundle_id = (handler.get("LSHandlerRoleAll") or "").lower()
+                for browser in Browser.instances.values():
+                    if bundle_id and (browser.bundle_id or "").lower() == bundle_id:
+                        return browser
+    except Exception:
+        pass
+    return None
+
+
 def open_webpage(url: str):
     set = globals.settings
     if set.browser.integrated:
@@ -613,9 +629,15 @@ def open_webpage(url: str):
         args = [set.browser_custom_executable, *shlex.split(set.browser_custom_arguments)]
     else:
         name = set.browser.name
-        args = [*set.browser.args]
+        browser = set.browser
+        if browser.system_default and set.browser_private:
+            # Private mode needs a known browser to pass flags to, look up what the system default is
+            default = _macos_default_browser()
+            if default and default.private_arg:
+                browser = default
+        args = [*browser.args]
         if set.browser_private:
-            args.extend(set.browser.private_arg)
+            args.extend(browser.private_arg)
     async def _open_webpage(url: str):
         try:
             if set.browser.integrated:
