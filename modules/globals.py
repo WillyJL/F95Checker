@@ -119,6 +119,8 @@ def _():
                 pass
     elif os is Os.MacOS:
         import plistlib
+        # System default browser, LaunchServices picks the app that handles the URL
+        Browser.add("Default", args=["open"])
         app_dir = pathlib.Path("/Applications")
         empty = []
         matches = ["http", "https"]
