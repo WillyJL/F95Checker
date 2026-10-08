@@ -8,3 +8,4 @@ build/
 dist/
 *.env
 F95Checker-debug.log
+F95Checker.egg-info/
