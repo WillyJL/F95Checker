@@ -899,6 +899,7 @@ class Settings:
     hide_empty_tabs             : bool
     highlight_tags              : bool
     ignore_semaphore_timeouts   : bool
+    image_timeout               : int
     independent_tab_views       : bool
     insecure_ssl                : bool
     interface_scaling           : float

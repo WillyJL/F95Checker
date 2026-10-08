@@ -51,6 +51,7 @@ from external import (
 from modules import (
     callbacks,
     db,
+    debuglog as dbg,
     globals,
     icons,
     msgbox,
@@ -172,6 +173,7 @@ def make_session():
             ),
         },
     )
+    dbg.log(f"http session created: proxy={globals.settings.proxy_type.name} aiohttp={aiohttp.__version__}")
 
     if old_session:
         async_thread.wait(old_session.close())
@@ -236,6 +238,18 @@ def get_url_domain(url: str):
     return re.search(r"^https?://([^/]+)", url).group(1)
 
 
+def pending_task_lines(loop: asyncio.AbstractEventLoop) -> list[str]:
+    """Innermost await line of every pending task, readable from another thread."""
+    lines = []
+    for task in asyncio.all_tasks(loop):
+        coro = task.get_coro()
+        frame = getattr(coro, "cr_frame", None)
+        where = f"{frame.f_code.co_name}:{frame.f_lineno}" if frame is not None and frame.f_lasti >= 0 else "not-started"
+        name = getattr(coro, "cr_qualname", None) or type(coro).__qualname__
+        lines.append(f"{task.get_name()} {name} @ {where}")
+    return sorted(lines)
+
+
 def is_f95zone_url(url: str):
     return bool(re.search(r"^https?://[^/]*\.?(" + r"|".join(re.escape(domain) for domain in f95_domains) + r")/", url))
 
@@ -249,7 +263,11 @@ async def request(method: str, url: str, read=True, cookies: dict = True, **kwar
     timeout = kwargs.pop("timeout", None)
     if not timeout:
         timeout = globals.settings.request_timeout
-    retries = globals.settings.max_retries + 1
+    retries_kw = kwargs.pop("retries", None)
+    retries = globals.settings.max_retries + 1 if retries_kw is None else retries_kw
+    # ponytail: separate budget for ignore_semaphore_timeouts (errno 121) retries,
+    # caps the previously infinite continue loop; raise it if flaky VPNs need more
+    soft_retries = 10
     req_opts = dict(
         timeout=timeout,
         allow_redirects=True,
@@ -267,12 +285,14 @@ async def request(method: str, url: str, read=True, cookies: dict = True, **kwar
     if_ratelimit_request = is_forum_request or is_attachments_request
     ratelimit_retries = 10
     ratelimit_sleep = 0
+    yielded = False
     _can_ratelimit = lambda: if_ratelimit_request and ratelimit_retries > 1
     async def _do_ratelimit():
         nonlocal ratelimit_retries, ratelimit_sleep
         ratelimit_retries -= 1
         with f95_ratelimit_sleeping:
             ratelimit_sleep += 5
+            dbg.log(f"ratelimit: sleeping {ratelimit_sleep}s for {url} ({ratelimit_retries} retries left)")
             await asyncio.sleep(ratelimit_sleep)
     while retries and ratelimit_retries:
         try:
@@ -297,20 +317,37 @@ async def request(method: str, url: str, read=True, cookies: dict = True, **kwar
                     await _do_ratelimit()
                     continue
                 if not read:
+                    yielded = True
                     yield b"", req
                     break
                 res = await req.read()
                 if _can_ratelimit() and any(msg in res for msg in f95_ratelimit_forum_errors):
                     await _do_ratelimit()
                     continue
+                yielded = True
                 yield res, req
             break
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            # A body exception thrown into the generator after yield must not retry
+            # (retrying here yields again inside athrow -> RuntimeError, leaked generator)
+            if yielded:
+                dbg.log(f"request body error (no retry): {method} {url} exc={type(exc).__name__}: {exc}")
+                raise
+            errno = getattr(exc, "errno", None)
             if globals.settings.ignore_semaphore_timeouts and isinstance(exc, OSError) and exc.errno == 121:
+                soft_retries -= 1
+                dbg.log(f"request retry[soft 121]: {method} {url} left={soft_retries} exc={type(exc).__name__} errno={errno}")
+                if not soft_retries:
+                    dbg.log(f"request give up[soft budget]: {method} {url} exc={type(exc).__name__}")
+                    raise
+                await asyncio.sleep(1)
                 continue
             retries -= 1
+            dbg.log(f"request retry: {method} {url} left={retries} exc={type(exc).__name__} errno={errno} msg={str(exc)[:200]}")
             if not retries:
+                dbg.log(f"request give up: {method} {url} exc={type(exc).__name__}")
                 raise
+            await asyncio.sleep(0.5)
 
 
 async def fetch(method: str, url: str, **kwargs):
@@ -488,11 +525,14 @@ async def download_webpage(url: str):
     return pathlib.Path(f.name).as_uri()
 
 
-async def download_image(url: str):
+async def download_image(url: str, timeout: int = None):
+    if timeout is None:
+        timeout = globals.settings.image_timeout
     with images_counter:
         while True:
             try:
-                res = await fetch("GET", url, timeout=globals.settings.request_timeout * 4, raise_for_status=True)
+                # Fail fast: single attempt, caller-controlled timeout so slow CDNs can't stall
+                res = await fetch("GET", url, timeout=timeout, retries=1, raise_for_status=True)
             except aiohttp.ClientResponseError as exc:
                 if exc.status < 400:
                     raise  # Not error status
@@ -823,6 +863,7 @@ async def fast_check(games: list[Game], full=False):
 
     global fast_checks_counter
     fast_checks_counter += len(games)
+    dbg.log(f"fast_check start: games={len(games)} full={full}")
     try:
         async with fast_checks_sem:
             res = None
@@ -847,6 +888,7 @@ async def fast_check(games: list[Game], full=False):
     finally:
         fast_checks_counter -= len(games)
 
+    dbg.log(f"fast_check: changes fetched for {len(games)} games, building full queue")
     full_queue: list[tuple[Game, int]] = []
     for game in games:
         last_changed = last_changes.get(str(game.id), 0)
@@ -876,14 +918,18 @@ async def fast_check(games: list[Game], full=False):
     try:
         tasks = [asyncio.create_task(full_check(game, ts)) for game, ts in full_queue]
         await asyncio.gather(*tasks)
-    except Exception:
+    except BaseException as exc:
+        pending = sum(not t.done() for t in tasks)
+        dbg.log(f"fast_check aborted ({type(exc).__name__}: {str(exc)[:200]}): cancelling {pending} pending full_check tasks")
         for task in tasks:
             task.cancel()
         raise
+    dbg.log(f"fast_check done: full_checks={len(full_queue)} progress={globals.refresh_progress}/{globals.refresh_total}")
 
 
 async def full_check(game: Game, last_changed: int):
     async with full_checks_counter, full_checks_sem:
+        dbg.log(f"full_check start: id={game.id}")
 
         async with request("GET", api_full_check_url.format(id=game.id, ts=last_changed), timeout=globals.settings.request_timeout * 2, cookies=False) as (res, req):
             raise_api_error(res)
@@ -912,11 +958,14 @@ async def full_check(game: Game, last_changed: int):
                         MsgBox.error,
                         buttons=buttons
                     )
+                dbg.log(f"full_check thread not found: id={game.id} name={game.name!r}")
                 globals.refresh_progress += 1
                 return
             thread = json.loads(res)
             raise_api_error(thread)
             url = f95_threads_page + str(game.id)
+
+        dbg.log(f"full_check fetched: id={game.id} status={req.status}")
 
         # Redis only allows string values, so API only gives str for simplicity
         try:
@@ -1059,18 +1108,33 @@ async def full_check(game: Game, last_changed: int):
                 )
                 globals.new_updated_games[game.id] = old_game
 
+        dbg.log(f"full_check saving start: id={game.id} fetch_image={bool(fetch_image and thread['image_url'] and thread['image_url'].startswith('http'))}")
         if fetch_image and thread["image_url"] and thread["image_url"].startswith("http"):
-            data, thread["image_url"] = await download_image(thread["image_url"])
-            async def set_image_and_update_game():
-                await game.set_image_async(data)
-                await update_game()
-            await asyncio.shield(set_image_and_update_game())
+            dbg.log(f"full_check image download: id={game.id} url={thread['image_url'][:120]}")
+            data = b""
+            ok = False
+            try:
+                data, thread["image_url"] = await download_image(thread["image_url"])
+                ok = True
+                dbg.log(f"full_check image done: id={game.id} bytes={len(data)}")
+            except Exception as exc:
+                # Slow or dead CDN must not stall or kill the whole refresh
+                dbg.log(f"full_check image failed, continuing without: id={game.id} exc={type(exc).__name__}: {str(exc)[:200]}")
+            if ok:
+                async def set_image_and_update_game():
+                    await game.set_image_async(data)
+                    await update_game()
+                await asyncio.shield(set_image_and_update_game())
+            else:
+                await asyncio.shield(update_game())
         else:
             await asyncio.shield(update_game())
         globals.refresh_progress += 1
+        dbg.log(f"full_check done: id={game.id} progress={globals.refresh_progress}/{globals.refresh_total}")
 
 
 async def check_notifs(standalone=True, retry=False):
+    dbg.log(f"check_notifs start: standalone={standalone} retry={retry} progress={globals.refresh_progress}/{globals.refresh_total}")
     if standalone:
         globals.refresh_total = 1
         globals.refresh_progress = 0
@@ -1089,6 +1153,8 @@ async def check_notifs(standalone=True, retry=False):
                     more=json.dumps(res, indent=4)
                 )
             if not await assert_login():
+                globals.refresh_progress += 1
+                dbg.log(f"check_notifs: not logged in, progress counted={globals.refresh_progress}/{globals.refresh_total}")
                 return
             return await check_notifs(retry=True)
         alerts = int(res["visitor"]["alerts_unread"].replace(",", "").replace(".", ""))
@@ -1107,6 +1173,7 @@ async def check_notifs(standalone=True, retry=False):
             more=f"Response body:\n{str(res)[:10000]}\n\n{error.traceback()}",
         )
     globals.refresh_progress += 1
+    dbg.log(f"check_notifs done: alerts={alerts} inbox={inbox} progress={globals.refresh_progress}/{globals.refresh_total}")
     for popup in globals.popup_stack:
         if popup.func is msgbox.msgbox and popup.args[0] == "Notifications":
             globals.popup_stack.remove(popup)
@@ -1408,6 +1475,35 @@ async def refresh(*games: list[Game], full=False, notifs=True, force_archived=Fa
     notifs = notifs and globals.settings.check_notifs
     globals.refresh_progress += 1
     globals.refresh_total += sum(len(chunk) for chunk in fast_queue) + bool(notifs)
+    dbg.log(
+        f"refresh start: full={full} notifs={bool(notifs)} chunks={len(fast_queue)} "
+        f"games={sum(len(chunk) for chunk in fast_queue)} progress={globals.refresh_progress}/{globals.refresh_total} "
+        f"settings: max_retries={globals.settings.max_retries} request_timeout={globals.settings.request_timeout} "
+        f"ignore_semaphore_timeouts={globals.settings.ignore_semaphore_timeouts} "
+        f"max_connections={globals.settings.max_connections} check_notifs={globals.settings.check_notifs} "
+        f"refresh_archived={globals.settings.refresh_archived_games} refresh_completed={globals.settings.refresh_completed_games} "
+        f"image_timeout={globals.settings.image_timeout}"
+    )
+
+    async def _watchdog():
+        while True:
+            await asyncio.sleep(5)
+            pending = [
+                getattr(t.get_coro(), "cr_qualname", None) or getattr(t.get_coro(), "__qualname__", "?")
+                for t in asyncio.all_tasks() if not t.done() and t is not asyncio.current_task()
+            ]
+            dbg.log(
+                f"watchdog: progress={globals.refresh_progress}/{globals.refresh_total} "
+                f"fast_counter={fast_checks_counter} "
+                f"fast_sem={getattr(fast_checks_sem, '_value', None)} full_sem={getattr(full_checks_sem, '_value', None)} "
+                f"pending={len(pending)} [{' '.join(sorted(pending)[:30])}]"
+            )
+    watchdog = asyncio.create_task(_watchdog(), name="refresh-watchdog")
+    loop = asyncio.get_running_loop()
+    dbg.watch(lambda: (
+        f"{globals.refresh_progress}/{globals.refresh_total}",
+        pending_task_lines(loop),
+    ))
 
     global fast_checks_sem, full_checks_sem, fast_checks_counter
     fast_checks_sem = asyncio.Semaphore(1)
@@ -1417,13 +1513,18 @@ async def refresh(*games: list[Game], full=False, notifs=True, force_archived=Fa
     try:
         tasks = [asyncio.create_task(fast_check(chunk, full=full)) for chunk in fast_queue]
         await asyncio.gather(*tasks)
-    except Exception:
+    except BaseException as exc:
+        dbg.log(f"refresh aborted ({type(exc).__name__}: {str(exc)[:200]}): cancelling fast_check tasks, resetting semaphores")
         for task in tasks:
             task.cancel()
         fast_checks_sem = None
         full_checks_sem = None
         fast_checks_counter = 0
         raise
+    finally:
+        watchdog.cancel()
+        dbg.unwatch()
+        dbg.log(f"refresh end: progress={globals.refresh_progress}/{globals.refresh_total} refreshing={bool(globals.refresh_task and not globals.refresh_task.done())}")
     fast_checks_sem = None
     full_checks_sem = None
     fast_checks_counter = 0
