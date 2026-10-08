@@ -1438,6 +1438,10 @@ class MainGUI():
             imgui.text_colored(game.name, *globals.settings.style_accent)
         if imgui.is_item_clicked(imgui.MOUSE_BUTTON_MIDDLE):
             callbacks.clipboard_copy(game.name)
+        if game.image.missing:
+            imgui.same_line(spacing=imgui.style.item_spacing.x * 0.5)
+            imgui.text_colored(icons.image_off, 1.00, 0.65, 0.00)
+            self.draw_hover_text("No image loaded!\nRight-click the card and use Refresh Image to fetch it.", text=None)
 
     def draw_game_finished_checkbox(self, game: Game, label=""):
         if game:
@@ -1709,6 +1713,17 @@ class MainGUI():
         if game and game.custom:
             imgui.pop_disabled()
 
+    def draw_game_refresh_image_button(self, game: Game, label="", selectable=False):
+        if selectable:
+            clicked = imgui.selectable(label, False)[0]
+        else:
+            clicked = imgui.button(label)
+        if clicked:
+            if game:
+                callbacks.refresh_images(game)
+            else:
+                callbacks.refresh_images()
+
     def draw_game_tab_widget(self, game: Game):
         self.draw_tab_widget(game.tab)
         if imgui.begin_popup_context_item(f"###{game.id}_context_tab"):
@@ -1801,6 +1816,7 @@ class MainGUI():
             imgui.text(f"Selected games: {self.selected_games_count}")
         self.draw_game_more_info_button(game, f"{icons.information_outline} More Info", selectable=True, carousel_ids=self.show_games_ids[self.current_tab])
         self.draw_game_recheck_button(game, f"{icons.reload_alert} Full Recheck", selectable=True)
+        self.draw_game_refresh_image_button(game, f"{icons.image_refresh} Refresh Image", selectable=True)
         imgui.separator()
         self.draw_game_play_button(game, f"{icons.play} Play", selectable=True)
         self.draw_game_open_thread_button(game, f"{icons.open_in_new} Open Thread", selectable=True)
@@ -5539,6 +5555,18 @@ class MainGUI():
             set.request_timeout = min(max(value, 1), 120)
             if changed:
                 async_thread.run(db.update_settings("request_timeout"))
+
+            draw_settings_label(
+                "Image timeout:",
+                "Cover image downloads use their own short timeout with no retries, so a slow or stuck image CDN cannot stall a "
+                "refresh. If an image does not finish within this many seconds it is skipped (the game still updates) and the "
+                "image is retried on the next refresh.\n"
+                "5 seconds is a good default, raise it if your images often end up missing."
+            )
+            changed, value = imgui.drag_int("###image_timeout", set.image_timeout, change_speed=0.1, min_value=1, max_value=60, format="%d sec")
+            set.image_timeout = min(max(value, 1), 60)
+            if changed:
+                async_thread.run(db.update_settings("image_timeout"))
 
             draw_settings_label(
                 "Retries:",
