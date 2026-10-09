@@ -709,6 +709,39 @@ def redirect_xpath_link(thread_url: str, xpath_expr: str, copy=False):
     async_thread.run(_retrieve_and_copy())
 
 
+def refresh_images(*games: list[Game]):
+    targets = list(games) or [g for g in globals.games.values() if g.selected]
+    if not targets:
+        return
+    async def _refresh_all():
+        failed: list[str] = []
+        for game in targets:
+            if not game.image_url or not game.image_url.startswith("http"):
+                failed.append(f"{game.name}: no image URL")
+                continue
+            try:
+                data, url = await api.download_image(game.image_url, timeout=60)
+            except Exception as exc:
+                failed.append(f"{game.name}: {type(exc).__name__}")
+                continue
+            if not data:
+                failed.append(f"{game.name}: no image data")
+                continue
+            await game.set_image_async(data)
+            if url != game.image_url:
+                game.image_url = url
+                await db.update_game(game, "image_url")
+        if failed:
+            utils.push_popup(
+                msgbox.msgbox, "Image refresh",
+                "Could not refresh some images:\n" +
+                "\n".join(failed[:20]) +
+                ("\n..." if len(failed) > 20 else ""),
+                MsgBox.warn
+            )
+    async_thread.run(_refresh_all())
+
+
 def convert_f95zone_to_custom(game: Game):
     async_thread.wait(db.update_game_id(game, utils.custom_id()))
     game.custom = True

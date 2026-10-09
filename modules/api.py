@@ -249,7 +249,9 @@ async def request(method: str, url: str, read=True, cookies: dict = True, **kwar
     timeout = kwargs.pop("timeout", None)
     if not timeout:
         timeout = globals.settings.request_timeout
-    retries = globals.settings.max_retries + 1
+    retries_kw = kwargs.pop("retries", None)
+    retries = globals.settings.max_retries + 1 if retries_kw is None else retries_kw
+    soft_retries = 10
     req_opts = dict(
         timeout=timeout,
         allow_redirects=True,
@@ -267,6 +269,7 @@ async def request(method: str, url: str, read=True, cookies: dict = True, **kwar
     if_ratelimit_request = is_forum_request or is_attachments_request
     ratelimit_retries = 10
     ratelimit_sleep = 0
+    yielded = False
     _can_ratelimit = lambda: if_ratelimit_request and ratelimit_retries > 1
     async def _do_ratelimit():
         nonlocal ratelimit_retries, ratelimit_sleep
@@ -297,20 +300,31 @@ async def request(method: str, url: str, read=True, cookies: dict = True, **kwar
                     await _do_ratelimit()
                     continue
                 if not read:
+                    yielded = True
                     yield b"", req
                     break
                 res = await req.read()
                 if _can_ratelimit() and any(msg in res for msg in f95_ratelimit_forum_errors):
                     await _do_ratelimit()
                     continue
+                yielded = True
                 yield res, req
             break
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            # A body exception thrown into the generator after yield must not retry
+            # (retrying here yields again inside athrow -> RuntimeError, leaked generator)
+            if yielded:
+                raise
             if globals.settings.ignore_semaphore_timeouts and isinstance(exc, OSError) and exc.errno == 121:
+                soft_retries -= 1
+                if not soft_retries:
+                    raise
+                await asyncio.sleep(1)
                 continue
             retries -= 1
             if not retries:
                 raise
+            await asyncio.sleep(0.5)
 
 
 async def fetch(method: str, url: str, **kwargs):
@@ -488,11 +502,14 @@ async def download_webpage(url: str):
     return pathlib.Path(f.name).as_uri()
 
 
-async def download_image(url: str):
+async def download_image(url: str, timeout: int = None):
+    if timeout is None:
+        timeout = globals.settings.image_timeout
     with images_counter:
         while True:
             try:
-                res = await fetch("GET", url, timeout=globals.settings.request_timeout * 4, raise_for_status=True)
+                # Fail fast: single attempt, caller-controlled timeout so slow CDNs can't stall
+                res = await fetch("GET", url, timeout=timeout, retries=1, raise_for_status=True)
             except aiohttp.ClientResponseError as exc:
                 if exc.status < 400:
                     raise  # Not error status
@@ -876,7 +893,7 @@ async def fast_check(games: list[Game], full=False):
     try:
         tasks = [asyncio.create_task(full_check(game, ts)) for game, ts in full_queue]
         await asyncio.gather(*tasks)
-    except Exception:
+    except BaseException:
         for task in tasks:
             task.cancel()
         raise
@@ -1060,11 +1077,21 @@ async def full_check(game: Game, last_changed: int):
                 globals.new_updated_games[game.id] = old_game
 
         if fetch_image and thread["image_url"] and thread["image_url"].startswith("http"):
-            data, thread["image_url"] = await download_image(thread["image_url"])
-            async def set_image_and_update_game():
-                await game.set_image_async(data)
-                await update_game()
-            await asyncio.shield(set_image_and_update_game())
+            data = b""
+            ok = False
+            try:
+                data, thread["image_url"] = await download_image(thread["image_url"])
+                ok = True
+            except Exception:
+                # Slow or dead CDN must not stall or kill the whole refresh
+                pass
+            if ok:
+                async def set_image_and_update_game():
+                    await game.set_image_async(data)
+                    await update_game()
+                await asyncio.shield(set_image_and_update_game())
+            else:
+                await asyncio.shield(update_game())
         else:
             await asyncio.shield(update_game())
         globals.refresh_progress += 1
@@ -1089,6 +1116,7 @@ async def check_notifs(standalone=True, retry=False):
                     more=json.dumps(res, indent=4)
                 )
             if not await assert_login():
+                globals.refresh_progress += 1
                 return
             return await check_notifs(retry=True)
         alerts = int(res["visitor"]["alerts_unread"].replace(",", "").replace(".", ""))
@@ -1417,7 +1445,7 @@ async def refresh(*games: list[Game], full=False, notifs=True, force_archived=Fa
     try:
         tasks = [asyncio.create_task(fast_check(chunk, full=full)) for chunk in fast_queue]
         await asyncio.gather(*tasks)
-    except Exception:
+    except BaseException:
         for task in tasks:
             task.cancel()
         fast_checks_sem = None
