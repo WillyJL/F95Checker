@@ -22,7 +22,6 @@ from external import async_thread
 from modules import (
     api,
     callbacks,
-    debuglog as dbg,
     globals,
     icons,
     msgbox,
@@ -125,14 +124,12 @@ def start_refresh_task(coro: typing.Coroutine, reset_bg_timers=True, notify_new_
     globals.refresh_progress = 0
     globals.refresh_total = 1
     globals.gui.refresh_ratio_smooth = 0.0
-    dbg.log(f"refresh task scheduled: games={len(globals.games)} reset_bg_timers={reset_bg_timers}")
     async def coro_wrapper():
         await coro
         await asyncio.sleep(0.5)
     globals.refresh_task = async_thread.run(coro_wrapper())
     globals.gui.tray.update_status()
     def done_callback(future: asyncio.Future):
-        dbg.log(f"refresh task done: cancelled={future.cancelled()} progress={globals.refresh_progress}/{globals.refresh_total}")
         globals.refresh_task = None
         globals.gui.tray.update_status()
         globals.gui.recalculate_ids = True
@@ -163,11 +160,9 @@ def start_refresh_task(coro: typing.Coroutine, reset_bg_timers=True, notify_new_
                 )
         # Continues after this only if the task was not cancelled
         try:
-            exc = future.exception()
+            future.exception()
         except concurrent.futures.CancelledError:
-            dbg.log("refresh task: cancelled, skipping post-refresh")
             return
-        dbg.log(f"refresh task: finished exc={exc!r}")
         if globals.last_update_check is not None and globals.last_update_check < time.time() - 21600:  # Check updates after refreshing at 6 hour intervals
             start_update_check()
     globals.refresh_task.add_done_callback(done_callback)
