@@ -251,8 +251,6 @@ async def request(method: str, url: str, read=True, cookies: dict = True, **kwar
         timeout = globals.settings.request_timeout
     retries_kw = kwargs.pop("retries", None)
     retries = globals.settings.max_retries + 1 if retries_kw is None else retries_kw
-    # ponytail: separate budget for ignore_semaphore_timeouts (errno 121) retries,
-    # caps the previously infinite continue loop; raise it if flaky VPNs need more
     soft_retries = 10
     req_opts = dict(
         timeout=timeout,
