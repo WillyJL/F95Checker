@@ -66,3 +66,7 @@ def apply():
             shutil.register_unpack_format("rar", [".rar"], unpack_rarfile)
     except rarfile.RarCannotExec:
         pass
+
+    # Batch management
+    from modules import batch_management
+    batch_management.apply()
