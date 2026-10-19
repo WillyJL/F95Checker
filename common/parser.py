@@ -407,17 +407,11 @@ def thread(res: bytes) -> ParsedThread | ParserError:
 
         # Find all preview images in the starter post, prefer the full-size URL
         previews_urls = []
-        for img in post.find(is_class("bbWrapper")).find_all("img"):
-            if img.find_parent("noscript"):
+        for img in post.find(is_class("bbWrapper")).find_all(is_class("js-lbImage")):
+            url = img.get("data-src") or ""
+            if not url.startswith("https://attachments.f95zone.to/"):
                 continue
-            url = img.get("data-src") or img.get("src") or ""
-            if not url.startswith("https://attachments."):
-                continue
-            # The wrapper link points at the full-size image, the img at a thumbnail
-            if (link := img.find_parent("a")) is not None and (href := link.get("href") or "").startswith("https://attachments."):
-                url = href
-            url = url.replace("/thumb/", "/", 1)
-            # Skip the cover image and duplicates
+            # Skip duplicates
             if url != image_url and url not in previews_urls:
                 previews_urls.append(url)
 
