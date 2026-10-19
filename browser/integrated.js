@@ -293,3 +293,7 @@ var updateIcons = async () => {
     installMutationObservers();
     doUpdate();
 };
+
+if (document.title !== "Just a moment...") {
+    updateIcons();
+}

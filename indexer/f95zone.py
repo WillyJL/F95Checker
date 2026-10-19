@@ -32,13 +32,15 @@ RATELIMIT_FORUM_ERRORS = (
 RATELIMIT_API_ERRORS = (
     "You have been temporarily blocked because of a large amount of requests, please try again later",
 )
+CLOUDFLARE_CAPTCHA_MESSAGES = (
+    b'(function(){window._cf_chl_opt = {',
+    b"<title>Just a moment...</title>",
+)
 TEMP_ERROR_MESSAGES = (
     b'<div id="cf-error-details" class="p-0">',
-    b'(function(){window._cf_chl_opt = {',
     b"<b>504 - Gateway Timeout .</b>",
     b"<title>502 Bad Gateway</title>",
     b"<title>Error 502</title>",
-    b"<title>Just a moment...</title>",
     b"An unexpected error occurred. Please try again later.",
     b"An unexpected database error occurred. Please try again later.\n<!--",
     b"<!-- Connection refused -->",
@@ -85,6 +87,9 @@ ERROR_SESSION_LOGGED_OUT = IndexerError(
 )
 ERROR_F95ZONE_RATELIMIT = IndexerError(
     "F95ZONE_RATELIMIT", dt.timedelta(minutes=15).total_seconds()
+)
+ERROR_CLOUDFLARE_CAPTCHA = IndexerError(
+    "CLOUDFLARE_CAPTCHA", dt.timedelta(minutes=15).total_seconds()
 )
 ERROR_F95ZONE_UNAVAILABLE = IndexerError(
     "F95ZONE_UNAVAILABLE", dt.timedelta(minutes=15).total_seconds()
@@ -157,6 +162,10 @@ def check_error(
         if any((msg in res) for msg in RATELIMIT_FORUM_ERRORS):
             logger.error("Hit F95zone Forum ratelimit")
             return ERROR_F95ZONE_RATELIMIT
+
+        if any((msg in res) for msg in CLOUDFLARE_CAPTCHA_MESSAGES) or not res:
+            logger.error("Hit Cloudflare Captcha")
+            return ERROR_CLOUDFLARE_CAPTCHA
 
         if any((msg in res) for msg in TEMP_ERROR_MESSAGES) or not res:
             logger.warning("F95zone temporarily unreachable")

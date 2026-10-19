@@ -11,6 +11,8 @@ identifier = "io.github.willy-jl.f95checker"
 icon = meta.self_path / "resources/icons/icon"
 script = meta.self_path / "main.py"
 debug_script = meta.self_path / "main-debug.py"
+egg_base_dir = meta.self_path / "build/metadata"
+egg_base_dir.mkdir(exist_ok=True, parents=True)
 
 # Friendly reminder
 try:
@@ -152,6 +154,9 @@ cx_Freeze.setup(
         ),
     ],
     options={
+        "egg_info": {
+            "egg_base": str(egg_base_dir),
+        },
         "build_exe": {
             "includes": includes,
             "excludes": excludes,

@@ -67,13 +67,13 @@ async def thread(id: int) -> dict[str, str] | f95zone.IndexerError | None:
         versions["msg"] = {}
     if index_error := f95zone.check_error(versions, logger):
         return index_error
+
     if str(id) in versions["msg"]:
         version = str(versions["msg"][str(id)])
         if version == "Unknown":
             version = ""
 
-    # If tracked by latest updates, try to search the thread there to get more precise details
-    if version:
+        # If tracked by latest updates, try to search the thread there to get more precise details
         query = f95zone.latest_updates_search_sanitize_query(ret.name)
         for category in f95zone.LATEST_UPDATES_CATEGORIES:
             try:

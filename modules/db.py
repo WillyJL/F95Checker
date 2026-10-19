@@ -193,6 +193,7 @@ async def connect():
         table_name="settings",
         columns={
             "_":                           f'INTEGER PRIMARY KEY CHECK (_=0)',
+            "app_beta_updates":            f'INTEGER DEFAULT {int(False)}',
             "background_on_close":         f'INTEGER DEFAULT {int(False)}',
             "bg_notifs_interval":          f'INTEGER DEFAULT 15',
             "bg_refresh_interval":         f'INTEGER DEFAULT 30',
@@ -219,11 +220,15 @@ async def connect():
             "ext_icon_glow":               f'INTEGER DEFAULT {int(True)}',
             "filter_all_tabs":             f'INTEGER DEFAULT {int(False)}',
             "fit_images":                  f'INTEGER DEFAULT {int(False)}',
+            "github_token":                f'TEXT    DEFAULT ""',
             "grid_columns":                f'INTEGER DEFAULT 3',
             "hidden_timeline_events":      f'TEXT    DEFAULT "[]"',
             "hide_empty_tabs":             f'INTEGER DEFAULT {int(False)}',
             "highlight_tags":              f'INTEGER DEFAULT {int(True)}',
             "ignore_semaphore_timeouts":   f'INTEGER DEFAULT {int(False)}',
+            "image_io_threads":            f'INTEGER DEFAULT 4',
+            "image_decode_threads":        f'INTEGER DEFAULT 3',
+            "image_decode_gif_max":        f'INTEGER DEFAULT 2',
             "independent_tab_views":       f'INTEGER DEFAULT {int(False)}',
             "insecure_ssl":                f'INTEGER DEFAULT {int(False)}',
             "interface_scaling":           f'REAL    DEFAULT 1.0',
@@ -270,7 +275,7 @@ async def connect():
             "tex_compress":                f'INTEGER DEFAULT {TexCompress.Disabled}',
             "tex_compress_replace":        f'INTEGER DEFAULT {int(False)}',
             "timestamp_format":            f'TEXT    DEFAULT "%d/%m/%Y %H:%M"',
-            "unload_offscreen_images":     f'INTEGER DEFAULT {int(False)}',
+            "unload_offscreen_images":     f'INTEGER DEFAULT {int(True)}',
             "vsync_ratio":                 f'INTEGER DEFAULT 1',
             "weighted_score":              f'INTEGER DEFAULT {int(False)}',
             "wine_extra_runners_dirs":     f'TEXT    DEFAULT "{{}}"',
@@ -593,7 +598,7 @@ async def update_game_id(game: Game, new_id):
     game.refresh_image()
 
 
-async def update_game(game: Game, *keys: list[str]):
+async def update_game(game: Game, *keys: str):
     values = []
 
     for key in keys:
@@ -608,7 +613,7 @@ async def update_game(game: Game, *keys: list[str]):
     """, tuple(values))
 
 
-async def update_settings(*keys: list[str]):
+async def update_settings(*keys: str):
     values = []
 
     for key in keys:
@@ -650,7 +655,7 @@ async def create_game(thread: ThreadMatch | SearchResult = None, custom=False):
         return thread.id
 
 
-async def update_label(label: Label, *keys: list[str]):
+async def update_label(label: Label, *keys: str):
     values = []
 
     for key in keys:
@@ -708,7 +713,7 @@ async def create_label():
     return label
 
 
-async def update_tab(tab: Tab, *keys: list[str]):
+async def update_tab(tab: Tab, *keys: str):
     values = []
 
     for key in keys:
@@ -785,7 +790,8 @@ async def update_cookies(new_cookies: dict[str, str]):
             (?, ?)
             ON CONFLICT DO NOTHING
         """, (key, value))
-    globals.cookies = new_cookies
+    globals.cookies.clear()
+    globals.cookies.update(new_cookies)
 
 
 def legacy_json_to_dict(path: pathlib.Path):  # Pre v9.0

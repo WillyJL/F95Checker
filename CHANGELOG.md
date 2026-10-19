@@ -9,6 +9,16 @@
   - Use arrow keys to cycle this game's images
   - Can also press space to toggle the viewer instead of clicking with mouse
   - Scroll to zoom then move mouse to pan
+- Parallelized image I/O and decoding (by @WillyJL):
+  - Multiple threads can now be allocated for image loading
+  - Customizable parameters In Settings > Images for how many threads to use for I/O, decoding and limit to concurrent GIF decoding
+  - Means that next images in queue can start being fetched from disk while previous images are still decoding, and multiple of these can happen at once
+  - Source images (with Tex compress option disabled) can now load much faster, like they should have to begin with
+  - Compressed images (with Tex compress option enabled) can now load even faster, making loading truly unnoticeable, though the tradeoff might not be worth to most users
+  - Due to this, Settings > Images > Unload off-screen is now on by default, and existing users who have it off should consider enabling it to save RAM and VRAM
+  - The default (4 I/O threads, 3 Decode threads, 2 Decode GIFs) should be fine for most users, but tweaking for your hardware can help (if you go all out you might get stutters)
+  - If you want the previous behavior (one image at a time) set all 3 parameters (I/O threads, Decode threads and Decode GIFs) to 1
+  - Note that changing these parameters requires restarting the app
 - Exe launch wrappers (#289 by @cicklolwut & @WillyJL):
   - Allows setting custom arguments and wrapper commands for launching
   - Support for Wine/Proton on Linux/macOS
@@ -17,6 +27,9 @@
     - specify all Video/GIF collections to be opened with a custom command for your media player
     - select the folder as executable for each collection
     - clicking Play will open all files in your media player
+  - Video and Pinup collections and such, default to seleting a folder when adding an executable
+- F95Checker Beta auto-update (by @WillyJL):
+  - Enable in Settings > Manage > F95Checker Beta
 - Show launch state on the play button (#288 by @cicklolwut)
 - Locally tracked playtime duration (#290 by @cicklolwut)
 - Label reordering (#291 by @px-pole & WillyJL)
@@ -34,9 +47,14 @@
   - But once enabled and the backlog of existing images are compressed, future image additions/updates in your library will be compressed quicker and unobtrusively
 - Animations (Video and GIF) and Comics (CG, Comics, Manga and Pinup) thread types are detected properly now, "Collection" and "SiteRip" prefixes are now ignored (by @WillyJL)
 - Notes textbox now resizes with how many lines are in the notes, so it is not the textbox that scrolls but rather the info popup (by @WillyJL)
+- Removing labels now asks for confirmation if Settings > Manage > Confirm when removing is enabled (by @WillyJL)
+- The label remove button now respects Settings > Manage > Show remove button, there is a new option to remove the label in right click menu over the text field (by @WillyJL)
 - Updated dependencies (by @WillyJL):
   - New cx-Freeze version skips unused PyQt6 .dll/.so/.dylib libraries, Windows/Linux install sizes reduced by 70-100MB
   - Possibly better Linux support with GLFW and desktop-notifier updates
+- Make most remaining popups closable by clicking outside the popup (by @WillyJL)
+- Adding a duplicate game via the bottom add/search bar will show its More Info popup instead of a duplicate warning (by @WillyJL)
+- Bulk game import actions will show a summary even if just 1 game was added instead of adding silently (by @WillyJL)
 
 ### Fixed:
 - Fix window show/hide from other threads and from tray icon (#286 by @cicklolwut & @WillyJL)
@@ -45,9 +63,19 @@
 - Donor DDL downloads can now be aborted correctly when stuck (by @WillyJL)
 - Limit image downloads to 2 per second just in case (by @WillyJL)
 - Fix image downloads in censorship regimes (by @WillyJL)
+- Drastically improved stutters during AVIF image loading, most noticeable with 4K images (by @WillyJL)
 - Drastically improved stutters during image compression, most noticeable in (what used to be) catastrophic cases with 5-10MB+ GIFs (by @WillyJL)
+- Pending image loads are cancelled if Settings > Images > Unload off-screen is enabled and image is no longer visible, so visible images can load sooner (by @WillyJL)
 - Fix missing icon on Wayland (#297 by @phubhunter)
 - Handle Cloudflare capcthas as 'F95zone unavailable' warnings (by @WillyJL)
+- Fix RPDL token expiry detection (by @WillyJL)
+- Add link to RPDL browser register page due to captcha/verification seemingly being required now (by @WillyJL)
+- Fix scrollbar not being clickable in multiline text fields (by @WillyJL)
+- Cache API errors and missing thread errors are now bunched together at end of refresh and are non-fatal (by @WillyJL)
+  - Refresh can complete even if some games have cache API errors
+  - Last available cached data is used in those cases
+  - The errors are bunched into a single warning popup at end of refresh, summarizing what games had what API errors and explaining that their data might be slightly out of date
+  - Missing threads are bunched into their own popup, and you can decide what to do to all of them at once (the usual remove, archive or convert to custom)
 
 ### Removed:
 - Collection and SiteRip thread types are gone, these are now detected as the appropriate animation/comic/game type

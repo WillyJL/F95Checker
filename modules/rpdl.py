@@ -166,6 +166,11 @@ async def login():
                 imgui.spacing()
                 _320 = globals.gui.scaled(320)
 
+                imgui.text("If you have issues registering, try from the")
+                imgui.same_line()
+                if imgui.small_button(f"website {icons.open_in_app}"):
+                    callbacks.open_webpage("https://dl.rpdl.net/register")
+
                 imgui.text("Username:")
                 imgui.same_line()
                 pos = imgui.get_cursor_pos_x()
@@ -207,7 +212,7 @@ async def login():
         utils.popup, "RPDL account",
         popup_content,
         closable=True,
-        outside=False
+        outside=True
     )
     while popup.open:
         if login is False:
@@ -234,6 +239,8 @@ def has_authenticated_tracker(res: bytes | dict):
             if res.get("error") == "Token invalid.":
                 return False
             if res.get("error").startswith("Token expired."):
+                return False
+            if res.get("error").startswith("Token not found."):
                 return False
             raise msgbox.Exc(
                 "Unknown response",
@@ -384,7 +391,7 @@ def open_search_popup(game: Game):
         _rpdl_search_popup,
         buttons=True,
         closable=True,
-        outside=False,
+        outside=True,
         footer="Donate at rpdl.net if you like the torrents!"
     )
     async_thread.run(_rpdl_run_search())

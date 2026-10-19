@@ -162,13 +162,13 @@ Please note that this extension is solely to aid the usage of the desktop tool, 
   When I implement new features or work on fixing bugs I submit directly to the [main branch on GitHub](https://github.com/WillyJL/F95Checker), so running directly from
   the source code there could prove unstable at times, and also requires a development environment with an updated Python install and all the requirements up to date. To
   make testing new versions easier, I sometimes issue beta builds. This usually happens when I make some significant change, or an important bugfix, and want to have
-  some binaries that everyone can try easily and give me feedback. **You can see the beta builds in the**
-  **[Actions tab on the GitHub repo](https://github.com/WillyJL/F95Checker/actions);** here you should look for entries with a green tick or a red cross icon. When you
-  open one, scroll down to the `Artifacts` section, look for your platform and click on it to download.
-  **Keep in mind you will need to be logged into GitHub to download.** If the entry had a red icon, that means that the build has failed for some platforms, but yours
-  might be fine so check anyway.
+  some binaries that everyone can try easily and give me feedback.
 
-  Have a look at this [visual guide](https://f95zone.to/threads/f95checker-willyjl.44173/post-15396547) if you still have doubts.
+  **You can enable automatic beta updates in Settings > Manage > F95Checker Beta.**
+
+  Alternatively, you can see the beta builds in the **[Actions tab on the GitHub repo](https://github.com/WillyJL/F95Checker/actions)** and manually look for entries with
+  a green tick, open one, scroll down to the `Artifacts` section, look for your platform and click on it to download.
+  Keep in mind you will need to be logged into GitHub to download.
 
 - **How long will it take for changes on the forum to be detected by F95Checker?**
 
