@@ -76,6 +76,7 @@
   - Last available cached data is used in those cases
   - The errors are bunched into a single warning popup at end of refresh, summarizing what games had what API errors and explaining that their data might be slightly out of date
   - Missing threads are bunched into their own popup, and you can decide what to do to all of them at once (the usual remove, archive or convert to custom)
+- Also use preview images from game thread, fix newline in game title (#298 by @xev-c & @WillyJL)
 
 ### Removed:
 - Collection and SiteRip thread types are gone, these are now detected as the appropriate animation/comic/game type
