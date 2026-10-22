@@ -119,6 +119,8 @@ def _():
                 pass
     elif os is Os.MacOS:
         import plistlib
+        # System default browser, LaunchServices picks the app that handles the URL
+        Browser.add("Default", args=["open"])
         app_dir = pathlib.Path("/Applications")
         empty = []
         matches = ["http", "https"]
@@ -135,7 +137,7 @@ def _():
                             name = parser["CFBundleName"]
                             args = [app / f"Contents/MacOS/{parser['CFBundleExecutable']}"]
                             if args and shutil.which(args[0]) and pathlib.Path(shutil.which(args[0])).exists():
-                                Browser.add(name, args=args)
+                                Browser.add(name, args=args, bundle_id=parser.get("CFBundleIdentifier"))
                             found = True
                             break
                     if found:
