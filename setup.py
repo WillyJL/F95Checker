@@ -64,6 +64,7 @@ zip_exclude_packages = [
     "bencode2",
     "desktop_notifier",
     "glfw",
+    "winrt",
 ] + (["PyQt6"] if sys.platform.startswith("win") else [])
 optimize = 2
 silent_level = 0
@@ -84,6 +85,16 @@ for platform, pkgs in platform_packages.items():
     if sys.platform.startswith(platform):
         for pkg in pkgs:
             packages.append(pkg)
+
+
+# Bundle all winrt namespaces, they can be imported by name at runtime
+# and cx_Freeze's hook skips namespace folders without __init__.py
+if sys.platform.startswith("win"):
+    import pathlib
+    import winrt
+    for winrt_path in winrt.__path__:
+        for table in pathlib.Path(winrt_path).rglob("_table.pywinrt"):
+            packages.append(".".join(("winrt", *table.parent.relative_to(winrt_path).parts)))
 
 
 # Bundle system libraries
