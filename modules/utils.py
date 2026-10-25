@@ -128,7 +128,7 @@ def start_update_check():
     update_check.add_done_callback(reset_timer)
 
 
-def start_refresh_task(coro: typing.Coroutine, reset_bg_timers=True, notify_new_games=True):
+def start_refresh_task(coro: typing.Coroutine, reset_bg_timers=True):
     if is_refreshing():
         return
     if reset_bg_timers:
@@ -146,31 +146,6 @@ def start_refresh_task(coro: typing.Coroutine, reset_bg_timers=True, notify_new_
         globals.refresh_task = None
         globals.gui.tray.update_status()
         globals.gui.recalculate_ids = True
-        if notify_new_games and (globals.new_updated_games or globals.updated_games):
-            if globals.new_updated_games:
-                globals.updated_games.update(globals.new_updated_games)
-                first = list(globals.new_updated_games.keys())[0]
-                globals.new_updated_games.clear()
-            else:
-                first = list(globals.updated_games.keys())[0]
-            globals.updated_games_sorted_ids = sorted(globals.updated_games.keys(), key=lambda id: globals.games[id].type.category.value)
-            for popup in globals.popup_stack:
-                if popup.func is type(globals.gui).draw_updates_popup:
-                    globals.popup_stack.remove(popup)
-                    globals.popup_stack_changed = True
-            push_popup(type(globals.gui).draw_updates_popup, globals.gui).uuid = "updates"
-            if globals.gui.hidden or not globals.gui.focused:
-                image = None
-                if globals.settings.notifs_show_update_banner:
-                    image_paths = list(filter(lambda f: f.suffix not in (".zst", ".aastc"), globals.images_path.glob(f"{first}.*")))
-                    if image_paths:
-                        image = desktop_notifier.Attachment(path=image_paths[0])
-                count = len(globals.updated_games)
-                notification_proc.notify(
-                    title="Updates",
-                    msg=f"{count} item{'' if count == 1 else 's'} in your library {'has' if count == 1 else 'have'} received updates!",
-                    attachment=image,
-                )
         # Continues after this only if the task was not cancelled
         try:
             future.exception()
@@ -702,22 +677,28 @@ def popup(label: str, popup_content: typing.Callable, buttons: dict[str, typing.
 
 def push_popup(*args, bottom=False, **kwargs):
     popup = Popup(*args, **kwargs)
-    notify = False
+    notify_error = False
     if globals.gui:
-        if (globals.gui.hidden or not globals.gui.focused) and (len(args) > 3) and (args[0] is msgbox.msgbox) and (args[3] in (MsgBox.warn, MsgBox.error)):
-            # Ignore some temporary errors in background mode, taken from modules/api.py
-            if globals.gui.hidden and args[1] in (
-                "Rate limit",
-                "Server downtime",
-            ):
-                return
-            notify = True
+        if globals.gui.hidden or not globals.gui.focused:
+            is_msgbox = (len(args) > 3) and (args[0] is msgbox.msgbox)
+            if is_msgbox and (args[3] in (MsgBox.warn, MsgBox.error)):
+                # Ignore some temporary errors in background mode, taken from modules/api.py
+                if globals.gui.hidden and args[1] in (
+                    "Cloudflare captcha",
+                    "Server downtime",
+                    "F95zone forum error",
+                    "F95zone API error",
+                    "Rate limit",
+                    "Login expired",
+                ):
+                    return
+                notify_error = True
     if bottom:
         globals.popup_stack.insert(0, popup)
     else:
         globals.popup_stack.append(popup)
     globals.popup_stack_changed = True
-    if notify:
+    if notify_error:
         notification_proc.notify(
             title="Oops",
             msg="Something went wrong! Click to view the error.",

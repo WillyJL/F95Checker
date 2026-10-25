@@ -78,10 +78,12 @@ def datestamp(timestamp: int | float):
     return int(utc_date.timestamp())
 
 
-def attachment(preview: str):
-    if preview.startswith("https://preview."):
-        return "https://attachments." + preview.removeprefix("https://preview.")
-    return preview
+def attachment(url: str):
+    if url.startswith("https://preview.f95zone.to/"):
+        url =  "https://attachments.f95zone.to/" + url.removeprefix("https://preview.f95zone.to/")
+    if url.startswith("https://attachments.f95zone.to/") and "?h=" in url:
+        url = url.split("?h=")[0]
+    return url
 
 
 class ParserError(Exception):
@@ -220,9 +222,9 @@ def thread(res: bytes) -> ParsedThread | ParserError:
 
         name = ""
         for elem in html.find(is_class("p-title-value")).children:
-            if not is_class("labelLink")(elem) and not is_class("label-append")(elem):
+            if not is_class("p-title-prefix")(elem) and not is_class("labelLink")(elem) and not is_class("label-append")(elem):
                 name += elem.text
-        name = fixed_spaces(sanitize_whitespace(re.search(r"^\s*(.*?)(?:\s*\[.*?\]\s*)*$", name).group(1)))
+        name = fixed_spaces(sanitize_whitespace(re.search(r"^\s*(.*?)(?:\s*\[.*?\]\s*)*$", name, re.DOTALL).group(1)).replace("\n", " "))
 
         thread_version = get_game_attr("version", "mod version", "game version")
         if not thread_version:
@@ -337,9 +339,9 @@ def thread(res: bytes) -> ParsedThread | ParserError:
         if not last_updated:
             try:
                 if elem := post.find(is_class("message-lastEdit")):
-                    last_updated = int(elem.find("time").get("data-time"))
+                    last_updated = int(elem.find("time").get("data-timestamp"))
                 else:
-                    last_updated = int(post.find(is_class("message-attribution-main")).find("time").get("data-time"))
+                    last_updated = int(post.find(is_class("message-attribution-main")).find("time").get("data-timestamp"))
             except Exception:
                 pass
         last_updated = datestamp(last_updated)
@@ -361,8 +363,6 @@ def thread(res: bytes) -> ParsedThread | ParserError:
             score = 0.0
             if elem := head.find("select", attrs={"name": "rating"}):
                 score = float(elem.get("data-initial-rating"))
-            elif elem := head.find(is_class("bratr-rating")):
-                score = float(re.search(r"(\d(?:\.\d\d?)?)", elem.get("title")).group(1))
 
         if votes is None:
             votes = 0
@@ -399,14 +399,22 @@ def thread(res: bytes) -> ParsedThread | ParserError:
                         tags.append(Tag[tag])
         tags = tuple(sorted(tags, key=lambda tag: tag.name))
 
-        elem = post.find(is_class("bbWrapper")).find(lambda elem: elem.name == "img" and "data-src" in elem.attrs)
+        elem = post.find(is_class("bbWrapper")).find(lambda elem: elem.name == "div" and "data-src" in elem.attrs)
         if elem:
-            image_url = elem.get("data-src")
+            image_url = attachment(elem.get("data-src"))
         else:
             image_url = "missing"
 
-        # FIXME: find preview images in thread
+        # Find all preview images in the starter post, prefer the full-size URL
         previews_urls = []
+        for img in post.find(is_class("bbWrapper")).find_all(is_class("js-lbImage")):
+            url = img.get("href", "")
+            if not url.startswith("https://attachments.f95zone.to/"):
+                continue
+            url = attachment(url)
+            # Skip duplicates
+            if url != image_url and url not in previews_urls:
+                previews_urls.append(url)
 
         downloads = get_game_downloads("downloads", "download")
 
@@ -552,7 +560,7 @@ def reviews(res: bytes) -> ParsedReviews | ParserError:
                 likes = len(likes_bar.find_all("bdi"))
                 if likes_match := re.search(r"and (\d+) other", likes_bar.get_text().replace(",", "")):
                     likes += int(likes_match.group(1))
-            timestamp = int(review.find(is_class("u-dt")).get("data-time"))
+            timestamp = int(review.find(is_class("u-dt")).get("data-timestamp"))
             parsed_review = ParsedReview(
                 user=user,
                 score=score,

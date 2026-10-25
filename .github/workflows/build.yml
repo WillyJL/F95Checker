@@ -211,7 +211,6 @@ jobs:
           mv ./common/meta.py.new ./common/meta.py
 
       - name: "Mark build number"
-        if: "github.event_name != 'release'"
         run: |
           sed "s/build_number = 0/build_number = ${{ github.run_number }}/g" ./common/meta.py > ./common/meta.py.new
           rm ./common/meta.py

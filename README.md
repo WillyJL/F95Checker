@@ -27,6 +27,7 @@ An update checker and library tool for (NSFW) games on the [F95zone](https://f95
   - Last update, last launched and added on dates
   - Description / overview and changelog
   - Cover images (including gifs)
+  - Preview images/gallery
   - Download links, F95zone Donor DDL and RPDL.net support
   - Forum tags and personal labels
   - Forum score (value out of 5) and personal rating (5 stars)
@@ -50,7 +51,7 @@ An update checker and library tool for (NSFW) games on the [F95zone](https://f95
 
 Built with Python 3.11/3.12 for Windows, Linux and macOS (x64 and arm64).
 
-Binaries are available for all 3 platforms, requiring no setup at all. If instead you want to run from source note that Python 3.11+ is required and you'll need to
+Binaries are available for all 3 platforms, requiring no setup at all. If instead you want to run from source note that Python 3.11/3.12 is required and you'll need to
 install the requirements with pip.
 
 ## Installation:
@@ -117,7 +118,7 @@ Please note that this extension is solely to aid the usage of the desktop tool, 
   - Using the browser extension (more info above)
   - Using the `Manage > Import` section in the settings sidebar:
     - Thread links to paste multiple links at once
-    - F95zone bookmarks and watched threads to add the pages you saved on your F95zone account
+    - F95zone watched and bookmarks to add the pages you saved on your F95zone account
     - Browser bookmarks to import the bookmarks you saved in your browser
     - URL shortcut file for Windows web shortcut files
 
@@ -160,15 +161,15 @@ Please note that this extension is solely to aid the usage of the desktop tool, 
 - **How can I try new features early?**
 
   When I implement new features or work on fixing bugs I submit directly to the [main branch on GitHub](https://github.com/WillyJL/F95Checker), so running directly from
-  the source code there could prove unstable at times, and also requires a development environment with an updated Python install and all the requirements up to date. To
-  make testing new versions easier, I sometimes issue beta builds. This usually happens when I make some significant change, or an important bugfix, and want to have
-  some binaries that everyone can try easily and give me feedback. **You can see the beta builds in the**
-  **[Actions tab on the GitHub repo](https://github.com/WillyJL/F95Checker/actions);** here you should look for entries with a green tick or a red cross icon. When you
-  open one, scroll down to the `Artifacts` section, look for your platform and click on it to download.
-  **Keep in mind you will need to be logged into GitHub to download.** If the entry had a red icon, that means that the build has failed for some platforms, but yours
-  might be fine so check anyway.
+  the source code there could prove unstable at times, and also requires a development environment with the correct Python version installed and all the requirements up
+  to date. To make testing new versions easier, I sometimes issue beta builds. This usually happens when I make some significant change, or an important bugfix, and want
+  to have some binaries that everyone can try easily and give me feedback.
 
-  Have a look at this [visual guide](https://f95zone.to/threads/f95checker-willyjl.44173/post-15396547) if you still have doubts.
+  **You can enable automatic beta updates in Settings > Manage > F95Checker Beta.**
+
+  Alternatively, you can see the beta builds in the **[Actions tab on the GitHub repo](https://github.com/WillyJL/F95Checker/actions)** and manually look for entries with
+  a green tick, open one, scroll down to the `Artifacts` section, look for your platform and click on it to download.
+  Keep in mind you will need to be logged into GitHub to download.
 
 - **How long will it take for changes on the forum to be detected by F95Checker?**
 
@@ -176,7 +177,7 @@ Please note that this extension is solely to aid the usage of the desktop tool, 
 
 ## About the speed™:
 
-F95zone does not yet have a proper API serving the information needed by this tool, so the only way to gather them is by requesting the full game threads like a normal
+F95zone does have an API but it does not provide a few datapoints needed by this tool, so the only way to gather them is by requesting the full game threads like a normal
 browser would. However this is not practical because it consumes a lot of network and computing resources, takes way too long and puts unnecessary stress on the forum
 servers.
 
@@ -249,10 +250,21 @@ Please note that this software is not ( yet ;) ) officially affiliated with the 
 
 Supporters:
 
-[FaceCrap](https://f95zone.to/members/2913051/) - [WhiteVanDaycare](https://f95zone.to/members/3509231/) - [ascsd](https://f95zone.to/members/3977760/) -
-[GioBol](https://f95zone.to/members/3716618/) - [Jarulf](https://f95zone.to/members/2709937/) - [salkrim](https://f95zone.to/members/3899517/) -
-[rozzic](https://f95zone.to/members/449099/) -[Belfaier](https://f95zone.to/members/7363156/) - [warez_gamez](https://f95zone.to/members/81517/) -
-[DeadMoan](https://f95zone.to/members/4392187/) - And 4 anons
+[FaceCrap](https://f95zone.to/members/2913051/) -
+[kitty_kt](https://f95zone.to/members/97672/) -
+[laseracid](https://f95zone.to/members/97860/) -
+[ascsd](https://f95zone.to/members/3977760/) -
+[GioBol](https://f95zone.to/members/3716618/) -
+[Turribel](https://f95zone.to/members/2114990/) -
+[leavy](https://f95zone.to/members/2642332/) -
+[WhiteVanDaycare](https://f95zone.to/members/3509231/) -
+[Jarulf](https://f95zone.to/members/2709937/) -
+[salkrim](https://f95zone.to/members/3899517/) -
+[rozzic](https://f95zone.to/members/449099/) -
+[Belfaier](https://f95zone.to/members/7363156/) -
+[warez_gamez](https://f95zone.to/members/81517/) -
+[DeadMoan](https://f95zone.to/members/4392187/) -
+And 4 anons
 
 Contributors:
 
@@ -260,19 +272,32 @@ Contributors:
 - [littleraisins](https://github.com/littleraisins): Fixes, features and misc ideas from the (defunct) 'X' fork
 - [FaceCrap](https://github.com/FaceCrap): Multiple small fixes, improvements and finetuning
 - [blackop](https://github.com/disaster2395): Proxy support, temporary ratelimit fix, linux login fix
+- [Crykon](https://github.com/Crykon): Preview images
 - [cicklolwut](https://github.com/cicklolwut): Security fixes, Linux wine/proton config, playtime stats
-- [Sam](https://f95zone.to/members/7899/): Support from F95zone side to make much this possible
-- [GR3ee3N](https://github.com/GR3ee3N): Optimized build workflows and other PRs
+- [Sam](https://f95zone.to/members/7899/): Support from F95zone side to make much of this possible
 - [batblue](https://f95zone.to/members/4143766/): macOS suppport and feedback guy
 - [unroot](https://f95zone.to/members/1585550/): Linux support and feedback guy
-- [ploper26](https://f95zone.to/members/1295524/): Suggested HEAD requests for refreshing
+- [ploper26](https://f95zone.to/members/1295524/): Suggested HEAD requests for refreshing (no longer used)
 - [ascsd](https://f95zone.to/members/3977760/): Helped with brainstorming on some issues and gave some tips
+- [GR3ee3N](https://github.com/GR3ee3N): Optimized build workflows and other PRs
+- See the full list [here](https://github.com/WillyJL/F95Checker/graphs/contributors?all=1)
 
 Community:
 
-[abada25](https://f95zone.to/members/1679118/) - [AtotehZ](https://f95zone.to/members/840616/) - [bitogno](https://f95zone.to/members/605466/) -
+[abada25](https://f95zone.to/members/1679118/) -
+[AtotehZ](https://f95zone.to/members/840616/) -
+[bitogno](https://f95zone.to/members/605466/) -
 [BrockLanders](https://f95zone.to/members/2707184/) -
 [d_pedestrian](https://f95zone.to/members/2616862/) -
-[Danv](https://f95zone.to/members/2758580/) - [DarK x Duke](https://f95zone.to/members/1852502/) - [Dukez](https://f95zone.to/members/3182770/) - [GrammerCop](https://f95zone.to/members/2114990/) - [harem.king](https://f95zone.to/members/6410446/) -
-[MillenniumEarl](https://f95zone.to/members/1470797/) - [simple_human](https://f95zone.to/members/1056502/) - [SmurfyBlue](https://f95zone.to/members/671/) - [WhiteVanDaycare](https://f95zone.to/members/3509231/) - [yohudood](https://f95zone.to/members/26049/) -
+[Danv](https://f95zone.to/members/2758580/) -
+[DarK x Duke](https://f95zone.to/members/1852502/) -
+[Dfour](https://f95zone.to/members/114089/) -
+[Dukez](https://f95zone.to/members/3182770/) -
+[Fauno36](https://f95zone.to/members/6131511/) -
+[harem.king](https://f95zone.to/members/6410446/) -
+[MillenniumEarl](https://f95zone.to/members/1470797/) -
+[simple_human](https://f95zone.to/members/1056502/) -
+[SirKat](https://f95zone.to/members/1876442/) -
+[SmurfyBlue](https://f95zone.to/members/671/) -
+[yohudood](https://f95zone.to/members/26049/) -
 And others that I might be forgetting

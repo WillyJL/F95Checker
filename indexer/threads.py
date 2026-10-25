@@ -75,3 +75,26 @@ async def full_request(id: int, ts: int):
         full,
         status_code=status,
     )
+
+
+@router.get("/raw/{id}")
+async def raw_request(id: int):
+    if id not in VALID_THREAD_IDS:
+        return fastapi.responses.JSONResponse(
+            "Invalid thread ID",
+            status_code=400,
+        )
+
+    full = await cache.get_thread(id, allow_stale=True)
+
+    status = 200
+    if index_error := full.get(cache.INDEX_ERROR):
+        if index_error == f95zone.ERROR_THREAD_MISSING.error_flag:
+            status = 404
+        else:
+            status = 500
+
+    return fastapi.responses.JSONResponse(
+        full,
+        status_code=status,
+    )

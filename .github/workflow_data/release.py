@@ -6,6 +6,8 @@ import os
 if __name__ == "__main__":
     with open("CHANGELOG.md") as f:
         changelog = f.read()
+        changelog = changelog.split("\n## ")[0]  # Remove previous version and the rest of the file
+        changelog = changelog.split("\n", 1)[1].lstrip()  # Remove the title for current version
     with open(os.environ["GITHUB_EVENT_PATH"]) as f:
         event = json.load(f)
     print(f"event = {json.dumps(event, indent=4)}")

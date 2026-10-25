@@ -34,7 +34,7 @@ lxml==6.1.2
 psutil==7.2.2
 pywin32==312 ; sys_platform == "win32"
 bencode2==0.3.33
-pillow==12.3.0
+pillow==13.0.0
 zstd==1.5.7.2
 
 # Proxy support
