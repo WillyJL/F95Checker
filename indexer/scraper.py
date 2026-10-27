@@ -67,13 +67,13 @@ async def thread(id: int) -> dict[str, str] | f95zone.IndexerError | None:
         versions["msg"] = {}
     if index_error := f95zone.check_error(versions, logger):
         return index_error
+
     if str(id) in versions["msg"]:
         version = str(versions["msg"][str(id)])
         if version == "Unknown":
             version = ""
 
-    # If tracked by latest updates, try to search the thread there to get more precise details
-    if version:
+        # If tracked by latest updates, try to search the thread there to get more precise details
         query = f95zone.latest_updates_search_sanitize_query(ret.name)
         for category in f95zone.LATEST_UPDATES_CATEGORIES:
             try:
@@ -111,10 +111,11 @@ async def thread(id: int) -> dict[str, str] | f95zone.IndexerError | None:
                     ret.developer = update["creator"] or ret.developer
                     ret.score = round(update["rating"], 1)
                     ret.image_url = parser.attachment(update["cover"]) or ret.image_url
-                    ret.previews_urls = [
-                        parser.attachment(preview_url)
-                        for preview_url in update["screens"]
-                    ] or ret.previews_urls
+                    # Append screens from latest updates that are missing in the thread
+                    for preview_url in update["screens"]:
+                        preview_url = parser.attachment(preview_url)
+                        if preview_url != ret.image_url and preview_url not in ret.previews_urls:
+                            ret.previews_urls.append(preview_url)
                     last_promoted = parser.datestamp(update["ts"])
                     if (
                         ret.last_updated > time.time()  # Only if thread has a typo
@@ -129,41 +130,44 @@ async def thread(id: int) -> dict[str, str] | f95zone.IndexerError | None:
         else:  # Didn't break
             logger.warning(f"Thread {id} not found in latest updates search")
 
-    retries = 10
-    while retries:
-        async with f95zone.RATELIMIT:
-            try:
-                async with f95zone.session.get(
-                    thread_url + "/br-reviews/",
-                    cookies=f95zone.cookies,
-                ) as req:
-                    if req.status == 429 and retries > 1:
-                        logger.warning("Hit a ratelimit, sleeping 2 seconds")
-                        await asyncio.sleep(2)
-                        retries -= 1
-                        continue
-                    res = await req.read()
-                    break
-            except Exception as exc:
-                if index_error := f95zone.check_error(exc, logger):
-                    return index_error
-                raise
-
-    if index_error := f95zone.check_error(res, logger):
-        return index_error
-
-    if not str(req.real_url).rstrip("/").endswith("br-reviews"):
-        # Some threads have reviews disabled
+    if ret.votes == 0:
         reviews = parser.ParsedReviews(total=0, items=[])
     else:
-        reviews = await loop.run_in_executor(None, parser.reviews, res)
-        if isinstance(reviews, parser.ParserError):
-            logger.error(
-                f"Thread {id} reviews parsing failed: {reviews.message}\n{reviews.dump}"
-            )
-            return f95zone.ERROR_PARSING_FAILED
+        retries = 10
+        while retries:
+            async with f95zone.RATELIMIT:
+                try:
+                    async with f95zone.session.get(
+                        thread_url + "/reviews/",
+                        cookies=f95zone.cookies,
+                    ) as req:
+                        if req.status == 429 and retries > 1:
+                            logger.warning("Hit a ratelimit, sleeping 2 seconds")
+                            await asyncio.sleep(2)
+                            retries -= 1
+                            continue
+                        res = await req.read()
+                        break
+                except Exception as exc:
+                    if index_error := f95zone.check_error(exc, logger):
+                        return index_error
+                    raise
 
-        reviews.items = [dataclasses.asdict(review) for review in reviews.items]
+        if index_error := f95zone.check_error(res, logger):
+            return index_error
+
+        if not str(req.real_url).rstrip("/").endswith("/reviews"):
+            # Some threads have reviews disabled
+            reviews = parser.ParsedReviews(total=0, items=[])
+        else:
+            reviews = await loop.run_in_executor(None, parser.reviews, res)
+            if isinstance(reviews, parser.ParserError):
+                logger.error(
+                    f"Thread {id} reviews parsing failed: {reviews.message}\n{reviews.dump}"
+                )
+                return f95zone.ERROR_PARSING_FAILED
+
+            reviews.items = [dataclasses.asdict(review) for review in reviews.items]
 
     # Prepare for redis, only strings allowed
     parsed = dataclasses.asdict(ret)

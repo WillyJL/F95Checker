@@ -102,12 +102,13 @@ async def last_change(id: int) -> int:
     return int(last_change)
 
 
-async def get_thread(id: int) -> dict[str, str]:
+async def get_thread(id: int, allow_stale=False) -> dict[str, str]:
     assert isinstance(id, int)
     name = NAME_FORMAT.format(id=id)
     logger.debug(f"Get {name}")
 
-    await _maybe_update_thread_cache(id, name)
+    if not allow_stale:
+        await _maybe_update_thread_cache(id, name)
 
     thread = await redis.hgetall(name)
 

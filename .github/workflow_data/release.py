@@ -6,6 +6,8 @@ import os
 if __name__ == "__main__":
     with open("CHANGELOG.md") as f:
         changelog = f.read()
+        changelog = changelog.split("\n## ")[0]  # Remove previous version and the rest of the file
+        changelog = changelog.split("\n", 1)[1].lstrip()  # Remove the title for current version
     with open(os.environ["GITHUB_EVENT_PATH"]) as f:
         event = json.load(f)
     print(f"event = {json.dumps(event, indent=4)}")
@@ -18,7 +20,7 @@ if __name__ == "__main__":
     ).json()
     print(f"release = {json.dumps(release, indent=4)}")
     body = "## ⬇️ Download\n"
-    for asset_type, asset_icon in [("Windows", "🪟"), ("Linux", "🐧"), ("MacOS", "🍎"), ("Source", "🐍")]:
+    for asset_type, asset_icon in [("Windows", "🪟"), ("Linux", "🐧"), ("macOS-x64", "🍎"), ("macOS-arm64", "🍎"), ("Source", "🐍")]:
         print(f"Adding {asset_type}")
         for asset in release["assets"]:
             if asset_type.lower() in asset["name"].lower():

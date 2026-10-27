@@ -47,6 +47,7 @@ from modules import (
 )
 
 connection: aiosqlite.Connection = None
+label_positions_lock: asyncio.Lock = None
 
 
 @contextlib.contextmanager
@@ -159,16 +160,40 @@ async def create_table(table_name: str, columns: dict[str, str], renames: list[t
 
 
 async def connect():
-    global connection
+    global connection, label_positions_lock
 
-    migrate = not (globals.data_path / "db.sqlite3").is_file()
-    connection = await aiosqlite.connect(globals.data_path / "db.sqlite3")
+    db_path = globals.data_path / "db.sqlite3"
+
+    db_abs = db_path.resolve()
+    self_abs = globals.self_path.resolve()
+    if self_abs in db_abs.parents:
+        utils.push_popup(
+            msgbox.msgbox, "Unsupported configuration",
+            "The app data location:\n"
+            f"{db_path}\n"
+            "resides in a location:\n"
+            f"{db_abs}\n"
+            "which is inside the app install files:\n"
+            f"{self_abs}\n"
+            "\n"
+            "DO NOT:\n"
+            "- place the app install files inside the app data location\n"
+            "- symlink the app data location inside the app install files\n"
+            "The current configuration WILL lead to IRRECOVERABLE LOSS OF DATA upon app updates.",
+            MsgBox.error,
+            buttons={}
+        )
+
+    migrate = not db_path.is_file()
+    connection = await aiosqlite.connect(db_path)
+    label_positions_lock = asyncio.Lock()
     connection.row_factory = aiosqlite.Row  # Return sqlite3.Row instead of tuple
 
     await create_table(
         table_name="settings",
         columns={
             "_":                           f'INTEGER PRIMARY KEY CHECK (_=0)',
+            "app_beta_updates":            f'INTEGER DEFAULT {int(False)}',
             "background_on_close":         f'INTEGER DEFAULT {int(False)}',
             "bg_notifs_interval":          f'INTEGER DEFAULT 15',
             "bg_refresh_interval":         f'INTEGER DEFAULT 30',
@@ -184,20 +209,26 @@ async def connect():
             "copy_urls_as_bbcode":         f'INTEGER DEFAULT {int(False)}',
             "datestamp_format":            f'TEXT    DEFAULT "%b %d, %Y"',
             "default_exe_dir":             f'TEXT    DEFAULT "{{}}"',
+            "default_launch_wrapper":      f'TEXT    DEFAULT "{{}}"',
             "default_tab_is_new":          f'INTEGER DEFAULT {int(False)}',
             "display_mode":                f'INTEGER DEFAULT {DisplayMode.list}',
             "display_tab":                 f'INTEGER DEFAULT NULL',
             "downloads_dir":               f'TEXT    DEFAULT "{{}}"',
+            "downloads_extract":           f'INTEGER DEFAULT {int(True)}',
             "ext_background_add":          f'INTEGER DEFAULT {int(True)}',
             "ext_highlight_tags":          f'INTEGER DEFAULT {int(True)}',
             "ext_icon_glow":               f'INTEGER DEFAULT {int(True)}',
             "filter_all_tabs":             f'INTEGER DEFAULT {int(False)}',
             "fit_images":                  f'INTEGER DEFAULT {int(False)}',
+            "github_token":                f'TEXT    DEFAULT ""',
             "grid_columns":                f'INTEGER DEFAULT 3',
             "hidden_timeline_events":      f'TEXT    DEFAULT "[]"',
             "hide_empty_tabs":             f'INTEGER DEFAULT {int(False)}',
             "highlight_tags":              f'INTEGER DEFAULT {int(True)}',
             "ignore_semaphore_timeouts":   f'INTEGER DEFAULT {int(False)}',
+            "image_io_threads":            f'INTEGER DEFAULT 4',
+            "image_decode_threads":        f'INTEGER DEFAULT 3',
+            "image_decode_gif_max":        f'INTEGER DEFAULT 2',
             "independent_tab_views":       f'INTEGER DEFAULT {int(False)}',
             "insecure_ssl":                f'INTEGER DEFAULT {int(False)}',
             "interface_scaling":           f'REAL    DEFAULT 1.0',
@@ -210,6 +241,8 @@ async def connect():
             "play_gifs":                   f'INTEGER DEFAULT {int(True)}',
             "play_gifs_unfocused":         f'INTEGER DEFAULT {int(False)}',
             "preload_nearby_images":       f'INTEGER DEFAULT {int(False)}',
+            "previews_enabled":            f'INTEGER DEFAULT {int(False)}',
+            "previews_height":             f'INTEGER DEFAULT 200',
             "proxy_type":                  f'INTEGER DEFAULT {ProxyType.Disabled}',
             "proxy_host":                  f'TEXT    DEFAULT ""',
             "proxy_port":                  f'INTEGER DEFAULT 8080',
@@ -218,7 +251,6 @@ async def connect():
             "quick_filters":               f'INTEGER DEFAULT {int(True)}',
             "refresh_archived_games":      f'INTEGER DEFAULT {int(True)}',
             "refresh_completed_games":     f'INTEGER DEFAULT {int(True)}',
-            "render_when_unfocused":       f'INTEGER DEFAULT {int(True)}',
             "request_timeout":             f'INTEGER DEFAULT 30',
             "rpc_enabled":                 f'INTEGER DEFAULT {int(True)}',
             "rpdl_password":               f'TEXT    DEFAULT ""',
@@ -244,9 +276,11 @@ async def connect():
             "tex_compress":                f'INTEGER DEFAULT {TexCompress.Disabled}',
             "tex_compress_replace":        f'INTEGER DEFAULT {int(False)}',
             "timestamp_format":            f'TEXT    DEFAULT "%d/%m/%Y %H:%M"',
-            "unload_offscreen_images":     f'INTEGER DEFAULT {int(False)}',
+            "unload_offscreen_images":     f'INTEGER DEFAULT {int(True)}',
             "vsync_ratio":                 f'INTEGER DEFAULT 1',
             "weighted_score":              f'INTEGER DEFAULT {int(False)}',
+            "wine_extra_runners_dirs":     f'TEXT    DEFAULT "{{}}"',
+            "wine_prefixes_dir":           f'TEXT    DEFAULT "{{}}"',
             "zoom_area":                   f'INTEGER DEFAULT 50',
             "zoom_enabled":                f'INTEGER DEFAULT {int(True)}',
             "zoom_times":                  f'REAL    DEFAULT 4.0',
@@ -284,6 +318,7 @@ async def connect():
             "last_full_check":             f'INTEGER DEFAULT 0',
             "last_check_version":          f'TEXT    DEFAULT ""',
             "last_launched":               f'INTEGER DEFAULT 0',
+            "playtime":                    f'REAL    DEFAULT 0',
             "score":                       f'REAL    DEFAULT 0',
             "votes":                       f'INTEGER DEFAULT 0',
             "rating":                      f'INTEGER DEFAULT 0',
@@ -292,6 +327,7 @@ async def connect():
             "updated":                     f'INTEGER DEFAULT NULL',
             "archived":                    f'INTEGER DEFAULT {int(False)}',
             "executables":                 f'TEXT    DEFAULT "[]"',
+            "launch_wrapper":              f'TEXT    DEFAULT "{{}}"',
             "description":                 f'TEXT    DEFAULT ""',
             "changelog":                   f'TEXT    DEFAULT ""',
             "tags":                        f'TEXT    DEFAULT "[]"',
@@ -328,6 +364,7 @@ async def connect():
             "id":                          f'INTEGER PRIMARY KEY AUTOINCREMENT',
             "name":                        f'TEXT    DEFAULT ""',
             "color":                       f'TEXT    DEFAULT "#696969"',
+            "position":                    f'INTEGER DEFAULT 0',
         }
     )
     await create_table(
@@ -379,6 +416,11 @@ def sql_to_py(value: str | int | float, data_type: typing.Type):
                     key_type = args[0]
                     value_type = args[1]
                     value = data_type((key_type(int(k) if (type(k) is str and k.isdigit()) else k), value_type(v)) for k, v in value.items())
+                    if getattr(value_type, "__name__", None) == "dict" and (value_args := getattr(value_type, "__args__", None)):
+                        value_key_type = value_args[0]
+                        value_value_type = value_args[1]
+                        # Lord have mercy
+                        value = data_type((key_type(int(k) if (type(k) is str and k.isdigit()) else k), value_type((value_key_type(int(vk) if (type(vk) is str and vk.isdigit()) else vk), value_value_type(vv)) for vk, vv in v.items())) for k, v in value.items())
             except json.JSONDecodeError:
                 value = data_type([("", value)]) if value else data_type()
         case "list" | "tuple":
@@ -409,7 +451,13 @@ def sql_to_py(value: str | int | float, data_type: typing.Type):
                 else:
                     value = None
             else:
-                value = data_type(value)
+                try:
+                    value = data_type(value)
+                except ValueError:
+                    if hasattr(data_type, "Unknown"):
+                        value = data_type.Unknown
+                    else:
+                        raise
     return value
 
 
@@ -437,9 +485,11 @@ async def load():
     cursor = await connection.execute("""
         SELECT *
         FROM labels
+        ORDER BY id
     """)
     for label in await cursor.fetchall():
         Label.add(row_to_cls(label, Label))
+    Label.sort_instances()
 
     cursor = await connection.execute("""
         SELECT *
@@ -514,35 +564,42 @@ def py_to_sql(value: enum.Enum | Timestamp | bool | list | tuple | typing.Any):
 
 
 async def update_game_id(game: Game, new_id):
+    old_id = game.id
+    game.cancel_preview_loading()
+    game.unload_previews()
     await connection.execute(f"""
         UPDATE games
         SET
             id={new_id}
-        WHERE id={game.id}
+        WHERE id={old_id}
     """)
     globals.games[new_id] = game
-    if game.id != new_id:
-        del globals.games[game.id]
+    if old_id != new_id:
+        del globals.games[old_id]
 
     await connection.execute(f"""
         UPDATE timeline_events
         SET
             game_id={new_id}
-        WHERE game_id={game.id}
+        WHERE game_id={old_id}
     """)
     for event in game.timeline_events:
         event.game_id = new_id
 
-    for img in globals.images_path.glob(f"{game.id}.*"):
+    for img in globals.images_path.glob(f"{old_id}.*"):
         try:
             shutil.move(img, img.with_name(f"{new_id}{''.join(img.suffixes)}"))
         except Exception:
             pass
+    try:
+        shutil.move(globals.images_path / f"previews/{old_id}", globals.images_path / f"previews/{new_id}")
+    except Exception:
+        pass
     game.id = new_id
     game.refresh_image()
 
 
-async def update_game(game: Game, *keys: list[str]):
+async def update_game(game: Game, *keys: str):
     values = []
 
     for key in keys:
@@ -557,7 +614,7 @@ async def update_game(game: Game, *keys: list[str]):
     """, tuple(values))
 
 
-async def update_settings(*keys: list[str]):
+async def update_settings(*keys: str):
     values = []
 
     for key in keys:
@@ -599,7 +656,7 @@ async def create_game(thread: ThreadMatch | SearchResult = None, custom=False):
         return thread.id
 
 
-async def update_label(label: Label, *keys: list[str]):
+async def update_label(label: Label, *keys: str):
     values = []
 
     for key in keys:
@@ -614,6 +671,16 @@ async def update_label(label: Label, *keys: list[str]):
     """, tuple(values))
 
 
+async def update_label_positions():
+    async with label_positions_lock:
+        positions = tuple((label.position, label.id) for label in Label.instances)
+        await connection.executemany("""
+            UPDATE labels
+            SET position=?
+            WHERE id=?
+        """, positions)
+
+
 async def delete_label(label: Label):
     await connection.execute(f"""
         DELETE FROM labels
@@ -626,24 +693,28 @@ async def delete_label(label: Label):
         if flt.match is label:
             globals.gui.filters.remove(flt)
     Label.remove(label)
+    Label.update_positions()
+    await update_label_positions()
 
 
 async def create_label():
     cursor = await connection.execute(f"""
         INSERT INTO labels
-        DEFAULT VALUES
-    """)
+        (position)
+        VALUES
+        (?)
+    """, (len(Label.instances),))
     cursor = await connection.execute(f"""
         SELECT *
         FROM labels
-        WHERE id={cursor.lastrowid}
-    """)
+        WHERE id=?
+    """, (cursor.lastrowid,))
     label = row_to_cls(await cursor.fetchone(), Label)
     Label.add(label)
     return label
 
 
-async def update_tab(tab: Tab, *keys: list[str]):
+async def update_tab(tab: Tab, *keys: str):
     values = []
 
     for key in keys:
@@ -720,7 +791,8 @@ async def update_cookies(new_cookies: dict[str, str]):
             (?, ?)
             ON CONFLICT DO NOTHING
         """, (key, value))
-    globals.cookies = new_cookies
+    globals.cookies.clear()
+    globals.cookies.update(new_cookies)
 
 
 def legacy_json_to_dict(path: pathlib.Path):  # Pre v9.0

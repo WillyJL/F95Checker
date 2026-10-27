@@ -15,7 +15,7 @@ from common import (
     parser,
 )
 
-RATELIMIT = aiolimiter.AsyncLimiter(max_rate=1, time_period=0.5)
+RATELIMIT = aiolimiter.AsyncLimiter(max_rate=1, time_period=0.25)
 TIMEOUT = aiohttp.ClientTimeout(total=30, connect=30, sock_read=30, sock_connect=30)
 LOGIN_ERROR_MESSAGES = (
     b'<a href="/login/" data-xf-click="overlay">Log in or register now.</a>',
@@ -31,6 +31,10 @@ RATELIMIT_FORUM_ERRORS = (
 )
 RATELIMIT_API_ERRORS = (
     "You have been temporarily blocked because of a large amount of requests, please try again later",
+)
+CLOUDFLARE_CAPTCHA_MESSAGES = (
+    b'(function(){window._cf_chl_opt = {',
+    b"<title>Just a moment...</title>",
 )
 TEMP_ERROR_MESSAGES = (
     b'<div id="cf-error-details" class="p-0">',
@@ -83,6 +87,9 @@ ERROR_SESSION_LOGGED_OUT = IndexerError(
 )
 ERROR_F95ZONE_RATELIMIT = IndexerError(
     "F95ZONE_RATELIMIT", dt.timedelta(minutes=15).total_seconds()
+)
+ERROR_CLOUDFLARE_CAPTCHA = IndexerError(
+    "CLOUDFLARE_CAPTCHA", dt.timedelta(minutes=15).total_seconds()
 )
 ERROR_F95ZONE_UNAVAILABLE = IndexerError(
     "F95ZONE_UNAVAILABLE", dt.timedelta(minutes=15).total_seconds()
@@ -156,7 +163,11 @@ def check_error(
             logger.error("Hit F95zone Forum ratelimit")
             return ERROR_F95ZONE_RATELIMIT
 
-        if any((msg in res) for msg in TEMP_ERROR_MESSAGES):
+        if any((msg in res) for msg in CLOUDFLARE_CAPTCHA_MESSAGES) or not res:
+            logger.error("Hit Cloudflare Captcha")
+            return ERROR_CLOUDFLARE_CAPTCHA
+
+        if any((msg in res) for msg in TEMP_ERROR_MESSAGES) or not res:
             logger.warning("F95zone temporarily unreachable")
             return ERROR_F95ZONE_UNAVAILABLE
 

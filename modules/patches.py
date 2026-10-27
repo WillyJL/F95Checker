@@ -32,7 +32,6 @@ def apply():
                 os.environ["QTWEBENGINEPROCESS_PATH"] = str(process)
 
     # Pillow image loading fixes
-    import pillow_avif
     from PIL import ImageFile, PngImagePlugin
     ImageFile.LOAD_TRUNCATED_IMAGES = True
     PngImagePlugin.MAX_TEXT_CHUNK *= 10

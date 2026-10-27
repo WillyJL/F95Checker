@@ -14,9 +14,10 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { os: "windows-2022",   python: "3.12.4", cx-freeze: "7.0.0", cx-logging: "v3.2.0", astcenc: "5.1.0", compressonator: "4.5.52" }
-          - { os: "ubuntu-22.04",   python: "3.12.4", cx-freeze: "7.0.0", cx-logging: ""      , astcenc: "5.1.0", compressonator: "4.5.52" }
-          - { os: "macos-15-intel", python: "3.12.4", cx-freeze: "7.0.0", cx-logging: ""      , astcenc: "5.1.0", compressonator: ""       }
+          - { os: "windows-2022",   python: "3.12.10", cx-freeze: "8.7.0", cx-logging: "v3.2.1", astcenc: "5.7.0", compressonator: "4.5.52", artifact: "Windows" }
+          - { os: "ubuntu-22.04",   python: "3.12.14", cx-freeze: "8.7.0", cx-logging: "",       astcenc: "5.7.0", compressonator: "4.5.52", artifact: "Linux" }
+          - { os: "macos-15-intel", python: "3.12.10", cx-freeze: "8.7.0", cx-logging: "",       astcenc: "5.7.0", compressonator: "",       artifact: "macOS-x64" }
+          - { os: "macos-15",       python: "3.12.10", cx-freeze: "8.7.0", cx-logging: "",       astcenc: "5.7.0", compressonator: "",       artifact: "macOS-arm64" }
     name: "${{ matrix.config.os }}"
     runs-on: "${{ matrix.config.os }}"
     if: "github.event_name != 'push' || contains(github.event.head_commit.message, '+ BUILD')"
@@ -30,7 +31,7 @@ jobs:
           git config --global core.eol lf
 
       - name: "Setup Python"
-        uses: "actions/setup-python@v5"
+        uses: "actions/setup-python@v6"
         with:
           python-version: "${{ matrix.config.python }}"
 
@@ -47,7 +48,7 @@ jobs:
       # === BUILD ===
 
       - name: "Clone repo"
-        uses: "actions/checkout@v4"
+        uses: "actions/checkout@v6"
         with:
           path: "."
 
@@ -87,25 +88,14 @@ jobs:
           mkdir ./dist/
           mv ./build/*.app/ ./dist/
 
-      - name: "Resolve symlinks (Linux, macOS)"
-        if: "runner.os != 'Windows'"
-        run: |
-          cd ./dist/
-          find ./ -type l -exec echo Resolving {} \; -exec sed -i '' {} \;
-
-      # - name: "Import codesign certificate (macOS)"
-      #   if: "runner.os == 'macOS'"
-      #   uses: "apple-actions/import-codesign-certs@v1"
-      #   with:
-      #     p12-file-base64: "${{ secrets.CODESIGN_P12_BASE64 }}"
-      #     p12-password: "${{ secrets.CODESIGN_P12_PASSWORD }}"
-
-      # - name: "Codesign (macOS)"
-      #   if: "runner.os == 'macOS'"
-      #   run: |
-      #     cd ./dist/
-      #     find ./ -type f -empty -delete
-      #     codesign -s "${{ secrets.CODESIGN_P12_NAME }}" --deep ./*.app
+          # Qt looks up its paths via CFBundleGetBundleWithIdentifier, which returns NULL
+          # for flat dylibs (not framework bundles). CFBundleCopyBundleURL(NULL) crashes
+          # in __CFCheckCFInfoPACSignature. Providing qt.conf bypasses the CFBundle lookup.
+          mkdir $(echo ./dist/*.app)/Contents/Helpers/QtWebEngineProcess.app/Contents/Resources/
+          cat << EOF > $(echo ./dist/*.app)/Contents/Helpers/QtWebEngineProcess.app/Contents/Resources/qt.conf
+          [Paths]
+          Prefix = ../../../Resources/lib/PyQt6/Qt6
+          EOF
 
       - name: "Bundle astcenc+compressonator (Windows)"
         if: "runner.os == 'Windows'"
@@ -136,6 +126,11 @@ jobs:
           tar xzf compressonatorcli.tar.gz
           rm -rf compressonatorcli-*/{documents,images}
           mv ./compressonatorcli-*/ ./dist/lib/compressonator/
+          if [ "$(head -n 1 ./dist/lib/compressonator/compressonatorcli)" = "" ]; then
+            tail -n +2 ./dist/lib/compressonator/compressonatorcli > ./dist/lib/compressonator/compressonatorcli.new
+            mv ./dist/lib/compressonator/compressonatorcli.new ./dist/lib/compressonator/compressonatorcli
+          fi
+          chmod +x ./dist/lib/compressonator/compressonatorcli
 
       - name: "Bundle astcenc (macOS)"
         if: "runner.os == 'macOS'"
@@ -145,28 +140,48 @@ jobs:
           mkdir $(echo ./dist/*.app)/Contents/Resources/lib/astcenc/
           mv ./bin/astcenc ./dist/*.app/Contents/Resources/lib/astcenc/
 
+      - name: "Resolve symlinks (Linux)"
+        if: "runner.os == 'Linux'"
+        run: |
+          cd ./dist/
+          find ./ -type l -exec echo Resolving {} \; -exec sed -i '' {} \;
+
+      # - name: "Import codesign certificate (macOS)"
+      #   if: "runner.os == 'macOS'"
+      #   uses: "apple-actions/import-codesign-certs@v7"
+      #   with:
+      #     p12-file-base64: "${{ secrets.CODESIGN_P12_BASE64 }}"
+      #     p12-password: "${{ secrets.CODESIGN_P12_PASSWORD }}"
+
+      # - name: "Codesign (macOS)"
+      #   if: "runner.os == 'macOS'"
+      #   run: |
+      #     cd ./dist/
+      #     find ./ -type f -empty -delete
+      #     codesign -s "${{ secrets.CODESIGN_P12_NAME }}" --deep ./*.app
+
       # === ARTIFACT ===
 
       - name: "Zip artifact"
         run: |
           cd ./dist/
-          7z a ../${{ github.event.repository.name }}-${{ runner.os }}.zip .
+          7z a ../${{ github.event.repository.name }}-${{ matrix.config.artifact }}.zip .
 
       - name: "Upload commit artifact"
         if: "github.event_name != 'release'"
-        uses: "actions/upload-artifact@v4"
+        uses: "actions/upload-artifact@v7"
         with:
-          name: "${{ github.event.repository.name }}-${{ runner.os }}-Artifact"
-          path: "./${{ github.event.repository.name }}-${{ runner.os }}.zip"
+          name: "${{ github.event.repository.name }}-${{ matrix.config.artifact }}-Artifact"
+          path: "./${{ github.event.repository.name }}-${{ matrix.config.artifact }}.zip"
           compression-level: 0
 
       - name: "Upload release artifact"
         if: "github.event_name == 'release'"
-        uses: "softprops/action-gh-release@v1"
+        uses: "softprops/action-gh-release@v3"
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         with:
-          files: "./${{ github.event.repository.name }}-${{ runner.os }}.zip"
+          files: "./${{ github.event.repository.name }}-${{ matrix.config.artifact }}.zip"
 
   source:
     name: "source"
@@ -184,7 +199,7 @@ jobs:
       # === PACKAGE ===
 
       - name: "Clone repo"
-        uses: "actions/checkout@v4"
+        uses: "actions/checkout@v6"
         with:
           path: "."
 
@@ -196,7 +211,6 @@ jobs:
           mv ./common/meta.py.new ./common/meta.py
 
       - name: "Mark build number"
-        if: "github.event_name != 'release'"
         run: |
           sed "s/build_number = 0/build_number = ${{ github.run_number }}/g" ./common/meta.py > ./common/meta.py.new
           rm ./common/meta.py
@@ -225,7 +239,7 @@ jobs:
 
       - name: "Upload commit artifact"
         if: "github.event_name != 'release'"
-        uses: "actions/upload-artifact@v4"
+        uses: "actions/upload-artifact@v7"
         with:
           name: "${{ github.event.repository.name }}-Source-Artifact"
           path: "./${{ github.event.repository.name }}-Source.zip"
@@ -233,7 +247,7 @@ jobs:
 
       - name: "Upload release artifact"
         if: "github.event_name == 'release'"
-        uses: "softprops/action-gh-release@v1"
+        uses: "softprops/action-gh-release@v3"
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         with:
@@ -263,10 +277,3 @@ jobs:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         run: |
           python ./.github/workflow_data/release.py
-
-      - name: "Delete skipped workflow runs"
-        if: "github.event_name == 'release'"
-        uses: "WillyJL/delete-skipped-workflow-runs@main"
-        with:
-          retain_days: 0
-          keep_minimum_runs: 0

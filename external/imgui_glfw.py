@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import
 
+import sys
+
 import glfw
 import imgui
 
@@ -67,6 +69,8 @@ class GlfwRenderer(ProgrammablePipelineRenderer):
 
         if action == glfw.PRESS:
             io.keys_down[key] = True
+            if sys.platform.startswith("darwin") and key == glfw.KEY_W and (mods & glfw.MOD_SUPER):
+                glfw.set_window_should_close(window, True)
         elif action == glfw.RELEASE:
             io.keys_down[key] = False
 

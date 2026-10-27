@@ -19,6 +19,14 @@ var rpcCall = async (method, path, body) => {
         const res = await (new Promise((resolve) => {
             new QWebChannel(qt.webChannelTransport, (channel) => {
                 channel.objects.rpcproxy.handle(method, path, body, (ret) => {
+                    if (!ret.status) {
+                        if (path === "/games/add") {
+                          alert(
+                              'Could not connect to F95Checker!\nIs it open and updated? Is RPC enabled?'
+                          );
+                        }
+                        throw new Error("Could not connect to F95Checker");
+                    }
                     resolve(new Response(atob(ret.body), ret));
                 });
             });
@@ -45,11 +53,11 @@ var getData = async () => {
 var addGame = async (url) => {
     await rpcCall('POST', '/games/add', JSON.stringify([url]));
     await sleep(0.5 * 1000);
-    await updateIcons();
+    await update();
 };
 
-// Add icons for games, reminders, etc.
-var updateIcons = async () => {
+// Main entrypoint
+var update = async () => {
     await getData();
     const font = await (await rpcCall('GET', '/assets/mdi-webfont.ttf', null)).text();
     const font_url = `data:@font/ttf;base64,${btoa(font)}`;
@@ -120,6 +128,7 @@ var updateIcons = async () => {
         // Ignore post navigation
         const parent = elem.parentNode
         if (/page-.*$/.test(elem.href)) return false;
+        if (/more\?k=[0-9a-f]+$/.test(elem.href)) return false;
         if (parent && parent.classList.contains('pageNav')) return false;
         if (parent && parent.classList.contains('pageNav-page')) return false;
 
@@ -133,6 +142,9 @@ var updateIcons = async () => {
         if (elem.classList.contains('button')) return false;
         if (elem.classList.contains('tabs-tab')) return false;
         if (elem.classList.contains('u-concealed')) return false;
+
+        // Ignore Reviews page
+        if (/\/reviews\/(?:$|\?)/.test(elem.href)) return false;
 
         return true;
     }
@@ -285,3 +297,7 @@ var updateIcons = async () => {
     installMutationObservers();
     doUpdate();
 };
+
+if (document.title !== "Just a moment...") {
+    update();
+}

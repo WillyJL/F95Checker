@@ -105,7 +105,8 @@ class FilePicker:
                 items.sort(key=lambda item: item.name.lower())  # Sort alphabetically
                 items.sort(key=lambda item: item.is_dir(), reverse=True)  # Sort dirs first
                 for item in items:
-                    self.items.append((dir_icon if item.is_dir() else file_icon) + item.name)
+                    is_app_bundle = sys.platform.startswith("darwin") and item.is_dir() and item.suffix == ".app"
+                    self.items.append((dir_icon if (item.is_dir() and not is_app_bundle) else file_icon) + item.name)
             else:
                 self.items.append("No items match your filter!" if self.filter_box_text else "This folder is empty!")
         except Exception:
@@ -219,7 +220,7 @@ class FilePicker:
                 imgui.internal.push_item_flag(imgui.internal.ITEM_DISABLED, True)
                 imgui.push_style_var(imgui.STYLE_ALPHA, style.alpha *  0.5)
             if imgui.button(open_icon):
-                self.goto(self.dir / item[len(dir_icon if self.dir_picker else file_icon):])
+                self.goto(self.dir / item[len(dir_icon):])
             if value == -1 or not is_dir:
                 imgui.internal.pop_item_flag()
                 imgui.pop_style_var()
@@ -232,7 +233,7 @@ class FilePicker:
                 if value == -1:
                     self.selected = str(self.dir)
                 else:
-                    self.selected = str(self.dir / item[len(dir_icon if self.dir_picker else file_icon):])
+                    self.selected = str(self.dir / item[len(dir_icon if is_dir else file_icon):])
                 imgui.close_current_popup()
                 closed = True  # added
             if not (is_file and not self.dir_picker) and not (is_dir and self.dir_picker):
@@ -245,7 +246,7 @@ class FilePicker:
                 if value == -1:
                     imgui.text(f"Selected:  {self.dir.name}")
                 else:
-                    imgui.text(f"Selected:  {item[len(dir_icon if self.dir_picker else file_icon):]}")
+                    imgui.text(f"Selected:  {item[len(dir_icon if is_dir else file_icon):]}")
             # Filter bar
             if imgui.is_topmost() and not imgui.is_any_item_active() and (globals.gui.input_chars or any(io.keys_down)):  # added
                 if imgui.is_key_pressed(glfw.KEY_BACKSPACE):  # added
@@ -271,9 +272,9 @@ class FilePicker:
             opened = 0  # added
             closed = True  # added
         if closed:  # changed
+            self.active = False
             if self.callback:
                 self.callback(self.selected)
-            self.active = False
         return opened, closed  # added
 
 

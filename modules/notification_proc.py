@@ -165,6 +165,8 @@ async def _daemon(icon_uri: str):
 
     while True:
         data = await pipe.get_async()
+        if data is None:
+            break
 
         try:
             event, args, kwargs = data

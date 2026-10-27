@@ -47,11 +47,11 @@ const getData = async () => {
 const addGame = async (url, tabId) => {
     await rpcCall('POST', '/games/add', JSON.stringify([url]), tabId);
     await sleep(0.5 * 1000);
-    await updateIcons(tabId);
+    await update(tabId);
 };
 
-// Add icons for games, reminders, etc.
-const updateIcons = async (tabId) => {
+// Main entrypoint
+const update = async (tabId) => {
     await getData();
     chrome.scripting.executeScript({
         target: { tabId: tabId },
@@ -123,6 +123,7 @@ const updateIcons = async (tabId) => {
                 // Ignore post navigation
                 const parent = elem.parentNode
                 if (/page-.*$/.test(elem.href)) return false;
+                if (/more\?k=[0-9a-f]+$/.test(elem.href)) return false;
                 if (parent && parent.classList.contains('pageNav')) return false;
                 if (parent && parent.classList.contains('pageNav-page')) return false;
 
@@ -136,6 +137,9 @@ const updateIcons = async (tabId) => {
                 if (elem.classList.contains('button')) return false;
                 if (elem.classList.contains('tabs-tab')) return false;
                 if (elem.classList.contains('u-concealed')) return false;
+
+                // Ignore Reviews page
+                if (/\/reviews\/(?:$|\?)/.test(elem.href)) return false;
 
                 return true;
             }
@@ -294,7 +298,7 @@ const updateIcons = async (tabId) => {
 
 chrome.webNavigation.onCompleted.addListener(
     (details) => {
-        updateIcons(details.tabId);
+        update(details.tabId);
     },
     { url: [{ hostSuffix: 'f95zone.to' }] }
 );

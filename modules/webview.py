@@ -10,16 +10,37 @@ from PyQt6 import (
     QtGui,
     QtNetwork,
     QtWebChannel,
-    QtWebEngineCore,
-    QtWebEngineWidgets,
     QtWidgets,
 )
 from PyQt6.QtNetwork import QNetworkProxy
 
 from common.structs import ChildPipe
 
+_user_agent = None
+_user_agent_set = False
+
 # Qt WebEngine doesn't like running alongside other OpenGL
 # applications so we need to run a dedicated multiprocess
+
+
+async def get_user_agent():
+    global _user_agent, _user_agent_set
+    if not _user_agent_set:
+        try:
+            with await start(
+                "user_agent",
+                use_f95_cookies=False,
+                buttons=False,
+                extension=False,
+                private=True,
+                proxy_config=None,
+                pipe=True,
+            ) as pipe:
+                _user_agent = await pipe.get_async()
+        except Exception:
+            pass
+        _user_agent_set = True
+    return _user_agent
 
 
 async def start(action: str, *args, centered=True, use_f95_cookies=True, pipe=False, **kwargs):
@@ -154,6 +175,11 @@ def create(
             proxy.setPassword(proxy_config["password"])
         QNetworkProxy.setApplicationProxy(proxy)
 
+    from PyQt6 import (
+        QtWebEngineCore,
+        QtWebEngineWidgets,
+    )
+
     app = QtWidgets.QApplication(sys.argv)
     app.pipe = ChildPipe()
     icon_font = QtGui.QFontDatabase.applicationFontFamilies(QtGui.QFontDatabase.addApplicationFont(icon_font))[0]
@@ -246,8 +272,11 @@ def create(
                     body = body.encode()
                 from common import meta
                 async def _handle():
-                    async with self.session.request(method, meta.rpc_url + path, data=body) as req:
-                        return {"status": req.status, "body": base64.b64encode(await req.read()).decode()}
+                    try:
+                        async with self.session.request(method, meta.rpc_url + path, data=body) as req:
+                            return {"status": req.status, "body": base64.b64encode(await req.read()).decode()}
+                    except aiohttp.ClientError:
+                        return {}
                 return async_thread.wait(_handle())
         app.window.webview.rpcproxy = RPCProxy()
         app.window.webview.channel = QtWebChannel.QWebChannel(app.window.webview)
@@ -281,16 +310,12 @@ def create(
         app.window.controls.buttons.reload.setText("󰅖")
         app.window.controls.progress.setValue(1)
         app.window.controls.progress.repaint()
-        if extension:
-            app.window.webview.page.runJavaScript(extension)
     def load_progress(value: int):
         app.window.controls.buttons.back.setEnabled(app.window.webview.history.canGoBack())
         app.window.controls.buttons.forward.setEnabled(app.window.webview.history.canGoForward())
         app.window.controls.buttons.reload.setText("󰅖")
         app.window.controls.progress.setValue(max(1, value))
         app.window.controls.progress.repaint()
-        if extension:
-            app.window.webview.page.runJavaScript(extension)
     def load_finished(_=None):
         nonlocal loading
         loading = False
@@ -300,7 +325,7 @@ def create(
         app.window.controls.progress.setValue(0)
         app.window.controls.progress.repaint()
         if extension:
-            app.window.webview.page.runJavaScript(extension + "\nupdateIcons();")
+            app.window.webview.page.runJavaScript(extension)
     app.window.webview.loadStarted.connect(load_started)
     app.window.webview.loadProgress.connect(load_progress)
     app.window.webview.loadFinished.connect(load_finished)
@@ -400,20 +425,29 @@ def open(url: str, *, cookies: dict[str, str] = {}, cookies_domain: str = None, 
     app.exec()
 
 
-def cookies(url: str, *, minimal=True, **kwargs):
-    if minimal:
-        kwargs |= dict(
-            buttons=False,
-            extension=False,
-            private=True,
-        )
-    app = create(**kwargs | dict(buttons=False, extension=False, private=True))
+def cookies(url: str, title_search: str | None = None, *, cookies: dict[str, str] = {}, cookies_domain: str = None, **kwargs):
+    kwargs |= dict(
+        buttons=False,
+        extension=False,
+        private=True,
+    )
+    app = create(**kwargs)
     url = QtCore.QUrl(url)
+    if cookies and cookies_domain:
+        cookies_domain = QtCore.QUrl("https://" + cookies_domain)
+        for key, value in cookies.items():
+            app.window.webview.cookieStore.setCookie(QtNetwork.QNetworkCookie(QtCore.QByteArray(key.encode()), QtCore.QByteArray(value.encode())), cookies_domain)
     def on_cookie_add(cookie: QtNetwork.QNetworkCookie):
         name = cookie.name().data().decode('utf-8')
         value = cookie.value().data().decode('utf-8')
         app.pipe.put((name, value))
     app.window.webview.cookieStore.cookieAdded.connect(on_cookie_add)
+    if title_search:
+        def title_changed(title: str):
+            if title_search in title:
+                app.pipe.put("success")
+                app.window.close()
+        app.window.webview.titleChanged.connect(title_changed)
     app.window.setWindowFlag(QtCore.Qt.WindowType.WindowStaysOnTopHint, True)
     app.window.webview.setUrl(url)
     app.window.show()
@@ -498,3 +532,9 @@ def xpath_redirect(url: str, xpath_expression: str = None, *, minimal=True, cook
     app.window.webview.setUrl(url)
     app.window.show()
     app.exec()
+
+
+def user_agent(**kwargs):
+    app = create(**kwargs)
+    app.pipe.put(app.window.webview.profile.httpUserAgent())
+    app.exit(0)

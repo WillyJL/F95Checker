@@ -22,6 +22,25 @@ from modules import (
     utils,
 )
 
+EXTENSION_SCHEMES = (
+    "moz-extension://",
+    "chrome-extension://",
+    "safari-web-extension://",
+)
+ALLOWED_WEB_ORIGINS = (
+    "https://f95zone.to",
+    "https://www.f95zone.to",
+)
+
+
+def origin_allowed(origin: str | None):
+    if not origin:
+        return True
+    if origin.startswith(EXTENSION_SCHEMES):
+        return True
+    return origin in ALLOWED_WEB_ORIGINS
+
+
 server: socketserver.TCPServer = None
 thread: threading.Thread = None
 
@@ -48,18 +67,35 @@ def start():
             if not globals.debug:
                 log_message = lambda *_, **__: None
 
+            def deny_origin(self):
+                if origin_allowed(self.headers.get("Origin")):
+                    return False
+                self.send_response(403)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(b"Origin not allowed")
+                return True
+
+            def send_cors(self):
+                origin = self.headers.get("Origin")
+                if origin:
+                    self.send_header("Access-Control-Allow-Origin", origin)
+                    self.send_header("Vary", "Origin")
+
             def do_OPTIONS(self):
+                if self.deny_origin():
+                    return
                 self.send_response(200, "ok")
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-                self.send_header("Access-Control-Allow-Headers", "X-Requested-With")
-                self.send_header("Access-Control-Allow-Headers", "Content-Type")
-                self.send_header("Access-Control-Allow-Private-Network", "true")
+                self.send_cors()
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "X-Requested-With, Content-Type")
+                if self.headers.get("Access-Control-Request-Private-Network") == "true":
+                    self.send_header("Access-Control-Allow-Private-Network", "true")
                 self.end_headers()
 
             def send_resp(self, code: int, content_type: str = "application/octet-stream", headers: dict[str, str] = {}):
                 self.send_response(code)
-                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_cors()
                 self.send_header("Content-Type", content_type)
                 for key, value in headers.items():
                     self.send_header(key, value)
@@ -70,6 +106,8 @@ def start():
                 self.wfile.write(json.dumps(data).encode())
 
             def do_GET(self):
+                if self.deny_origin():
+                    return
                 try:
                     match self.path:
                         case "/games":
@@ -102,6 +140,8 @@ def start():
                     self.send_resp(500)
 
             def do_POST(self):
+                if self.deny_origin():
+                    return
                 try:
                     match self.path:
                         case "/window/show":

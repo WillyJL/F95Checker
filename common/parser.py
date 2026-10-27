@@ -78,10 +78,12 @@ def datestamp(timestamp: int | float):
     return int(utc_date.timestamp())
 
 
-def attachment(preview: str):
-    if preview.startswith("https://preview."):
-        return "https://attachments." + preview.removeprefix("https://preview.")
-    return preview
+def attachment(url: str):
+    if url.startswith("https://preview.f95zone.to/"):
+        url =  "https://attachments.f95zone.to/" + url.removeprefix("https://preview.f95zone.to/")
+    if url.startswith("https://attachments.f95zone.to/") and "?h=" in url:
+        url = url.split("?h=")[0]
+    return url
 
 
 class ParserError(Exception):
@@ -220,9 +222,9 @@ def thread(res: bytes) -> ParsedThread | ParserError:
 
         name = ""
         for elem in html.find(is_class("p-title-value")).children:
-            if not is_class("labelLink")(elem) and not is_class("label-append")(elem):
+            if not is_class("p-title-prefix")(elem) and not is_class("labelLink")(elem) and not is_class("label-append")(elem):
                 name += elem.text
-        name = fixed_spaces(sanitize_whitespace(re.search(r"^\s*(.*?)(?:\s*\[.*?\]\s*)*$", name).group(1)))
+        name = fixed_spaces(sanitize_whitespace(re.search(r"^\s*(.*?)(?:\s*\[.*?\]\s*)*$", name, re.DOTALL).group(1)).replace("\n", " "))
 
         thread_version = get_game_attr("version", "mod version", "game version")
         if not thread_version:
@@ -271,28 +273,27 @@ def thread(res: bytes) -> ParsedThread | ParserError:
             type = Type.Request
         elif game_has_prefixes("Tutorial"):
             type = Type.Tutorial
-        # Media Types
-        elif game_has_prefixes("SiteRip"):
-            type = Type.SiteRip
-        elif game_has_prefixes("Collection"):
-            type = Type.Collection
-        elif game_has_prefixes("Manga"):
-            type = Type.Manga
-        elif game_has_prefixes("Comics"):
-            type = Type.Comics
+        # Animation Types
         elif game_has_prefixes("Video"):
             type = Type.Video
         elif game_has_prefixes("GIF"):
             type = Type.GIF
-        elif game_has_prefixes("Pinup"):
-            type = Type.Pinup
+        # Comic Types
         elif game_has_prefixes("CG"):
             type = Type.CG
+        elif game_has_prefixes("Manga"):
+            type = Type.Manga
+        elif game_has_prefixes("Comics"):
+            type = Type.Comics
+        elif game_has_prefixes("Pinup"):
+            type = Type.Pinup
         # Game Engines
         elif game_has_prefixes("ADRIFT"):
             type = Type.ADRIFT
         elif game_has_prefixes("Flash"):
             type = Type.Flash
+        elif game_has_prefixes("Godot"):
+            type = Type.Godot
         elif game_has_prefixes("HTML"):
             type = Type.HTML
         elif game_has_prefixes("Java"):
@@ -338,9 +339,9 @@ def thread(res: bytes) -> ParsedThread | ParserError:
         if not last_updated:
             try:
                 if elem := post.find(is_class("message-lastEdit")):
-                    last_updated = int(elem.find("time").get("data-time"))
+                    last_updated = int(elem.find("time").get("data-timestamp"))
                 else:
-                    last_updated = int(post.find(is_class("message-attribution-main")).find("time").get("data-time"))
+                    last_updated = int(post.find(is_class("message-attribution-main")).find("time").get("data-timestamp"))
             except Exception:
                 pass
         last_updated = datestamp(last_updated)
@@ -360,10 +361,6 @@ def thread(res: bytes) -> ParsedThread | ParserError:
 
         if score is None:
             score = 0.0
-            if elem := head.find("select", attrs={"name": "rating"}):
-                score = float(elem.get("data-initial-rating"))
-            elif elem := head.find(is_class("bratr-rating")):
-                score = float(re.search(r"(\d(?:\.\d\d?)?)", elem.get("title")).group(1))
 
         if votes is None:
             votes = 0
@@ -400,14 +397,22 @@ def thread(res: bytes) -> ParsedThread | ParserError:
                         tags.append(Tag[tag])
         tags = tuple(sorted(tags, key=lambda tag: tag.name))
 
-        elem = post.find(is_class("bbWrapper")).find(lambda elem: elem.name == "img" and "data-src" in elem.attrs)
+        elem = post.find(is_class("bbWrapper")).find(lambda elem: elem.name == "div" and "data-src" in elem.attrs)
         if elem:
-            image_url = elem.get("data-src")
+            image_url = attachment(elem.get("data-src"))
         else:
             image_url = "missing"
 
-        # FIXME: find preview images in thread
+        # Find all preview images in the starter post, prefer the full-size URL
         previews_urls = []
+        for img in post.find(is_class("bbWrapper")).find_all(is_class("js-lbImage")):
+            url = img.get("href", "")
+            if not url.startswith("https://attachments.f95zone.to/"):
+                continue
+            url = attachment(url)
+            # Skip duplicates
+            if url != image_url and url not in previews_urls:
+                previews_urls.append(url)
 
         downloads = get_game_downloads("downloads", "download")
 
@@ -542,27 +547,26 @@ def reviews(res: bytes) -> ParsedReviews | ParserError:
                 )
             return e
         parsed_reviews = []
-        for review in body.find_all(is_class("block-row")):
-            user = review.get("data-author")
-            score = int(review.find(is_class("ratingStars")).get("title")[0])
-            message = review.find(is_class("bbWrapper")).get_text()
-            likes_bar = review.find(is_class("likesBar")).find("a")
-            if not likes_bar:
-                likes = 0
-            else:
-                likes = len(likes_bar.find_all("bdi"))
-                if likes_match := re.search(r"and (\d+) other", likes_bar.get_text().replace(",", "")):
-                    likes += int(likes_match.group(1))
-            timestamp = int(review.find(is_class("u-dt")).get("data-time"))
-            parsed_review = ParsedReview(
-                user=user,
-                score=score,
-                message=message,
-                likes=likes,
-                timestamp=timestamp,
-            )
-            parsed_reviews.append(parsed_review)
-        total = int(body.find(is_class("js-displayTotals")).get("data-total"))
+        reviews_list = body.find(is_class("f95rv-cards"))
+        if reviews_list:
+            for review in reviews_list.find_all(is_class("f95rv-card")):
+                user = review.get("data-author")
+                score = int(review.find(is_class("f95rv-stars")).get("aria-label")[0])
+                message = review.find(is_class("bbWrapper")).find(is_class("bbWrapper")).get_text()
+                for goofy_unicode in "\u2063\u200c\u200b\u2064":
+                    message = message.replace(goofy_unicode, "")
+                likes = int(review.find(is_class("f95rv-vote")).get_text().split(" ")[-1])
+                timestamp = int(review.find(is_class("u-dt")).get("data-timestamp"))
+                parsed_review = ParsedReview(
+                    user=user,
+                    score=score,
+                    message=message,
+                    likes=likes,
+                    timestamp=timestamp,
+                )
+                parsed_reviews.append(parsed_review)
+        match = re.search(r"reviews\s*\(([\d,]+)\)", html.find(is_class("tabs")).get_text(), re.M | re.I)
+        total = int(match.group(1).replace(",", ""))
     except Exception:
         e = ParserError(
             message=f"Unhandled exception: {error.text()}",

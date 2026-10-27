@@ -5,9 +5,9 @@ import enum
 import functools
 import hashlib
 import json
-import os
 import pathlib
 import shutil
+import string
 import sys
 import time
 import typing
@@ -174,6 +174,8 @@ class ChildPipe(AbstractPipe):
                 await self.stdin_event.wait()
                 self.stdin_event.clear()
             line = await self.loop.run_in_executor(None, sys.stdin.readline)
+            if not line:
+                return None
             try:
                 return json.loads(line)
             except json.JSONDecodeError:
@@ -320,6 +322,8 @@ class FileDownload:
 
     cancel: bool = False
     state: State = State.Preparing
+    start: Timestamp = time.time()
+    current:  Timestamp = time.time()
     extracted: pathlib.Path = None
     error: str = None
     traceback: str = None
@@ -388,6 +392,7 @@ Status = IntEnumHack("Status", [
     ("Abandoned", (4, {"color" : (0.87, 0.20, 0.20), "icon": "close_circle"})),
     ("Unchecked", (5, {"color" : (0.50, 0.50, 0.50), "icon": "alert_circle"})),
     ("Custom",    (6, {"color" : (0.95, 0.50, 0.00), "icon": "dots_horizontal_circle"})),
+    ("Unknown",   (7, {"color" : (0.50, 0.50, 0.50), "icon": "alert_circle"})),
 ])
 
 
@@ -545,6 +550,7 @@ Tag = IntEnumHack("Tag", [
     ("voiced",                 (137, {"text": "voiced"})),
     ("vore",                   (138, {"text": "vore"})),
     ("voyeurism",              (139, {"text": "voyeurism"})),
+    ("unknown",                (154, {"text": "unknown"})),
 ])
 
 
@@ -559,6 +565,13 @@ ExeState = IntEnumHack("ExeState", [
     ("Invalid",  1),
     ("Selected", 2),
     ("Unset",    3),
+])
+
+
+LaunchState = IntEnumHack("LaunchState", [
+    ("Idle",     1),
+    ("Starting", 2),
+    ("Playing",  3),
 ])
 
 
@@ -587,9 +600,10 @@ FilterMode = IntEnumHack("FilterMode", [
 
 
 Category = IntEnumHack("Category", [
-    ("Games", 1),
-    ("Media", 2),
-    ("Misc",  3),
+    ("Games",      1),
+    ("Animations", 2),
+    ("Comics",     3),
+    ("Misc",       4),
 ])
 
 
@@ -660,6 +674,7 @@ class Label:
     id: int
     name: str
     color: tuple[float]
+    position: int
     instances: typing.ClassVar = []
 
     @property
@@ -686,6 +701,16 @@ class Label:
     def remove(cls, self):
         while self in cls.instances:
             cls.instances.remove(self)
+
+    @classmethod
+    def update_positions(cls):
+        for self_i, self in enumerate(cls.instances):
+            self.position = self_i
+
+    @classmethod
+    def sort_instances(cls):
+        cls.instances.sort(key=lambda self: self.position)
+        cls.update_positions()
 
 
 @dataclasses.dataclass(slots=True)
@@ -766,11 +791,19 @@ class Browser:
         self.integrated = self.hash == 0
         self.custom = self.hash == -1
         private_args = {
-            "Opera":   "-private",
-            "Chrom":   "-incognito",
-            "Brave":   "-incognito",
-            "Edge":    "-inprivate",
-            "fox":     "-private-window"
+            # Firefox based
+            "fox":       "--private-window",
+            "LibreWolf": "--private-window",
+            "Zen":       "--private-window",
+            "Floorp":    "--private-window",
+            # Chromium based
+            "Chrom":     "--incognito",
+            "Helium":    "--incognito",
+            "Brave":     "--incognito",
+            # Opera
+            "Opera":     "-private",
+            # Microslop
+            "Edge":      "-inprivate",
         }
         self.private_arg = []
         for search, arg in private_args.items():
@@ -806,8 +839,43 @@ Browser.add("Integrated", 0)
 Browser.add("Custom", -1)
 
 
+Type = IntEnumHack("Type", [
+    ("ADRIFT",     (2,  {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Games})),
+    ("Flash",      (4,  {"color": colors.hex_to_rgba_0_1("#616161"), "category": Category.Games})),
+    ("Godot",      (31, {"color": colors.hex_to_rgba_0_1("#03A9F4"), "category": Category.Games})),
+    ("HTML",       (5,  {"color": colors.hex_to_rgba_0_1("#689F38"), "category": Category.Games})),
+    ("Java",       (6,  {"color": colors.hex_to_rgba_0_1("#52A6B0"), "category": Category.Games})),
+    ("Others",     (9,  {"color": colors.hex_to_rgba_0_1("#8BC34A"), "category": Category.Games})),
+    ("QSP",        (10, {"color": colors.hex_to_rgba_0_1("#D32F2F"), "category": Category.Games})),
+    ("RAGS",       (11, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Games})),
+    ("RenPy",      (14, {"color": colors.hex_to_rgba_0_1("#B069E8"), "category": Category.Games})),
+    ("RPGM",       (13, {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Games})),
+    ("Tads",       (16, {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Games})),
+    ("Unity",      (19, {"color": colors.hex_to_rgba_0_1("#FE5901"), "category": Category.Games})),
+    ("Unreal Eng", (20, {"color": colors.hex_to_rgba_0_1("#0D47A1"), "category": Category.Games})),
+    ("WebGL",      (21, {"color": colors.hex_to_rgba_0_1("#FE5901"), "category": Category.Games})),
+    ("Wolf RPG",   (22, {"color": colors.hex_to_rgba_0_1("#4CAF50"), "category": Category.Games})),
+    ("GIF",        (25, {"color": colors.hex_to_rgba_0_1("#03A9F4"), "category": Category.Animations})),
+    ("Video",      (29, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Animations})),
+    ("CG",         (30, {"color": colors.hex_to_rgba_0_1("#DFCB37"), "category": Category.Comics})),
+    ("Comics",     (24, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Comics})),
+    ("Manga",      (26, {"color": colors.hex_to_rgba_0_1("#0FB2FC"), "category": Category.Comics})),
+    ("Pinup",      (27, {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Comics})),
+    ("Cheat Mod",  (3,  {"color": colors.hex_to_rgba_0_1("#D32F2F"), "category": Category.Misc})),
+    ("Mod",        (8,  {"color": colors.hex_to_rgba_0_1("#BA4545"), "category": Category.Misc})),
+    ("README",     (12, {"color": colors.hex_to_rgba_0_1("#DC143C"), "category": Category.Misc})),
+    ("Request",    (15, {"color": colors.hex_to_rgba_0_1("#D32F2F"), "category": Category.Misc})),
+    ("Tool",       (17, {"color": colors.hex_to_rgba_0_1("#EC5555"), "category": Category.Misc})),
+    ("Tutorial",   (18, {"color": colors.hex_to_rgba_0_1("#EC5555"), "category": Category.Misc})),
+    ("Misc",       (1,  {"color": colors.hex_to_rgba_0_1("#B8B00C"), "category": Category.Misc})),
+    ("Unchecked",  (23, {"color": colors.hex_to_rgba_0_1("#393939"), "category": Category.Misc})),
+    ("Unknown",    (32, {"color": colors.hex_to_rgba_0_1("#393939"), "category": Category.Misc})),
+])
+
+
 @dataclasses.dataclass(slots=True)
 class Settings:
+    app_beta_updates            : bool
     background_on_close         : bool
     bg_notifs_interval          : int
     bg_refresh_interval         : int
@@ -823,20 +891,26 @@ class Settings:
     copy_urls_as_bbcode         : bool
     datestamp_format            : str
     default_exe_dir             : dict[Os, str]
+    default_launch_wrapper      : dict[Os, dict[Type, str]]
     default_tab_is_new          : bool
     display_mode                : DisplayMode
     display_tab                 : Tab.get
     downloads_dir               : dict[Os, str]
+    downloads_extract           : bool
     ext_background_add          : bool
     ext_highlight_tags          : bool
     ext_icon_glow               : bool
     filter_all_tabs             : bool
     fit_images                  : bool
+    github_token                : str
     grid_columns                : int
     hidden_timeline_events      : list[TimelineEventType]
     hide_empty_tabs             : bool
     highlight_tags              : bool
     ignore_semaphore_timeouts   : bool
+    image_io_threads            : int
+    image_decode_threads        : int
+    image_decode_gif_max        : int
     independent_tab_views       : bool
     insecure_ssl                : bool
     interface_scaling           : float
@@ -849,6 +923,8 @@ class Settings:
     play_gifs                   : bool
     play_gifs_unfocused         : bool
     preload_nearby_images       : bool
+    previews_enabled            : bool
+    previews_height             : int
     proxy_type                  : ProxyType
     proxy_host                  : str
     proxy_port                  : int
@@ -857,7 +933,6 @@ class Settings:
     quick_filters               : bool
     refresh_archived_games      : bool
     refresh_completed_games     : bool
-    render_when_unfocused       : bool
     request_timeout             : int
     rpc_enabled                 : bool
     rpdl_password               : str
@@ -886,6 +961,8 @@ class Settings:
     unload_offscreen_images     : bool
     vsync_ratio                 : int
     weighted_score              : bool
+    wine_extra_runners_dirs     : dict[Os, list[str]]
+    wine_prefixes_dir           : dict[Os, str]
     zoom_area                   : int
     zoom_enabled                : bool
     zoom_times                  : float
@@ -895,40 +972,6 @@ class Settings:
             from modules import globals
             self.default_exe_dir[globals.os] = self.default_exe_dir[""]
             del self.default_exe_dir[""]
-
-
-Type = IntEnumHack("Type", [
-    ("ADRIFT",     (2,  {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Games})),
-    ("Flash",      (4,  {"color": colors.hex_to_rgba_0_1("#616161"), "category": Category.Games})),
-    ("HTML",       (5,  {"color": colors.hex_to_rgba_0_1("#689F38"), "category": Category.Games})),
-    ("Java",       (6,  {"color": colors.hex_to_rgba_0_1("#52A6B0"), "category": Category.Games})),
-    ("Others",     (9,  {"color": colors.hex_to_rgba_0_1("#8BC34A"), "category": Category.Games})),
-    ("QSP",        (10, {"color": colors.hex_to_rgba_0_1("#D32F2F"), "category": Category.Games})),
-    ("RAGS",       (11, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Games})),
-    ("RenPy",      (14, {"color": colors.hex_to_rgba_0_1("#B069E8"), "category": Category.Games})),
-    ("RPGM",       (13, {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Games})),
-    ("Tads",       (16, {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Games})),
-    ("Unity",      (19, {"color": colors.hex_to_rgba_0_1("#FE5901"), "category": Category.Games})),
-    ("Unreal Eng", (20, {"color": colors.hex_to_rgba_0_1("#0D47A1"), "category": Category.Games})),
-    ("WebGL",      (21, {"color": colors.hex_to_rgba_0_1("#FE5901"), "category": Category.Games})),
-    ("Wolf RPG",   (22, {"color": colors.hex_to_rgba_0_1("#4CAF50"), "category": Category.Games})),
-    ("CG",         (30, {"color": colors.hex_to_rgba_0_1("#DFCB37"), "category": Category.Media})),
-    ("Collection", (7,  {"color": colors.hex_to_rgba_0_1("#616161"), "category": Category.Media})),
-    ("Comics",     (24, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Media})),
-    ("GIF",        (25, {"color": colors.hex_to_rgba_0_1("#03A9F4"), "category": Category.Media})),
-    ("Manga",      (26, {"color": colors.hex_to_rgba_0_1("#0FB2FC"), "category": Category.Media})),
-    ("Pinup",      (27, {"color": colors.hex_to_rgba_0_1("#2196F3"), "category": Category.Media})),
-    ("SiteRip",    (28, {"color": colors.hex_to_rgba_0_1("#8BC34A"), "category": Category.Media})),
-    ("Video",      (29, {"color": colors.hex_to_rgba_0_1("#FF9800"), "category": Category.Media})),
-    ("Cheat Mod",  (3,  {"color": colors.hex_to_rgba_0_1("#D32F2F"), "category": Category.Misc})),
-    ("Mod",        (8,  {"color": colors.hex_to_rgba_0_1("#BA4545"), "category": Category.Misc})),
-    ("READ ME",    (12, {"color": colors.hex_to_rgba_0_1("#DC143C"), "category": Category.Misc})),
-    ("Request",    (15, {"color": colors.hex_to_rgba_0_1("#D32F2F"), "category": Category.Misc})),
-    ("Tool",       (17, {"color": colors.hex_to_rgba_0_1("#EC5555"), "category": Category.Misc})),
-    ("Tutorial",   (18, {"color": colors.hex_to_rgba_0_1("#EC5555"), "category": Category.Misc})),
-    ("Misc",       (1,  {"color": colors.hex_to_rgba_0_1("#B8B00C"), "category": Category.Misc})),
-    ("Unchecked",  (23, {"color": colors.hex_to_rgba_0_1("#393939"), "category": Category.Misc})),
-])
 
 
 @dataclasses.dataclass(slots=True)
@@ -946,6 +989,7 @@ class Game:
     last_full_check    : int
     last_check_version : str
     last_launched      : Datestamp
+    playtime           : float
     score              : float
     votes              : int
     rating             : int
@@ -954,6 +998,7 @@ class Game:
     updated            : bool | None
     archived           : bool
     executables        : list[str]
+    launch_wrapper     : dict[Os, str]
     description        : str
     changelog          : str
     tags               : tuple[Tag]
@@ -968,7 +1013,15 @@ class Game:
     reviews_total      : int
     reviews            : list[Review]
     selected           : bool = False
+    launch_state       : LaunchState = LaunchState.Idle
+    launch_started     : float = 0.0
+    launch_flushed     : float = 0.0
+    launch_process     : typing.Any = None
     image              : "imagehelper.ImageHelper" = None
+    preview_images     : list["imagehelper.ImageHelper"] = dataclasses.field(default_factory=list)
+    previews_loading   : bool = False
+    previews_loaded    : bool = False
+    preview_load_future: typing.Any = dataclasses.field(default=None, init=False, repr=False, compare=False)
     executables_valids : list[bool] = None
     executables_valid  : bool = None
     timeline_events    : list[TimelineEvent] = dataclasses.field(default_factory=list)
@@ -976,6 +1029,7 @@ class Game:
 
     def __post_init__(self):
         self._did_init = True
+        self.labels.sort(key=lambda label: label.position)
         if self.custom is None:
             self.custom = bool(self.status is Status.Custom)
         if self.id < 0:
@@ -991,15 +1045,105 @@ class Game:
         from external import imagehelper
         from modules import globals
         self.image = imagehelper.ImageHelper(globals.images_path, glob=f"{self.id}.*")
+        self.preview_images = []
         self.validate_executables()
 
-    def delete_images(self):
+    async def load_previews_async(self):
+        """Download and cache the indexer's preview URLs on first use.
+
+        Preview URLs are intentionally not part of the cover-image cache: the
+        latter uses ``<id>.*`` and is replaced during refreshes.  Keeping the
+        preview cache under a separate prefix prevents a cover reset from
+        deleting the gallery.
+        """
+        if self.previews_loading or self.previews_loaded or not self.previews_urls:
+            return
+        self.previews_loading = True
+        try:
+            from external import imagehelper
+            from modules import api, globals, utils
+            import aiofiles
+            # A retry or resumed load may already have partially populated
+            # this list. Use the normal cleanup path so existing textures and
+            # decoded image data are released before rebuilding it.
+            self.unload_previews()
+            preview_dir = globals.images_path / f"previews/{self.id}"
+            preview_dir.mkdir(parents=True, exist_ok=True)
+            async def _fetch_preview(preview_i: int, url: str, digest: str, glob: str):
+                try:
+                    data, _ = await api.download_image(url)
+                    if data:
+                        path = preview_dir / f"{digest}.{utils.image_ext(data)}"
+                        async with aiofiles.open(path, "wb") as f:
+                            await f.write(data)
+                except Exception:
+                    return
+                self.preview_images[preview_i] = imagehelper.ImageHelper(preview_dir, glob=glob)
+            digests = [hashlib.sha1(url.encode("utf-8")).hexdigest() for url in self.previews_urls]
+            for img in preview_dir.glob("*"):
+                digest = img.stem
+                if len(digest) != 40 or not all(c in string.hexdigits for c in digest):
+                    # Not a digest
+                    continue
+                if digest not in digests:
+                    # Old preview
+                    try:
+                        img.unlink()
+                    except Exception:
+                        pass
+            fetch_preview_tasks = []
+            for preview_i, (url, digest) in enumerate(zip(self.previews_urls, digests)):
+                if not url.startswith(("http://", "https://")):
+                    continue
+                glob = f"{digest}.*"
+                paths = list(preview_dir.glob(glob))
+                if not paths:
+                    fetch_preview_tasks.append(_fetch_preview(preview_i, url, digest, glob))
+                    self.preview_images.append(None)
+                else:
+                    self.preview_images.append(imagehelper.ImageHelper(preview_dir, glob=glob))
+            await asyncio.gather(*fetch_preview_tasks)
+            self.previews_loaded = True
+        finally:
+            self.previews_loading = False
+
+    def cancel_preview_loading(self):
+        """Cancel an in-flight preview request when its popup is dismissed."""
+        future = self.preview_load_future
+        if future is not None and not future.done():
+            future.cancel()
+        self.preview_load_future = None
+        self.previews_loading = False
+
+    def delete_images(self, cover_only=True):
         from modules import globals
         for img in globals.images_path.glob(f"{self.id}.*"):
             try:
                 img.unlink()
             except Exception:
                 pass
+        if not cover_only:
+            self.cancel_preview_loading()
+            self.unload_previews()
+            preview_dir = globals.images_path / "previews" / str(self.id)
+            for img in preview_dir.glob("*"):
+                try:
+                    img.unlink()
+                except Exception:
+                    pass
+            try:
+                preview_dir.rmdir()
+            except OSError:
+                pass
+
+    def unload_previews(self):
+        """Release decoded preview data and GPU textures, keeping disk cache."""
+        from external import imagehelper
+        for image in self.preview_images:
+            if image is not None:
+                imagehelper.unload_queue.append(image)
+        self.preview_images.clear()
+        self.previews_loaded = False
 
     def refresh_image(self):
         self.image.glob = f"{self.id}.*"
@@ -1036,16 +1180,22 @@ class Game:
                     if base in exe.parents:
                         self.executables[i] = exe.relative_to(base).as_posix()
                         changed = True
-                    executables_valids.append(exe.is_file())
+                    executables_valids.append(exe.is_file() or exe.is_dir())
                 else:
-                    executables_valids.append((base / exe).is_file())
+                    abs_exe = base / exe
+                    executables_valids.append(abs_exe.is_file() or abs_exe.is_dir())
             self.executables_valids = executables_valids
             if changed:
                 from external import async_thread
                 from modules import db
                 async_thread.run(db.update_game(self, "executables"))
         else:
-            self.executables_valids = [utils.is_uri(executable) or os.path.isfile(executable) for executable in self.executables]
+            def _exe_valid(executable):
+                if utils.is_uri(executable):
+                    return True
+                exe = pathlib.Path(executable)
+                return exe.is_file() or (globals.os is Os.MacOS and exe.suffix == ".app" and exe.is_dir())
+            self.executables_valids = [_exe_valid(e) for e in self.executables]
         self.executables_valid = all(self.executables_valids)
         if globals.gui:
             globals.gui.recalculate_ids = True
@@ -1088,7 +1238,7 @@ class Game:
     def add_label(self, label: Label):
         if label not in self.labels:
             self.labels.append(label)
-        self.labels.sort(key=lambda label: Label.instances.index(label))
+        self.labels.sort(key=lambda label: label.position)
         from external import async_thread
         from modules import db, globals
         async_thread.run(db.update_game(self, "labels"))
@@ -1110,6 +1260,19 @@ class Game:
         async_thread.run(db.create_timeline_event(self.id, Timestamp(time.time()), list(args), type))
 
 
+    @property
+    def playtime_display(self):
+        playtime = self.playtime
+        if self.launch_state is not LaunchState.Idle and self.launch_started:
+            playtime += time.time() - self.launch_started - self.launch_flushed
+        if playtime >= 3600:
+            return f"{playtime / 3600:.1f}h"
+        if playtime >= 60:
+            return f"{int(playtime / 60)}m"
+        if playtime:
+            return "<1m"
+        return ""
+
     def __setattr__(self, name: str, value: typing.Any):
         if hasattr(self, "_did_init") and self._did_init and name in [
             "custom",
@@ -1124,6 +1287,7 @@ class Game:
             "last_full_check",
             "last_check_version",
             "last_launched",
+            "playtime",
             "score",
             "votes",
             "rating",
