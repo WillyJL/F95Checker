@@ -4700,7 +4700,19 @@ class MainGUI():
                     )
             else:
                 draw_settings_label("Use private mode:")
-                draw_settings_checkbox("browser_private")
+                cant_private = not set.browser.integrated and not set.browser.private_arg
+                if cant_private:
+                    # Show as unchecked without touching the saved value, so it comes back when switching browser
+                    imgui.push_disabled()
+                    imgui.set_cursor_pos_x(imgui.get_cursor_pos_x() + checkbox_offset)
+                    imgui.checkbox("###browser_private", False)
+                    imgui.pop_disabled()
+                    self.draw_hover_text(
+                        "The selected browser does not support private mode!",
+                        text=None,
+                    )
+                else:
+                    draw_settings_checkbox("browser_private")
 
             draw_settings_label(
                 "Download pages:",
