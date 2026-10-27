@@ -795,7 +795,10 @@ async def add_games(*threads: list[ThreadMatch | SearchResult], force_summary=Fa
             utils.push_popup(globals.gui.draw_game_info_popup, globals.games[threads[0].id], None)
         elif force_summary or dupe_count > 0 or added_count > 1:
             utils.push_popup(
-                msgbox.msgbox, f"{'Duplicate' if dupe_count > 0 else 'Added'} games",
+                msgbox.msgbox, ("New " if added_count > 0 else "") +
+                    (f"and " if added_count > 0 and dupe_count > 0 else "") +
+                    ("Duplicate " if dupe_count > 0 else "") +
+                    "game" + ("s" if added_count > 1 or dupe_count > 1 else ""),
                 (
                     (f"{added_count} new game{' has' if added_count == 1 else 's have'} been added to your library.")
                     if added_count > 0 else ""
