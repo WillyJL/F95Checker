@@ -776,8 +776,10 @@ class Browser:
     name: str
     hash: int = None
     args: list[str] = None
+    bundle_id: str = None
     hashed_name: str = None
     integrated: bool = None
+    system_default: bool = None
     custom: bool = None
     private_arg: list = None
     index : int = None
@@ -790,6 +792,7 @@ class Browser:
         self.hashed_name = f"{self.name}###{self.hash}"
         self.integrated = self.hash == 0
         self.custom = self.hash == -1
+        self.system_default = self.hash == self.make_hash("Default")
         private_args = {
             # Firefox based
             "fox":       "--private-window",
