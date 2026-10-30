@@ -785,6 +785,7 @@ async def add_games(*threads: list[ThreadMatch | SearchResult], force_summary=Fa
         done = []
         dupes = []
         added = []
+        games = []
         for thread in threads:
             if thread.id in done:
                 continue
@@ -796,20 +797,25 @@ async def add_games(*threads: list[ThreadMatch | SearchResult], force_summary=Fa
             await db.load_games(thread.id)
             game = globals.games[thread.id]
             added.append(game.name)
+            games.append(game)
             if globals.settings.mark_installed_after_add:
                 game.installed = game.version
             if globals.settings.select_executable_after_add:
                 add_game_exe(game)
         dupe_count = len(dupes)
         added_count = len(added)
+        if len(games) > 0:
+            await api.refresh(*games, full=True, notifs=False)
         if open_duplicate and dupe_count == 1 and added_count == 0:
             utils.push_popup(globals.gui.draw_game_info_popup, globals.games[threads[0].id], None)
         elif force_summary or dupe_count > 0 or added_count > 1:
             utils.push_popup(
-                msgbox.msgbox, f"{'Duplicate' if dupe_count > 0 else 'Added'} games",
+                msgbox.msgbox, ("New " if added_count > 0 else "") +
+                    (f"and " if added_count > 0 and dupe_count > 0 else "") +
+                    ("Duplicate " if dupe_count > 0 else "") +
+                    "game" + ("s" if added_count > 1 or dupe_count > 1 else ""),
                 (
-                    (f"{added_count} new game{' has' if added_count == 1 else 's have'} been added to your library.\n"
-                    "Make sure to refresh to grab all the game details.")
+                    (f"{added_count} new game{' has' if added_count == 1 else 's have'} been added to your library.")
                     if added_count > 0 else ""
                 ) +
                 ("\n\n" if dupe_count > 0 and added_count > 0 else "") +
@@ -818,7 +824,7 @@ async def add_games(*threads: list[ThreadMatch | SearchResult], force_summary=Fa
                     if dupe_count > 0 else ""
                 ),
                 MsgBox.warn if dupe_count > 0 else MsgBox.info,
-                more=(("Added:\n - " + "\n - ".join(added)) if added_count > 0 else "") +
+                more=(("Added:\n - " + "\n - ".join(game.name for game in games)) if added_count > 0 else "") +
                      ("\n\n" if dupe_count > 0 and added_count > 0 else "") +
                      (("Duplicates:\n - " + "\n - ".join(dupes)) if dupe_count > 0 else "")
             )
