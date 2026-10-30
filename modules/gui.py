@@ -2521,7 +2521,10 @@ class MainGUI():
                                 diff = -1 if self.scroll_energy > 0 else +1
                                 self.scroll_energy = 0.0
                             else:
-                                diff = -1 if imgui.io.mouse_wheel > 0 else +1
+                                if imgui.io.mouse_wheel_horizontal:
+                                    diff = -1 if imgui.io.mouse_wheel_horizontal > 0 else +1
+                                else:
+                                    diff = -1 if imgui.io.mouse_wheel > 0 else +1
                             cycle_fullscreen_viewer(diff)
                         if int(imgui.get_scroll_y() - 1.0):
                             if globals.settings.scroll_smooth:

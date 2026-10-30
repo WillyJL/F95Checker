@@ -107,8 +107,12 @@ class GlfwRenderer(ProgrammablePipelineRenderer):
         pass
 
     def scroll_callback(self, window, x_offset, y_offset):
-        self.io.mouse_wheel_horizontal = x_offset
-        self.io.mouse_wheel = y_offset
+        if glfw.get_mouse_button(window, glfw.MOUSE_BUTTON_RIGHT):
+            self.io.mouse_wheel_horizontal = y_offset
+            self.io.mouse_wheel = x_offset
+        else:
+            self.io.mouse_wheel_horizontal = x_offset
+            self.io.mouse_wheel = y_offset
 
     def process_inputs(self):
         io = imgui.get_io()
