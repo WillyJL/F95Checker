@@ -776,6 +776,7 @@ class Browser:
     name: str
     hash: int = None
     args: list[str] = None
+    private_base_args: list[str] = None
     hashed_name: str = None
     integrated: bool = None
     custom: bool = None
