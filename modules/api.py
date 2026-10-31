@@ -187,17 +187,11 @@ def make_session():
             loop=async_thread.loop,
         )
 
-    # Temporarily ignore the single attachments host with signed URLs enabled
-    async def resolve(self: aiohttp.DefaultResolver, host: str, port: int = 0, family: socket.AddressFamily = socket.AF_INET):
-        hosts = await type(self).resolve(self, host, port, family)
-        if host in f95_attachments_domains:
-            for host_i in reversed(range(len(hosts))):
-                if hosts[host_i].get("host") in (
-                    "91.202.4.58",
-                ):
-                    del hosts[host_i]
-        return hosts
-    connector._resolver.resolve = functools.partial(resolve, connector._resolver)
+    # If we ever need to modify DNS results
+    # async def resolve(self: aiohttp.DefaultResolver, host: str, port: int = 0, family: socket.AddressFamily = socket.AF_INET):
+    #     hosts = await type(self).resolve(self, host, port, family)
+    #     return hosts
+    # connector._resolver.resolve = functools.partial(resolve, connector._resolver)
 
     session = aiohttp.ClientSession(
         loop=async_thread.loop,
