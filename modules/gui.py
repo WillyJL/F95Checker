@@ -1092,15 +1092,23 @@ class MainGUI():
 
                         # Popups
                         open_popup_count = 0
+                        ran_popups = []
                         for popup in globals.popup_stack:
                             opened, closed = popup()
+                            ran_popups.append(f"{popup.uuid}: opened={opened} {popup.func}()")
                             if closed:
                                 globals.popup_stack.remove(popup)
                                 globals.popup_stack_changed = True
                             open_popup_count += opened
                         # Popups are closed all at the end to allow stacking
                         for _ in range(open_popup_count):
-                            imgui.end_popup()
+                            try:
+                                imgui.end_popup()
+                            except imgui.core.ImGuiError:
+                                msg = "Popup stack:\n"
+                                for ran_popup in ran_popups:
+                                    msg += f"{ran_popup}\n"
+                                raise Exception(msg)
 
                         # Close main window (technically popups are inside the window, and inside one another - this gives proper stacking order)
                         imgui.end()
