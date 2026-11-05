@@ -133,9 +133,11 @@ def _():
                     for scheme in handler.get("CFBundleURLSchemes", empty):
                         if scheme in matches:
                             name = parser["CFBundleName"]
-                            args = [app / f"Contents/MacOS/{parser['CFBundleExecutable']}"]
-                            if args and shutil.which(args[0]) and pathlib.Path(shutil.which(args[0])).exists():
-                                Browser.add(name, args=args)
+                            exe = app / f"Contents/MacOS/{parser['CFBundleExecutable']}"
+                            if shutil.which(exe) and pathlib.Path(shutil.which(exe)).exists():
+                                # Launch via LaunchServices so URLs are delivered as open events,
+                                # this is needed for apps that don't parse URLs from argv (e.g. Velja)
+                                Browser.add(name, args=["open", "-a", str(app)], private_base_args=[exe])
                             found = True
                             break
                     if found:
