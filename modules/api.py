@@ -187,17 +187,11 @@ def make_session():
             loop=async_thread.loop,
         )
 
-    # Temporarily ignore the single attachments host with signed URLs enabled
-    async def resolve(self: aiohttp.DefaultResolver, host: str, port: int = 0, family: socket.AddressFamily = socket.AF_INET):
-        hosts = await type(self).resolve(self, host, port, family)
-        if host in f95_attachments_domains:
-            for host_i in reversed(range(len(hosts))):
-                if hosts[host_i].get("host") in (
-                    "91.202.4.58",
-                ):
-                    del hosts[host_i]
-        return hosts
-    connector._resolver.resolve = functools.partial(resolve, connector._resolver)
+    # If we ever need to modify DNS results
+    # async def resolve(self: aiohttp.DefaultResolver, host: str, port: int = 0, family: socket.AddressFamily = socket.AF_INET):
+    #     hosts = await type(self).resolve(self, host, port, family)
+    #     return hosts
+    # connector._resolver.resolve = functools.partial(resolve, connector._resolver)
 
     session = aiohttp.ClientSession(
         loop=async_thread.loop,
@@ -1083,15 +1077,15 @@ async def full_check(game: Game, last_changed: int, updates: dict[int, OldGame],
                     thread["tags"][i] = Tag.unknown
             thread["tags"] = tuple(thread["tags"])
             thread["unknown_tags"] = json.loads(thread["unknown_tags"])
+            thread["previews_urls"] = json.loads(thread.get("previews_urls", "[]"))
             thread["downloads"] = json.loads(thread["downloads"])
             for _, links in thread["downloads"]:
                 for link_i, link_pair in enumerate(links):
                     links[link_i] = tuple(link_pair)
-            thread["previews_urls"] = json.loads(thread.get("previews_urls", "[]"))
             thread["downloads"] = tuple(thread["downloads"])
             thread["reviews_total"] = int(thread.get("reviews_total", "0"))
             thread["reviews"] = json.loads(thread.get("reviews", "[]"))
-            thread["reviews"] = [Review(**review) for review in thread["reviews"]]
+            thread["reviews"] = [Review(**{k: v for k, v in review.items() if k in Review.__dataclass_fields__}) for review in thread["reviews"]]
 
             old_name = game.name
             old_version = game.version
@@ -1516,26 +1510,42 @@ async def check_updates():
         total = 1.0
         status = f"(2/3) Extracting {asset_name}..."
         if asset_artifact:
-            with zipfile.ZipFile(asset_data) as z:
-                asset_data = io.BytesIO(z.read(asset_name.replace("-Artifact", "")))
+            with zipfile.ZipFile(asset_data) as arc:
+                asset_data = io.BytesIO(arc.read(asset_name.replace("-Artifact", "")))
         asset_path = pathlib.Path(tempfile.TemporaryDirectory(prefix=asset_name[:asset_name.rfind(".")] + "-").name)
-        with zipfile.ZipFile(asset_data) as z:
-            total = float(len(z.filelist))
-            for file in z.filelist:
+        with zipfile.ZipFile(asset_data) as arc:
+            arc._ignore_invalid_names = True  # Fix path and link traversal in arc.extract()
+            # Extract manually to create symlinks and apply permissions
+            path = asset_path
+            total = float(len(arc.filelist))
+            for file in arc.filelist:
                 if cancel:
                     shutil.rmtree(asset_path, ignore_errors=True)
                     return
                 mode = file.external_attr >> 16
                 if (mode & stat.S_IFLNK) == stat.S_IFLNK:
-                    extracted = asset_path / file.filename
-                    symlink = z.read(file).decode()
-                    os.symlink(symlink, extracted)
-                    if hasattr(os, "lchmod"):
-                        os.lchmod(extracted, mode)
+                    extracted = path / file.filename
+                    if path.resolve() not in extracted.resolve().parents:
+                        # Path traversal, ignore
+                        progress += 1
+                        continue
+                    symlink = arc.read(file).decode()
+                    if path.resolve() not in (extracted.resolve().parent / symlink).resolve().parents:
+                        # Link traversal, ignore
+                        progress += 1
+                        continue
+                    if extracted.exists():
+                        extracted.unlink()
+                    extracted.symlink_to(symlink)
+                    try:
+                        extracted.lchmod(mode)
+                    except NotImplementedError:
+                        pass
                 else:
-                    extracted = z.extract(file, asset_path)
-                    if mode != 0:
-                        os.chmod(extracted, mode)
+                    extracted = arc.extract(file, path)
+                    if extracted and mode != 0:
+                        extracted = pathlib.Path(extracted)
+                        extracted.chmod(mode)
                 progress += 1
         progress = 5.0
         total = 5.0

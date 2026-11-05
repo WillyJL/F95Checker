@@ -828,11 +828,19 @@ class Browser:
         self.integrated = self.hash == 0
         self.custom = self.hash == -1
         private_args = {
-            "Opera":   "-private",
-            "Chrom":   "-incognito",
-            "Brave":   "-incognito",
-            "Edge":    "-inprivate",
-            "fox":     "-private-window"
+            # Firefox based
+            "fox":       "--private-window",
+            "LibreWolf": "--private-window",
+            "Zen":       "--private-window",
+            "Floorp":    "--private-window",
+            # Chromium based
+            "Chrom":     "--incognito",
+            "Helium":    "--incognito",
+            "Brave":     "--incognito",
+            # Opera
+            "Opera":     "-private",
+            # Microslop
+            "Edge":      "-inprivate",
         }
         self.private_arg = []
         for search, arg in private_args.items():
@@ -953,6 +961,7 @@ class Settings:
     play_gifs_unfocused         : bool
     preload_nearby_images       : bool
     previews_enabled            : bool
+    previews_height             : int
     proxy_type                  : ProxyType
     proxy_host                  : str
     proxy_port                  : int

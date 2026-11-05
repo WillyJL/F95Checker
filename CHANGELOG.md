@@ -3,12 +3,20 @@
 ### Added:
 
 - Add arrows and a counter to image viewer (#327 by @zerebos)
+- Preview images gallery can be resized by dragging the scroll bar vertically (by @WillyJL)
 
 ### Fixed:
 - Slow responses from cache api are now handled gracefully (by @WillyJL)
 - Fix libraries not being bundled on Linux (by @WillyJL)
 - Fix height shifting during verification and extraction of Donor DDL files (by @WillyJL)
 - Show empty progress bar when showing a Donor DDL error (by @WillyJL)
+- Updated browser addon for new reviews page (by @WillyJL)
+- Fix private mode option for LibreWolf, Floorp, Zen, Helium (by @WillyJL)
+- Fix Donor DDL zip extraction of file permissions and symlinks (by @WillyJL)
+- Fix path/link traversal during archive extraction (by @WillyJL)
+- Ignore wine-based wrappers for non-windows exes (by @WillyJL)
+- Don't suppress exe console output to help with toubleshooting (by @WillyJL)
+- Workaround Renpy's questionable Wayland support (by @WillyJL)
 
 ## 11.2.1
 

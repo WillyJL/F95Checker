@@ -51,16 +51,56 @@ def apply():
         logging.basicConfig()
 
     # Register archive formats
-    import py7zr
-    import rarfile
+    import pathlib
     import shutil
-    import zipfile_deflate64
-    shutil.register_unpack_format("7zip", [".7z"], py7zr.unpack_7zarchive)
+    import stat
+
+    import tarfile
+    tarfile.TarFile.extraction_filter = tarfile.data_filter  # Fix path and link traversal
+
+    import zipfile_deflate64 as zipfile
+    def unpack_zipfile(archive, path):
+        if not zipfile.is_zipfile(archive):
+            raise shutil.ReadError(f"{archive} is not a zip file")
+        with zipfile.ZipFile(archive) as arc:
+            arc._ignore_invalid_names = True  # Fix path and link traversal in arc.extract()
+            # Extract manually to create symlinks and apply permissions
+            path = pathlib.Path(path)
+            for file in arc.filelist:
+                mode = file.external_attr >> 16
+                if (mode & stat.S_IFLNK) == stat.S_IFLNK:
+                    extracted = path / file.filename
+                    if path.resolve() not in extracted.resolve().parents:
+                        # Path traversal, ignore
+                        continue
+                    symlink = arc.read(file).decode()
+                    if path.resolve() not in (extracted.resolve().parent / symlink).resolve().parents:
+                        # Link traversal, ignore
+                        continue
+                    if extracted.exists():
+                        extracted.unlink()
+                    extracted.symlink_to(symlink)
+                    try:
+                        extracted.lchmod(mode)
+                    except NotImplementedError:
+                        pass
+                else:
+                    extracted = arc.extract(file, path)
+                    if extracted and mode != 0:
+                        extracted = pathlib.Path(extracted)
+                        extracted.chmod(mode)
+    shutil.unregister_unpack_format("zip")
+    shutil.register_unpack_format("zip", [".zip"], unpack_zipfile)
+
+    import py7zr
+    shutil.register_unpack_format("7zip", [".7z"], py7zr.unpack_7zarchive)  # py7zr handles symlinks and permissions
+
+    import rarfile
     def unpack_rarfile(archive, path):
         if not rarfile.is_rarfile(archive):
-            raise shutil.ReadError(f"{archive} is not a RAR file.")
+            raise shutil.ReadError(f"{archive} is not a RAR file")
         with rarfile.RarFile(archive) as arc:
-            arc.extractall(path)
+            arc.extractall(path)  # rarfile handles symlinks and permissions
     try:
         if rarfile.tool_setup():
             shutil.register_unpack_format("rar", [".rar"], unpack_rarfile)

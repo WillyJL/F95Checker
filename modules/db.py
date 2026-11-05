@@ -242,6 +242,7 @@ async def connect():
             "play_gifs_unfocused":         f'INTEGER DEFAULT {int(False)}',
             "preload_nearby_images":       f'INTEGER DEFAULT {int(False)}',
             "previews_enabled":            f'INTEGER DEFAULT {int(False)}',
+            "previews_height":             f'INTEGER DEFAULT 200',
             "proxy_type":                  f'INTEGER DEFAULT {ProxyType.Disabled}',
             "proxy_host":                  f'TEXT    DEFAULT ""',
             "proxy_port":                  f'INTEGER DEFAULT 8080',

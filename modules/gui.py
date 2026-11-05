@@ -339,6 +339,8 @@ class MainGUI():
         self.game_hitbox_click = False
         self.hovered_game: Game = None
         self.dragging_previews = False
+        self.grabbing_previews_scrollbar = False
+        self.resizing_previews_height = False
         self.filters: list[Filter] = []
         self.poll_chars: list[int] = []
         self.refresh_ratio_smooth = 0.0
@@ -426,6 +428,21 @@ class MainGUI():
         glfw.set_window_pos_callback(self.window, self.pos_callback)
         glfw.set_drop_callback(self.window, self.drop_callback)
         glfw.swap_interval(globals.settings.vsync_ratio)
+
+        # Query supported Wayland protocls
+        self.wayland_protocols = {}
+        self.glfw_platform = glfw.get_platform()
+        if self.glfw_platform == glfw.PLATFORM_WAYLAND:
+            try:
+                import pywayland.client
+                def on_global(registry, name, interface, version):
+                    self.wayland_protocols[interface] = version
+                with pywayland.client.Display() as display:
+                    registry = display.get_registry()
+                    registry.dispatcher["global"] = on_global
+                    display.roundtrip()
+            except Exception as exc:
+                print(f"Failed enumerating Wayland protocols: {exc}")
 
         self.logo_texture = imagehelper.ImageHelper(globals.self_path / "resources/icons/logo.png")
         self.refresh_fonts()
@@ -1076,15 +1093,23 @@ class MainGUI():
 
                         # Popups
                         open_popup_count = 0
+                        ran_popups = []
                         for popup in globals.popup_stack:
                             opened, closed = popup()
+                            ran_popups.append(f"{popup.uuid}: opened={opened} {popup.func}()")
                             if closed:
                                 globals.popup_stack.remove(popup)
                                 globals.popup_stack_changed = True
                             open_popup_count += opened
                         # Popups are closed all at the end to allow stacking
                         for _ in range(open_popup_count):
-                            imgui.end_popup()
+                            try:
+                                imgui.end_popup()
+                            except imgui.core.ImGuiError:
+                                msg = "Popup stack:\n"
+                                for ran_popup in ran_popups:
+                                    msg += f"{ran_popup}\n"
+                                raise Exception(msg)
 
                         # Close main window (technically popups are inside the window, and inside one another - this gives proper stacking order)
                         imgui.end()
@@ -2390,7 +2415,14 @@ class MainGUI():
                 # the row in a child with an explicit horizontal bar.
                 # Without a child, ImGui clips same-line items at the
                 # popup boundary and the parent only scrolls vertically.
-                preview_height = self.scaled(200)
+                preview_height = self.scaled(globals.settings.previews_height)
+                if self.grabbing_previews_scrollbar:
+                    drag_delta = imgui.get_mouse_drag_delta()
+                    if self.resizing_previews_height or abs(drag_delta.y) > self.scaled(20.0):
+                        self.resizing_previews_height = True
+                        preview_height = min(max(self.scaled(20.0), preview_height + drag_delta.y), self.scaled(500.0))
+                    elif abs(drag_delta.x) > self.scaled(10.0):
+                        self.grabbing_previews_scrollbar = False
                 horizontal_flags = (
                     imgui.WINDOW_HORIZONTAL_SCROLLING_BAR |
                     imgui.WINDOW_ALWAYS_HORIZONTAL_SCROLLBAR |
@@ -2445,6 +2477,20 @@ class MainGUI():
                         self.dragging_previews = False
                     first = False
                 imgui.end_child()
+                mouse_pos = imgui.io.mouse_pos
+                item_rect_min = imgui.get_item_rect_min()
+                item_rect_max = imgui.get_item_rect_max()
+                if self.grabbing_previews_scrollbar or ((item_rect_min.x < mouse_pos.x and mouse_pos.x < item_rect_max.x) and
+                    (item_rect_max.y - imgui.style.scrollbar_size < mouse_pos.y and mouse_pos.y < item_rect_max.y)):
+                        if imgui.is_mouse_clicked():
+                            self.grabbing_previews_scrollbar = True
+                        if imgui.is_mouse_released():
+                            self.grabbing_previews_scrollbar = False
+                            if self.resizing_previews_height:
+                                drag_delta = imgui.get_mouse_drag_delta()
+                                globals.settings.previews_height = preview_height / globals.settings.interface_scaling
+                                async_thread.run(db.update_settings("previews_height"))
+                                self.resizing_previews_height = False
             imgui.push_text_wrap_pos()
 
             # Fullscreen image viewer

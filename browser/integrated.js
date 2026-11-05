@@ -53,11 +53,11 @@ var getData = async () => {
 var addGame = async (url) => {
     await rpcCall('POST', '/games/add', JSON.stringify([url]));
     await sleep(0.5 * 1000);
-    await updateIcons();
+    await update();
 };
 
-// Add icons for games, reminders, etc.
-var updateIcons = async () => {
+// Main entrypoint
+var update = async () => {
     await getData();
     const font = await (await rpcCall('GET', '/assets/mdi-webfont.ttf', null)).text();
     const font_url = `data:@font/ttf;base64,${btoa(font)}`;
@@ -128,6 +128,7 @@ var updateIcons = async () => {
         // Ignore post navigation
         const parent = elem.parentNode
         if (/page-.*$/.test(elem.href)) return false;
+        if (/more\?k=[0-9a-f]+$/.test(elem.href)) return false;
         if (parent && parent.classList.contains('pageNav')) return false;
         if (parent && parent.classList.contains('pageNav-page')) return false;
 
@@ -141,6 +142,9 @@ var updateIcons = async () => {
         if (elem.classList.contains('button')) return false;
         if (elem.classList.contains('tabs-tab')) return false;
         if (elem.classList.contains('u-concealed')) return false;
+
+        // Ignore Reviews page
+        if (/\/reviews\/(?:$|\?)/.test(elem.href)) return false;
 
         return true;
     }
@@ -295,5 +299,5 @@ var updateIcons = async () => {
 };
 
 if (document.title !== "Just a moment...") {
-    updateIcons();
+    update();
 }

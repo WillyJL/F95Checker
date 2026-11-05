@@ -130,41 +130,44 @@ async def thread(id: int) -> dict[str, str] | f95zone.IndexerError | None:
         else:  # Didn't break
             logger.warning(f"Thread {id} not found in latest updates search")
 
-    retries = 10
-    while retries:
-        async with f95zone.RATELIMIT:
-            try:
-                async with f95zone.session.get(
-                    thread_url + "/reviews/",
-                    cookies=f95zone.cookies,
-                ) as req:
-                    if req.status == 429 and retries > 1:
-                        logger.warning("Hit a ratelimit, sleeping 2 seconds")
-                        await asyncio.sleep(2)
-                        retries -= 1
-                        continue
-                    res = await req.read()
-                    break
-            except Exception as exc:
-                if index_error := f95zone.check_error(exc, logger):
-                    return index_error
-                raise
-
-    if index_error := f95zone.check_error(res, logger):
-        return index_error
-
-    if not str(req.real_url).rstrip("/").endswith("/reviews"):
-        # Some threads have reviews disabled
+    if ret.votes == 0:
         reviews = parser.ParsedReviews(total=0, items=[])
     else:
-        reviews = await loop.run_in_executor(None, parser.reviews, res)
-        if isinstance(reviews, parser.ParserError):
-            logger.error(
-                f"Thread {id} reviews parsing failed: {reviews.message}\n{reviews.dump}"
-            )
-            return f95zone.ERROR_PARSING_FAILED
+        retries = 10
+        while retries:
+            async with f95zone.RATELIMIT:
+                try:
+                    async with f95zone.session.get(
+                        thread_url + "/reviews/",
+                        cookies=f95zone.cookies,
+                    ) as req:
+                        if req.status == 429 and retries > 1:
+                            logger.warning("Hit a ratelimit, sleeping 2 seconds")
+                            await asyncio.sleep(2)
+                            retries -= 1
+                            continue
+                        res = await req.read()
+                        break
+                except Exception as exc:
+                    if index_error := f95zone.check_error(exc, logger):
+                        return index_error
+                    raise
 
-        reviews.items = [dataclasses.asdict(review) for review in reviews.items]
+        if index_error := f95zone.check_error(res, logger):
+            return index_error
+
+        if not str(req.real_url).rstrip("/").endswith("/reviews"):
+            # Some threads have reviews disabled
+            reviews = parser.ParsedReviews(total=0, items=[])
+        else:
+            reviews = await loop.run_in_executor(None, parser.reviews, res)
+            if isinstance(reviews, parser.ParserError):
+                logger.error(
+                    f"Thread {id} reviews parsing failed: {reviews.message}\n{reviews.dump}"
+                )
+                return f95zone.ERROR_PARSING_FAILED
+
+            reviews.items = [dataclasses.asdict(review) for review in reviews.items]
 
     # Prepare for redis, only strings allowed
     parsed = dataclasses.asdict(ret)
