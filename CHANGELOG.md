@@ -20,6 +20,7 @@
 - Workaround Renpy's questionable Wayland support (by @WillyJL)
 - Support new F95zone masked download links (by @WillyJL)
 - Support new F95zone article-style threads (by @WillyJL)
+- Handle newly-required login for latest updates search (by @WillyJL)
 
 ## 11.2.1
 
