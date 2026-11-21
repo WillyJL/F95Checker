@@ -178,7 +178,12 @@ def thread(res: bytes) -> ParsedThread | ParserError:
                         link_host = f"{f95_host}/dl/"
                     else:
                         link_host = link_url[:link_url.find("/", len("https://")) + 1]
-                    xpath_expr = f"//{elem.name}[starts-with(@href,{link_host!r}) and text()={elem.get_text()!r}]"
+                    xpath_own_text = elem.find(string=True, recursive=False)
+                    if xpath_own_text:
+                        xpath_own_text_expr = f" and starts-with(text(),{xpath_own_text!r})"
+                    else:
+                        xpath_own_text_expr = ""
+                    xpath_expr = f"//{elem.name}[starts-with(@href,{link_host!r}){xpath_own_text_expr}]"
                     xpath_results = post_tree.xpath(xpath_expr)
                     for xpath_i, xpath_result in enumerate(xpath_results):
                         if xpath_result.get("href") == link_url:
