@@ -48,7 +48,7 @@ class ParsedReviews:
     total: int
     items: list[ParsedReview]
 
-f95_host = "https://f95zone.to/"
+f95_host = "https://f95zone.to"
 
 # [^\S\r\n] = whitespace but not newlines
 sanitize_whitespace = lambda text: re.sub(r" *(?:\r\n?|\n)", r"\n", re.sub(r"(?:[^\S\r\n]|\u200b)", " ", text))
@@ -164,14 +164,21 @@ def thread(res: bytes) -> ParsedThread | ParserError:
             else:
                 elem = elem.parent
                 continue
+            if is_class("u-hidden")(elem):
+                continue
             while not (is_link := is_class("link")(elem)) and (children := list(getattr(elem, "children", []))):
                 elem = children[0]
             if is_link and (link_url := elem.get("href")):
-                if not link_url.startswith(f95_host):
+                is_masked = link_url.startswith(f"{f95_host}/dl/")
+                if is_masked or not link_url.startswith(f"{f95_host}/"):
                     # Cache API is public, to prevent abuse we replace naked links with XPath
                     # expressions to allow client to automatically find the link in main post
-                    link_host = link_url[:link_url.find("/", len("https://")) + 1]
-                    xpath_expr = f"//{elem.name}[starts-with(@href,{link_host!r})]"
+                    # Masked (/dl/) links are user-tied so let the client find them too
+                    if is_masked:
+                        link_host = f"{f95_host}/dl/"
+                    else:
+                        link_host = link_url[:link_url.find("/", len("https://")) + 1]
+                    xpath_expr = f"//{elem.name}[starts-with(@href,{link_host!r}) and text()={elem.get_text()!r}]"
                     xpath_results = post_tree.xpath(xpath_expr)
                     for xpath_i, xpath_result in enumerate(xpath_results):
                         if xpath_result.get("href") == link_url:
