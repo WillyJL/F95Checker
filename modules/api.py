@@ -565,7 +565,7 @@ async def is_logged_in():
 async def login():
     try:
         ret = False
-        new_cookies = {}
+        new_cookies = globals.cookies.copy()
         with await webview.start(
             "cookies", f95_login_page,
             title="F95Checker: Login to F95zone",
