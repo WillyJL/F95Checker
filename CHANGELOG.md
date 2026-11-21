@@ -6,6 +6,7 @@
 - Preview images gallery can be resized by dragging the scroll bar vertically (by @WillyJL)
 
 ### Fixed:
+
 - Slow responses from cache api are now handled gracefully (by @WillyJL)
 - Fix libraries not being bundled on Linux (by @WillyJL)
 - Fix height shifting during verification and extraction of Donor DDL files (by @WillyJL)
@@ -18,13 +19,16 @@
 - Don't suppress exe console output to help with toubleshooting (by @WillyJL)
 - Workaround Renpy's questionable Wayland support (by @WillyJL)
 - Support new F95zone masked download links (by @WillyJL)
+- Support new F95zone article-style threads (by @WillyJL)
 
 ## 11.2.1
 
 ### Updated:
+
 - Incremental changelog system, showing changelogs for all versions between your current one and the new one (by @WillyJL)
 
 ### Fixed:
+
 - Fix Windows notifications with PyWinRT 4.0 (#326 by @zerebos)
 - Fix duplicate preview images (by @WillyJL)
 - Release will not update to beta if beta is older than release (by @WillyJL)
@@ -32,6 +36,7 @@
 ## 11.2
 
 ### Added:
+
 - Preview images in More Info popup (#285 by @Crykon & @WillyJL):
   - Opt-in from Settings > Images > Preview images
   - Downloads on-demand only while the game's More Info popup is open, resuming/interrupting as it's opened/closed
@@ -71,6 +76,7 @@
 - Setting to disable Donor DDL extraction, in Settings > Manage > Extract downloads (by @WillyJL)
 
 ### Updated:
+
 - Tex Compress transparently in background (by @WillyJL):
   - If Settings > Images > Tex Compress is enabled, images are now compressed in background
   - The uncompressed copy of an image is visible on screen while it is being / waiting to be compressed
@@ -90,6 +96,7 @@
 - Bulk game import actions will show a summary even if just 1 game was added instead of adding silently (by @WillyJL)
 
 ### Fixed:
+
 - Fix window show/hide from other threads and from tray icon (#286 by @cicklolwut & @WillyJL)
 - Restrict RPC server CORS to the browser addon and f95zone.to (#287 by @cicklolwut)
 - Redraw UI when popups are opened/closed (by @WillyJL)
@@ -113,11 +120,13 @@
 - Compatibility with F95zone XenForo 2.3 and new Watched Games system (by @WillyJL)
 
 ### Removed:
+
 - Collection and SiteRip thread types are gone, these are now detected as the appropriate animation/comic/game type
 
 ## 11.1.3
 
 ### Fixed:
+
 - Fix launching ELF binaries on Linux (by @WillyJL)
 - Fix notification daemon spinning when main process dies (by @WillyJL)
 - Fix images with 0ms durations freezing the program (by @WillyJL)
@@ -125,29 +134,35 @@
 ## 11.1.2
 
 ### Fixed:
+
 - Don't draw continuously while focused unless necessary (by @WillyJL)
 - Fix symbolic links in auto update (by @WillyJL)
 - Pick correct macOS update file if on x64 (by @WillyJL)
 
 ### Removed:
+
 - Removed "Interface > Render if unfocused" setting:
   - Doesn't make sense anymore
   - Previously it would always draw when focused, and always draw when unfocused if this setting was on
   - Now, both when focused and unfocused, it will draw only if necessary, eg mouse moved, GIF is playing...
 
 ### Known Issues:
+
 - The new notification-daemon process on Linux can sometimes get stuck spinning and cause the app to crash
 
 ## 11.1.1
 
 ### Added:
+
 - Right click option on Refresh button to manually check app updates (by @WillyJL)
 - Add Cmd+W shortcut to close window on macOS (#268 by @cantunborn)
 
 ### Updated:
+
 - Show download size and speed in Donor DDL progress bar (#271 by @FaceCrap & @WillyJL)
 
 ### Fixed:
+
 - Fix updating on Windows when the app closes faster than Powershell starts (by @WillyJL)
 - Detect unsupported configurations with app data and app install locations overlapping (by @WillyJL)
 - Fix horizontal scrolling in more info popup (by @WillyJL)
@@ -157,11 +172,13 @@
 - Fix tray icon and menu theming on macOS (by @cantunborn & @WillyJL)
 
 ### Known Issues:
+
 - The new notification-daemon process on Linux can sometimes get stuck spinning and cause the app to crash
 
 ## 11.1
 
 ### Added:
+
 - Reviews Tab in More Info Popup (#224 by @WillyJL)
   - Labels moved next to executables
 - Image Texture Compression (`(ASTC or BC7) + ZSTD`) option (#212 by @WillyJL):
@@ -181,11 +198,13 @@
 - macOS arm64 (Apple Silicon) binary builds (#258 by @rakleed)
 
 ### Updated:
+
 - New notification system with buttons and better platform support, option to include banner image in update notifs (#220 by @WillyJL)
 - Updates popup is now cumulative, new updates get grouped with any previous popups and moved to top (#220 by @WillyJL)
 - Executable paths in More Info popup wrap after `/` and `\` characters for easier readability (by @WillyJL)
 
 ### Fixed:
+
 - Fix switching view modes with "Table header outside list" disabled (by @WillyJL)
 - Fix flashbang while interface is loading (#221 by @sodamouse)
 - Fix GUI redraws not pausing when unfocused, hovered and not moving mouse (by @WillyJL)
@@ -206,18 +225,22 @@
 - Add unknown type/tag/status so API updates don't create errors (by @WillyJL)
 
 ### Removed:
+
 - Excluded `libEGL.so` on linux binary bundles, fixes "Cannot find EGLConfig, returning null config" (by @WillyJL)
 
 ## 11.0.3
 
 ### Added:
+
 - Table header visible in all view modes setting, allows changing sorting and shown elements in grid/kanban view(by @Willy-JL)
 
 ### Updated:
+
 - DDL can extract 7zip and RAR archives too (by @Willy-JL)
 - App icons are now rounded, and MacOS icon has an empty border to fit design guidelines (by @rakleed & @Willy-JL)
 
 ### Fixed:
+
 - Added support for AVIF images, supports new F95zone attachment server conversion (by @Willy-JL)
 - DDL files are deleted asynchronously now, avoids stutters on slow drives (by @Willy-JL)
 - Simplify some error handling, correctly handles connection issues in some edge cases (by @Willy-JL)
@@ -225,15 +248,18 @@
 - Detect system SSL certificates on more Linux distros, include certifi as fallback (by @kalvisbuls & @Willy-JL)
 
 ### Known Issues:
+
 - MacOS webview in frozen binaries remains blank, run from source instead
 
 ## 11.0.2
 
 ### Updated:
+
 - More info popup has constant size, easier to read when cycling games as it no longer shifts based on scroll bar being visible or vertical content length (by @Willy-JL)
 - Extension > Add in Background now enabled by default for new users (by @Willy-JL)
 
 ### Fixed:
+
 - Fixed sorting corruption bug (#211 by @Willy-JL & @FaceCrap)
 - Fixed incorrect tab for first frame that caused images from default tab to load (by @Willy-JL)
 - Fixed GIF animation speed (by @Willy-JL)
@@ -247,17 +273,20 @@
 - Fix weird wrapping at edge of grid/kanban cells in some edge cases (by @Willy-JL)
 
 ### Known Issues:
+
 - MacOS webview in frozen binaries remains blank, run from source instead
 
 ## 11.0.1
 
 ### Added:
+
 - Insecure SSL option (by @Willy-JL)
 - Archive/Unarchive button to more info popup (by @Willy-JL)
 - Allow removing personal rating for selected games in context menu (by @Willy-JL)
 - Show full note when hovering notes icon (#198 by @FaceCrap)
 
 ### Updated:
+
 - Rename "Last Played" to "Last Launched" and add timeline event when manually setting launched date (by @Willy-JL)
 - Save URIs and relative exe path correctly in Launched timeline event (by @Willy-JL)
 - Add executable fuzzy matches subdirs in Default Exe Dir for game type, developer, name (by @Willy-JL)
@@ -265,6 +294,7 @@
 - Themed integrated browser right click menu (by @Willy-JL)
 
 ### Fixed:
+
 - More efficient grid/kanban cell cluster text (#200 by @Willy-JL)
 - Fix Windows start with system setting and quotes usage (#156 by @oneshoekid & @Willy-JL)
 - Fix Extension mdi-webfont not loading from RPC (#205 by @FaceCrap)
@@ -279,15 +309,18 @@
 - Make sure GLFW logic happens in main thread (by @Willy-JL)
 
 ### Removed:
+
 - Removed obsolete DDOS-GUARD bypass, no longer needed and never really worked
 
 ### Known Issues:
+
 - Sorting can be sporadically break/change with some actions, seems to be memory corruption inside (py)imgui, re-launch to fix it or change sorting manually
 - MacOS webview in frozen binaries remains blank, run from source instead
 
 ## 11.0
 
 ### Added:
+
 - Tabs system, more ways to organize your library (by @Willy-JL)
 - Tab customization and colored icons in extension (#112 #117 #118 #126 by @r37r05p3C7 & @Willy-JL)
 - F95zone Donor DDL integration, download and extract in-app (#190 by @Willy-JL, #192 by @FaceCrap)
@@ -315,6 +348,7 @@
 - Style loading from `styles.toml` file (#130 by @r37r05p3C7)
 
 ### Updated:
+
 - Refresh process with F95Checker Cache API (#180 #184 #187 #188 by @Willy-JL):
   - Due to strain this tool was causing on F95zone servers they now have many ratelimits which make it unfeasible to continue as before
   - From now on F95Checker will not get game info directly from F95zone, but from a middleman F95Checker Cache API
@@ -360,6 +394,7 @@
 - Bumped OS targets and dependencies, Python 3.11 minimum (by @Willy-JL)
 
 ### Fixed:
+
 - F95zone ratelimits properly handled (by @Willy-JL)
 - Improve detection of many game details and add fallbacks (by @Willy-JL)
 - SSL certificates verified, and SSL trusted CA loaded from system store (by @Willy-JL)
@@ -391,11 +426,13 @@
 - Fixed running without stdout or stderr (by @Willy-JL)
 
 ### Removed:
+
 - MacOS binaries no longer codesigned as Apple broke it and made it pointless
 - Main process doesn't re-launch itself to make a `log.txt` anymore, use the Debug binaries in console to get log output
 - Parser processes option and multiprocessing logic are gone, as parsing is no longer done clientside
 
 ### Known Issues:
+
 - Sorting can sporadically break/change with some actions, seems to be memory corruption inside (py)imgui, re-launch to fix it or change sorting manually
 - MacOS webview in frozen binaries remains blank, run from source instead
 
@@ -420,7 +457,7 @@
 
 ## 10.1.1
 
-- NEW: Switched to a new refresh system (thanks Sam) which is more reliable, MUCH  faster, and causes less problems to the forum
+- NEW: Switched to a new refresh system (thanks Sam) which is more reliable, MUCH faster, and causes less problems to the forum
 
 WARNING: This means versions are detected differently, I tried to make it auto-adjust but you might encounter some slight annoyances; I suggest you refresh right after you update to the new version
 
@@ -525,11 +562,12 @@ WARNING: This means versions are detected differently, I tried to make it auto-a
 - FIXED: Windows "semaphore expired" error, check the refresh settings
 - FIXED: database and ui settings should save properly on unexpected exits
 - FIXED: "more details" text now uses a monospace font for cleaner error messages
-and a bunch more fixes and improvements...
+  and a bunch more fixes and improvements...
 
 ## 9.4
 
 While adjusting some widget IDs the main table configuration got messed up, so you might lose your layout (column order, visibility, sorting and size). No other data will be lost. Sorry for the inconvenience.
+
 - FIXED: weird input box behavior when deleting text
 - FIXED: removing filters takes out the correct one
 - FIXED: crash when pasting with non-text payloads
@@ -549,7 +587,7 @@ While adjusting some widget IDs the main table configuration got messed up, so y
 - FIXED: better text inputs, less lag and unlimited text input
 - NEW: added paste to right click menu on most text boxes
 - NEW: smooth refresh progress bar
-and more small fixes
+  and more small fixes
 
 ## 9.3
 

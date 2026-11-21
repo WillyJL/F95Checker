@@ -209,7 +209,7 @@ def thread(res: bytes) -> ParsedThread | ParserError:
 
         html = _html(res)
         head = html.find(is_class("p-body-header"))
-        post = html.find(is_class("message-threadStarterPost"))
+        post = html.find(is_class("message-threadStarterPost")) or html.find(is_class("message--article"))
         if head is None or post is None:
             logo = html.select_one(".p-header-logo img")
             if logo and logo.attrs.get("alt", "").startswith("F95zone"):
@@ -549,7 +549,7 @@ def reviews(res: bytes) -> ParsedReviews | ParserError:
             logo = html.select_one(".p-header-logo img")
             if logo and logo.attrs.get("alt", "").startswith("F95zone"):
                 e = ParserError(
-                    message="Thread structure missing",
+                    message="Review structure missing",
                     dump=res,
                 )
             else:
