@@ -6,6 +6,7 @@
 
 ### Updated:
 - Personal Rating and Forum Score support half stars (by @WillyJL)
+- Personal Rating stars can be dragged and show a preview on hover (by @WillyJL)
 
 ### Fixed:
 - Slow responses from cache api are now handled gracefully (by @WillyJL)
