@@ -1709,53 +1709,54 @@ async def refresh(*games: Game, full=False, notifs=True, force_archived=False, f
     full_checks_sem = None
     fast_checks_counter = 0
 
-    # Close previous instances of these single-instance popups
-    for popup in globals.popup_stack:
-        if popup.func in (
-            type(globals.gui).draw_updates_popup,
-            type(globals.gui).draw_api_errors_popup,
-            type(globals.gui).draw_missing_threads_popup,
-        ):
-            globals.popup_stack.remove(popup)
-            globals.popup_stack_changed = True
+    with globals.popup_stack_lock:
+        # Close previous instances of these single-instance popups
+        for popup in globals.popup_stack:
+            if popup.func in (
+                type(globals.gui).draw_updates_popup,
+                type(globals.gui).draw_api_errors_popup,
+                type(globals.gui).draw_missing_threads_popup,
+            ):
+                globals.popup_stack.remove(popup)
+                globals.popup_stack_changed = True
 
-    if updates or globals.updates:
-        if updates:
-            # Merge with previous updates, eg in case of multiple refreshes in background
-            globals.updates.update(updates)
-            first = list(updates.keys())[0]
-        else:
-            first = list(globals.updates.keys())[0]
-        globals.updates_sorted_ids = sorted(globals.updates.keys(), key=lambda id: globals.games[id].type.category.value)
-        utils.push_popup(type(globals.gui).draw_updates_popup, globals.gui).uuid = "updates"
-        if globals.gui.hidden or not globals.gui.focused:
-            image = None
-            if globals.settings.notifs_show_update_banner:
-                image_paths = list(filter(lambda f: f.suffix != ".zst", globals.images_path.glob(f"{first}.*")))
-                if image_paths:
-                    image = desktop_notifier.Attachment(path=image_paths[0])
-            count = len(globals.updates)
-            notification_proc.notify(
-                title="Updates",
-                msg=f"{count} item{'' if count == 1 else 's'} in your library {'has' if count == 1 else 'have'} received updates!",
-                attachment=image,
-            )
-
-    # Don't merge with previous errors, we only care about latest ones,
-    # previous errors might have disappeared since then
-    globals.api_errors.clear()
-    globals.missing_threads.clear()
-
-    for id, api_error in api_errors.items():
-        if api_error not in globals.api_errors:
-            globals.api_errors[api_error] = set()
-        globals.api_errors[api_error].add(id)
-    if globals.api_errors:
-        utils.push_popup(type(globals.gui).draw_api_errors_popup, globals.gui).uuid = "api_errors"
-
-    globals.missing_threads.update(missing_threads)
-    if globals.missing_threads:
-        utils.push_popup(type(globals.gui).draw_missing_threads_popup, globals.gui).uuid = "missing_threads"
+        if updates or globals.updates:
+            if updates:
+                # Merge with previous updates, eg in case of multiple refreshes in background
+                globals.updates.update(updates)
+                first = list(updates.keys())[0]
+            else:
+                first = list(globals.updates.keys())[0]
+            globals.updates_sorted_ids = sorted(globals.updates.keys(), key=lambda id: globals.games[id].type.category.value)
+            utils.push_popup(type(globals.gui).draw_updates_popup, globals.gui).uuid = "updates"
+            if globals.gui.hidden or not globals.gui.focused:
+                image = None
+                if globals.settings.notifs_show_update_banner:
+                    image_paths = list(filter(lambda f: f.suffix != ".zst", globals.images_path.glob(f"{first}.*")))
+                    if image_paths:
+                        image = desktop_notifier.Attachment(path=image_paths[0])
+                count = len(globals.updates)
+                notification_proc.notify(
+                    title="Updates",
+                    msg=f"{count} item{'' if count == 1 else 's'} in your library {'has' if count == 1 else 'have'} received updates!",
+                    attachment=image,
+                )
+    
+        # Don't merge with previous errors, we only care about latest ones,
+        # previous errors might have disappeared since then
+        globals.api_errors.clear()
+        globals.missing_threads.clear()
+    
+        for id, api_error in api_errors.items():
+            if api_error not in globals.api_errors:
+                globals.api_errors[api_error] = set()
+            globals.api_errors[api_error].add(id)
+        if globals.api_errors:
+            utils.push_popup(type(globals.gui).draw_api_errors_popup, globals.gui).uuid = "api_errors"
+    
+        globals.missing_threads.update(missing_threads)
+        if globals.missing_threads:
+            utils.push_popup(type(globals.gui).draw_missing_threads_popup, globals.gui).uuid = "missing_threads"
 
     if notifs:
         await check_notifs(standalone=False)

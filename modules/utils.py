@@ -324,10 +324,11 @@ def push_popup(*args, bottom=False, **kwargs):
                 ):
                     return
                 notify_error = True
-    if bottom:
-        globals.popup_stack.insert(0, popup)
-    else:
-        globals.popup_stack.append(popup)
+    with globals.popup_stack_lock:
+        if bottom:
+            globals.popup_stack.insert(0, popup)
+        else:
+            globals.popup_stack.append(popup)
     globals.popup_stack_changed = True
     if notify_error:
         notification_proc.notify(
