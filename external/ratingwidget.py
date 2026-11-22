@@ -21,6 +21,7 @@ def ratingwidget(id: str, current: float, num_stars=5, *args, **kwargs):
         if i > current and current > i - 1:
             pos = imgui.get_cursor_pos()
             imgui.text(empty_icon)
+            imgui.same_line()
             imgui.set_cursor_pos(pos)
             label = half_icon
         elif i <= current:
