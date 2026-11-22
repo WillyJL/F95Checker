@@ -1,9 +1,12 @@
 ## 11.2.2
 
 ### Added:
-
 - Add arrows and a counter to image viewer (#327 by @zerebos)
 - Preview images gallery can be resized by dragging the scroll bar vertically (by @WillyJL)
+
+### Updated:
+- Personal Rating and Forum Score support half stars (by @WillyJL)
+- Personal Rating stars can be dragged and show a preview on hover (by @WillyJL)
 
 ### Fixed:
 - Slow responses from cache api are now handled gracefully (by @WillyJL)
@@ -17,6 +20,13 @@
 - Ignore wine-based wrappers for non-windows exes (by @WillyJL)
 - Don't suppress exe console output to help with toubleshooting (by @WillyJL)
 - Workaround Renpy's questionable Wayland support (by @WillyJL)
+- Support new F95zone masked download links (by @WillyJL)
+- Support new F95zone article-style threads (by @WillyJL)
+- Handle newly-required login for latest updates search (by @WillyJL)
+- Keep old cookies for login so 2FA just needs the code (by @WillyJL)
+- Fix parsing of forum score and vote counts (by @WillyJL)
+- Fix race conditions with opening/closing popups (by @WillyJL)
+- Skip empty image links (by @WillyJL)
 
 ## 11.2.1
 

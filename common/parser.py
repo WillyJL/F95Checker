@@ -38,7 +38,7 @@ class ParsedThread:
 @dataclasses.dataclass(slots=True)
 class ParsedReview:
     user: str
-    score: int
+    score: float
     message: str
     likes: int
     timestamp: int
@@ -48,7 +48,7 @@ class ParsedReviews:
     total: int
     items: list[ParsedReview]
 
-f95_host = "https://f95zone.to/"
+f95_host = "https://f95zone.to"
 
 # [^\S\r\n] = whitespace but not newlines
 sanitize_whitespace = lambda text: re.sub(r" *(?:\r\n?|\n)", r"\n", re.sub(r"(?:[^\S\r\n]|\u200b)", " ", text))
@@ -164,14 +164,26 @@ def thread(res: bytes) -> ParsedThread | ParserError:
             else:
                 elem = elem.parent
                 continue
+            if is_class("u-hidden")(elem):
+                continue
             while not (is_link := is_class("link")(elem)) and (children := list(getattr(elem, "children", []))):
                 elem = children[0]
             if is_link and (link_url := elem.get("href")):
-                if not link_url.startswith(f95_host):
+                is_masked = link_url.startswith(f"{f95_host}/dl/")
+                if is_masked or not link_url.startswith(f"{f95_host}/"):
                     # Cache API is public, to prevent abuse we replace naked links with XPath
                     # expressions to allow client to automatically find the link in main post
-                    link_host = link_url[:link_url.find("/", len("https://")) + 1]
-                    xpath_expr = f"//{elem.name}[starts-with(@href,{link_host!r})]"
+                    # Masked (/dl/) links are user-tied so let the client find them too
+                    if is_masked:
+                        link_host = f"{f95_host}/dl/"
+                    else:
+                        link_host = link_url[:link_url.find("/", len("https://")) + 1]
+                    xpath_own_text = elem.find(string=True, recursive=False)
+                    if xpath_own_text:
+                        xpath_own_text_expr = f" and starts-with(text(),{xpath_own_text!r})"
+                    else:
+                        xpath_own_text_expr = ""
+                    xpath_expr = f"//{elem.name}[starts-with(@href,{link_host!r}){xpath_own_text_expr}]"
                     xpath_results = post_tree.xpath(xpath_expr)
                     for xpath_i, xpath_result in enumerate(xpath_results):
                         if xpath_result.get("href") == link_url:
@@ -197,7 +209,7 @@ def thread(res: bytes) -> ParsedThread | ParserError:
 
         html = _html(res)
         head = html.find(is_class("p-body-header"))
-        post = html.find(is_class("message-threadStarterPost"))
+        post = html.find(is_class("message-threadStarterPost")) or html.find(is_class("message--article"))
         if head is None or post is None:
             logo = html.select_one(".p-header-logo img")
             if logo and logo.attrs.get("alt", "").startswith("F95zone"):
@@ -348,6 +360,7 @@ def thread(res: bytes) -> ParsedThread | ParserError:
 
         score = None
         votes = None
+        # Seems like aggregateRating is no longer provided by F95zone, but check it anyway for now
         for ldjson in html.find_all("script", type="application/ld+json"):
             try:
                 schema = json.loads(ldjson.get_text())
@@ -361,11 +374,16 @@ def thread(res: bytes) -> ParsedThread | ParserError:
 
         if score is None:
             score = 0.0
+            if elem := html.find(is_class("f95rv-banner-ringValue")):
+                try:
+                    score = float(elem.get_text())
+                except Exception:
+                    pass
 
         if votes is None:
             votes = 0
-            if elem := html.find(is_class("tabs")):
-                if match := re.search(r"reviews\s*\(([\d,]+)\)", elem.get_text(), re.M | re.I):
+            if elem := html.find(is_class("f95rv-banner-count")):
+                if match := re.search(r"([\d,]+)\s*reviews", elem.get_text(), re.M | re.I):
                     try:
                         votes = int(match.group(1).replace(",", ""))
                     except Exception:
@@ -397,7 +415,7 @@ def thread(res: bytes) -> ParsedThread | ParserError:
                         tags.append(Tag[tag])
         tags = tuple(sorted(tags, key=lambda tag: tag.name))
 
-        elem = post.find(is_class("bbWrapper")).find(lambda elem: elem.name == "div" and "data-src" in elem.attrs)
+        elem = post.find(is_class("bbWrapper")).find(lambda elem: elem.name == "div" and "data-src" in elem.attrs and len(elem.get("data-src", "")) > len("https://"))
         if elem:
             image_url = attachment(elem.get("data-src"))
         else:
@@ -537,7 +555,7 @@ def reviews(res: bytes) -> ParsedReviews | ParserError:
             logo = html.select_one(".p-header-logo img")
             if logo and logo.attrs.get("alt", "").startswith("F95zone"):
                 e = ParserError(
-                    message="Thread structure missing",
+                    message="Review structure missing",
                     dump=res,
                 )
             else:
@@ -551,7 +569,7 @@ def reviews(res: bytes) -> ParsedReviews | ParserError:
         if reviews_list:
             for review in reviews_list.find_all(is_class("f95rv-card")):
                 user = review.get("data-author")
-                score = int(review.find(is_class("f95rv-stars")).get("aria-label")[0])
+                score = float(review.find(is_class("f95rv-stars")).get("aria-label", "").split(" ")[0])
                 message = review.find(is_class("bbWrapper")).find(is_class("bbWrapper")).get_text()
                 for goofy_unicode in "\u2063\u200c\u200b\u2064":
                     message = message.replace(goofy_unicode, "")
@@ -565,7 +583,7 @@ def reviews(res: bytes) -> ParsedReviews | ParserError:
                     timestamp=timestamp,
                 )
                 parsed_reviews.append(parsed_review)
-        match = re.search(r"reviews\s*\(([\d,]+)\)", html.find(is_class("tabs")).get_text(), re.M | re.I)
+        match = re.search(r"([\d,]+)\s*reviews", html.find(is_class("f95rv-banner-count")).get_text(), re.M | re.I)
         total = int(match.group(1).replace(",", ""))
     except Exception:
         e = ParserError(

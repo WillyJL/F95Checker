@@ -872,7 +872,9 @@ class MainGUI():
 
     def drop_callback(self, window: glfw._GLFWwindow, items: list[str]):
         paths = [pathlib.Path(item) for item in items]
-        if globals.popup_stack and isinstance(picker := getattr(globals.popup_stack[-1].func, "__self__", None), filepicker.FilePicker):
+        with globals.popup_stack_lock:
+            is_picker = globals.popup_stack and isinstance(picker := getattr(globals.popup_stack[-1].func, "__self__", None), filepicker.FilePicker)
+        if is_picker:
             path = paths[0]
             if (picker.dir_picker and path.is_dir()) or (not picker.dir_picker and path.is_file()):
                 picker.selected = str(path)
@@ -1091,25 +1093,26 @@ class MainGUI():
                         imgui.set_cursor_screen_pos((text_x, text_y))
                         imgui.text(text)
 
-                        # Popups
-                        open_popup_count = 0
-                        ran_popups = []
-                        for popup in globals.popup_stack:
-                            opened, closed = popup()
-                            ran_popups.append(f"{popup.uuid}: opened={opened} {popup.func}()")
-                            if closed:
-                                globals.popup_stack.remove(popup)
-                                globals.popup_stack_changed = True
-                            open_popup_count += opened
-                        # Popups are closed all at the end to allow stacking
-                        for _ in range(open_popup_count):
-                            try:
-                                imgui.end_popup()
-                            except imgui.core.ImGuiError:
-                                msg = "Popup stack:\n"
-                                for ran_popup in ran_popups:
-                                    msg += f"{ran_popup}\n"
-                                raise Exception(msg)
+                        with globals.popup_stack_lock:
+                            # Popups
+                            open_popup_count = 0
+                            ran_popups = []
+                            for popup in globals.popup_stack:
+                                opened, closed = popup()
+                                ran_popups.append(f"{popup.uuid}: opened={opened} {popup.func}()")
+                                if closed:
+                                    globals.popup_stack.remove(popup)
+                                    globals.popup_stack_changed = True
+                                open_popup_count += opened
+                            # Popups are closed all at the end to allow stacking
+                            for _ in range(open_popup_count):
+                                try:
+                                    imgui.end_popup()
+                                except imgui.core.ImGuiError:
+                                    msg = "Popup stack:\n"
+                                    for ran_popup in ran_popups:
+                                        msg += f"{ran_popup}\n"
+                                    raise Exception(msg)
 
                         # Close main window (technically popups are inside the window, and inside one another - this gives proper stacking order)
                         imgui.end()
@@ -1557,7 +1560,7 @@ class MainGUI():
                     if game.selected:
                         game.rating = 0
             imgui.same_line()
-        changed, value = ratingwidget.ratingwidget("", game.rating if game else 0)
+        changed, value = ratingwidget.ratingwidget(f"###{game.id}_rating" if game else "", game.rating if game else -1.0)
         if changed:
             if game:
                 game.rating = value
@@ -2844,8 +2847,7 @@ class MainGUI():
                     self.draw_hover_text(
                         "Left clicking opens the webpage in your chosen browser.\n"
                         "Middle clicking copies the link to your clipboard.\n\n"
-                        "There's 3 types of links that work slightly different:\n"
-                        f"{icons.link}Direct: Plain download link, retrieved with automated integrated browser\n"
+                        "There's 2 types of links that work slightly different:\n"
                         f"{icons.domino_mask}Masked: CAPTCHA protected link, unmasked with automated integrated browser\n"
                         f"{icons.open_in_app}Forum: Link internal to F95zone, no special processing\n"
                     )
@@ -2865,18 +2867,19 @@ class MainGUI():
                                         # Use thread url when link is missing
                                         link = game.url
                                     if link.startswith("//"):
-                                        # XPath expression
-                                        if imgui.small_button(icons.link + mirror):
-                                            callbacks.redirect_xpath_link(game.url, link)
-                                        if imgui.is_item_clicked(imgui.MOUSE_BUTTON_MIDDLE):
-                                            callbacks.redirect_xpath_link(game.url, link, copy=True)
-                                    elif link.startswith(f"{api.f95_host}/masked/"):
-                                        # Masked link
-                                        if imgui.small_button(icons.domino_mask + mirror):
-                                            callbacks.redirect_masked_link(link)
-                                        if imgui.is_item_clicked(imgui.MOUSE_BUTTON_MIDDLE):
-                                            callbacks.redirect_masked_link(link, copy=True)
-                                    elif link.startswith(api.f95_host):
+                                        if f"{api.f95_host}/dl/" in link:
+                                            # XPath expression for masked link
+                                            if imgui.small_button(icons.domino_mask + mirror):
+                                                callbacks.redirect_xpath_masked_link(game.url, link)
+                                            if imgui.is_item_clicked(imgui.MOUSE_BUTTON_MIDDLE):
+                                                callbacks.redirect_xpath_masked_link(game.url, link, copy=True)
+                                        else:
+                                            # XPath expression for direct link, doesn't seem to be used anymore but let's keep it for now
+                                            if imgui.small_button(icons.link + mirror):
+                                                callbacks.redirect_xpath_link(game.url, link)
+                                            if imgui.is_item_clicked(imgui.MOUSE_BUTTON_MIDDLE):
+                                                callbacks.redirect_xpath_link(game.url, link, copy=True)
+                                    elif link.startswith(f"{api.f95_host}/"):
                                         # F95zone link
                                         if imgui.small_button(icons.open_in_app + mirror):
                                             callbacks.open_webpage(link)
@@ -3538,7 +3541,7 @@ class MainGUI():
                     case FilterMode.Label.value:
                         key = lambda game, f: (f.match in game.labels)
                     case FilterMode.Rating.value:
-                        key = lambda game, f: (game.rating == f.match)
+                        key = lambda game, f: (game.rating >= f.match)
                     case FilterMode.Score.value:
                         key = lambda game, f: (game.score >= f.match)
                     case FilterMode.Status.value:
@@ -4530,7 +4533,7 @@ class MainGUI():
                         if Label.instances:
                             flt.match = Label.instances[0]
                     case FilterMode.Rating.value:
-                        flt.match = 0
+                        flt.match = 0.0
                     case FilterMode.Score.value:
                         flt.match = 0.0
                     case FilterMode.Status.value:

@@ -564,7 +564,8 @@ async def is_logged_in():
 
 async def login():
     try:
-        new_cookies = {}
+        ret = False
+        new_cookies = globals.cookies.copy()
         with await webview.start(
             "cookies", f95_login_page,
             title="F95Checker: Login to F95zone",
@@ -576,8 +577,10 @@ async def login():
                 (key, value) = await pipe.get_async()
                 new_cookies[key] = value
                 if "xf_user" in new_cookies:
+                    ret = True
                     break
         await asyncio.shield(db.update_cookies(new_cookies))
+        return ret
     except Exception:
         raise msgbox.Exc(
             "Login window failure",
@@ -727,7 +730,7 @@ def latest_updates_search_sanitize_query(query: str):
     return query
 
 
-async def latest_updates_search(category: str, search: str, query: str, sort="likes", count=15, page=1):
+async def latest_updates_search(category: str, search: str, query: str, do_login: bool, sort="likes", count=15, page=1):
     res = await fetch("GET", f95_latest_endpoint.format(
         cmd="list",
         cat=category,
@@ -740,6 +743,10 @@ async def latest_updates_search(category: str, search: str, query: str, sort="li
     ))
     raise_f95zone_error(res)
     res = json.loads(res)
+    if res.get("status") == "error" and res.get("msg") == "You have to be logged in to see Latest Updates.":
+        if do_login and await login():
+            return await latest_updates_search(category, search, query, do_login, sort, count, page)
+        return "Login to F95zone necessary, click Search to continue"
     raise_f95zone_error(res)
     results = []
     for result in res["msg"]["data"]:
@@ -792,11 +799,11 @@ def open_search_popup(query: str):
         )
         imgui.same_line()
         if imgui.button(f"{icons.magnify} Search") or activated:
-            async_thread.run(_f95zone_run_search())
+            async_thread.run(_f95zone_run_search(do_login=True))
 
         if real_query != ran_query:
             imgui.text_disabled("Note: the real search query is different because Latest Updates struggles searching some words/symbols")
-        if results:
+        if results and isinstance(results, list):
             imgui.text("Click on any of the results to add it, click Ok when you're finished.")
             imgui.text(f"Latest Updates search results for {searches[ran_search].lower()} '{real_query}' in {categories[ran_category].lower()} category:")
         else:
@@ -805,8 +812,10 @@ def open_search_popup(query: str):
             imgui.same_line()
             if results is None:
                 imgui.text("Searching...")
-            else:
+            elif results == []:
                 imgui.text("No results!")
+            else:
+                imgui.text(results)
             return
         imgui.text("\n")
 
@@ -822,7 +831,7 @@ def open_search_popup(query: str):
                 imgui.pop_disabled()
             if clicked:
                 async_thread.run(callbacks.add_games(result))
-    async def _f95zone_run_search():
+    async def _f95zone_run_search(do_login):
         nonlocal results, ran_query, real_query, ran_category, ran_search
         results = None
         ran_query = query
@@ -833,7 +842,7 @@ def open_search_popup(query: str):
         real_search = searches[ran_search].lower()
         if real_search == "title":
             real_search = "search"
-        results = await latest_updates_search(real_category, real_search, real_query)
+        results = await latest_updates_search(real_category, real_search, real_query, do_login)
     utils.push_popup(
         utils.popup, "F95zone thread search",
         _f95zone_search_popup,
@@ -841,7 +850,7 @@ def open_search_popup(query: str):
         closable=True,
         outside=True
     )
-    async_thread.run(_f95zone_run_search())
+    async_thread.run(_f95zone_run_search(do_login=False))
 
 
 async def import_url_shortcut(file: str | pathlib.Path):
@@ -1700,53 +1709,54 @@ async def refresh(*games: Game, full=False, notifs=True, force_archived=False, f
     full_checks_sem = None
     fast_checks_counter = 0
 
-    # Close previous instances of these single-instance popups
-    for popup in globals.popup_stack:
-        if popup.func in (
-            type(globals.gui).draw_updates_popup,
-            type(globals.gui).draw_api_errors_popup,
-            type(globals.gui).draw_missing_threads_popup,
-        ):
-            globals.popup_stack.remove(popup)
-            globals.popup_stack_changed = True
+    with globals.popup_stack_lock:
+        # Close previous instances of these single-instance popups
+        for popup in globals.popup_stack:
+            if popup.func in (
+                type(globals.gui).draw_updates_popup,
+                type(globals.gui).draw_api_errors_popup,
+                type(globals.gui).draw_missing_threads_popup,
+            ):
+                globals.popup_stack.remove(popup)
+                globals.popup_stack_changed = True
 
-    if updates or globals.updates:
-        if updates:
-            # Merge with previous updates, eg in case of multiple refreshes in background
-            globals.updates.update(updates)
-            first = list(updates.keys())[0]
-        else:
-            first = list(globals.updates.keys())[0]
-        globals.updates_sorted_ids = sorted(globals.updates.keys(), key=lambda id: globals.games[id].type.category.value)
-        utils.push_popup(type(globals.gui).draw_updates_popup, globals.gui).uuid = "updates"
-        if globals.gui.hidden or not globals.gui.focused:
-            image = None
-            if globals.settings.notifs_show_update_banner:
-                image_paths = list(filter(lambda f: f.suffix != ".zst", globals.images_path.glob(f"{first}.*")))
-                if image_paths:
-                    image = desktop_notifier.Attachment(path=image_paths[0])
-            count = len(globals.updates)
-            notification_proc.notify(
-                title="Updates",
-                msg=f"{count} item{'' if count == 1 else 's'} in your library {'has' if count == 1 else 'have'} received updates!",
-                attachment=image,
-            )
-
-    # Don't merge with previous errors, we only care about latest ones,
-    # previous errors might have disappeared since then
-    globals.api_errors.clear()
-    globals.missing_threads.clear()
-
-    for id, api_error in api_errors.items():
-        if api_error not in globals.api_errors:
-            globals.api_errors[api_error] = set()
-        globals.api_errors[api_error].add(id)
-    if globals.api_errors:
-        utils.push_popup(type(globals.gui).draw_api_errors_popup, globals.gui).uuid = "api_errors"
-
-    globals.missing_threads.update(missing_threads)
-    if globals.missing_threads:
-        utils.push_popup(type(globals.gui).draw_missing_threads_popup, globals.gui).uuid = "missing_threads"
+        if updates or globals.updates:
+            if updates:
+                # Merge with previous updates, eg in case of multiple refreshes in background
+                globals.updates.update(updates)
+                first = list(updates.keys())[0]
+            else:
+                first = list(globals.updates.keys())[0]
+            globals.updates_sorted_ids = sorted(globals.updates.keys(), key=lambda id: globals.games[id].type.category.value)
+            utils.push_popup(type(globals.gui).draw_updates_popup, globals.gui).uuid = "updates"
+            if globals.gui.hidden or not globals.gui.focused:
+                image = None
+                if globals.settings.notifs_show_update_banner:
+                    image_paths = list(filter(lambda f: f.suffix != ".zst", globals.images_path.glob(f"{first}.*")))
+                    if image_paths:
+                        image = desktop_notifier.Attachment(path=image_paths[0])
+                count = len(globals.updates)
+                notification_proc.notify(
+                    title="Updates",
+                    msg=f"{count} item{'' if count == 1 else 's'} in your library {'has' if count == 1 else 'have'} received updates!",
+                    attachment=image,
+                )
+    
+        # Don't merge with previous errors, we only care about latest ones,
+        # previous errors might have disappeared since then
+        globals.api_errors.clear()
+        globals.missing_threads.clear()
+    
+        for id, api_error in api_errors.items():
+            if api_error not in globals.api_errors:
+                globals.api_errors[api_error] = set()
+            globals.api_errors[api_error].add(id)
+        if globals.api_errors:
+            utils.push_popup(type(globals.gui).draw_api_errors_popup, globals.gui).uuid = "api_errors"
+    
+        globals.missing_threads.update(missing_threads)
+        if globals.missing_threads:
+            utils.push_popup(type(globals.gui).draw_missing_threads_popup, globals.gui).uuid = "missing_threads"
 
     if notifs:
         await check_notifs(standalone=False)

@@ -110,7 +110,8 @@ async def thread(id: int) -> dict[str, str] | f95zone.IndexerError | None:
                     ret.name = update["title"] or ret.name
                     ret.developer = update["creator"] or ret.developer
                     ret.score = round(update["rating"], 1)
-                    ret.image_url = parser.attachment(update["cover"]) or ret.image_url
+                    if len(update["cover"]) > len("https://"):
+                        ret.image_url = parser.attachment(update["cover"]) or ret.image_url
                     # Append screens from latest updates that are missing in the thread
                     for preview_url in update["screens"]:
                         preview_url = parser.attachment(preview_url)
