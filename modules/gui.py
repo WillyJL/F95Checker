@@ -1559,7 +1559,7 @@ class MainGUI():
                     if game.selected:
                         game.rating = 0
             imgui.same_line()
-        changed, value = ratingwidget.ratingwidget("", game.rating if game else 0.0)
+        changed, value = ratingwidget.ratingwidget(f"###{game.id}_rating" if game else "", game.rating if game else -1.0)
         if changed:
             if game:
                 game.rating = value

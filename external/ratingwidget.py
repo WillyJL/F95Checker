@@ -8,7 +8,7 @@ half_icon = icons.star_half
 empty_icon  = icons.star_outline
 
 
-def ratingwidget(id: str, current: float, num_stars=5, *args, **kwargs):
+def ratingwidget(id: str, current: float, num_stars=5):
     value = current
     accent_col = imgui.style.colors[imgui.COLOR_BUTTON_HOVERED]
     imgui.push_style_color(imgui.COLOR_BUTTON, 0, 0, 0, 0)
@@ -17,30 +17,55 @@ def ratingwidget(id: str, current: float, num_stars=5, *args, **kwargs):
     imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (0, 0))
     imgui.push_style_var(imgui.STYLE_ITEM_SPACING, (0, 0))
     imgui.push_style_var(imgui.STYLE_FRAME_BORDERSIZE, 0)
+    star_size = imgui.calc_text_size(filled_icon)
+    pos = imgui.get_cursor_pos()
+    imgui.invisible_button(id, star_size.x * num_stars, star_size.y)
+    imgui.same_line()
+    imgui.set_cursor_pos(pos)
+    is_active = imgui.is_item_active()
+    is_hovered = imgui.is_item_hovered()
+    show = current
+    if is_active or is_hovered:
+        mouse_pos = imgui.get_mouse_pos()
+        star_pos_x = imgui.get_item_rect_min().x
+        for i in range(num_stars):
+            if mouse_pos.x < star_pos_x:
+                show = float(i)
+                break
+            elif mouse_pos.x < star_pos_x + star_size.x / 2:
+                show = i + 0.5
+                break
+            else:
+                show = float(i + 1)
+            star_pos_x += star_size.x
+        show = min(max(show, 0.0), num_stars)
+        if is_active:
+            if imgui.is_item_clicked():
+                if show == current:
+                    value = 0.0  # Clicking the current value resets the rating to 0
+                else:
+                    value = show
+            elif imgui.is_mouse_dragging(imgui.MOUSE_BUTTON_LEFT):
+                value = show
+        elif is_hovered:
+            accent_col = accent_col._replace(w=accent_col.w * 0.69)
     for i in range(1, num_stars + 1):
-        if i > current and current > i - 1:
+        if i > show and show > i - 1:
             pos = imgui.get_cursor_pos()
             imgui.text(empty_icon)
             imgui.same_line()
             imgui.set_cursor_pos(pos)
             label = half_icon
-        elif i <= current:
+        elif i <= show:
             label = filled_icon
         else:
             label = empty_icon
         if label != empty_icon:
             imgui.push_style_color(imgui.COLOR_TEXT, *accent_col)
-        if imgui.small_button(label, *args, **kwargs):
-            if imgui.get_mouse_pos().x < imgui.get_item_rect_min().x + imgui.get_item_rect_size().x / 2:
-                value = i - 0.5
-            else:
-                value = float(i)
-            if value == current:
-                value = 0.0  # Clicking the current value resets the rating to 0
+        imgui.text(label)
         if label != empty_icon:
             imgui.pop_style_color()
         imgui.same_line()
-    value = min(max(value, 0), num_stars)
     imgui.pop_style_color(3)
     imgui.pop_style_var(3)
     imgui.dummy(0, 0)
