@@ -360,6 +360,7 @@ def thread(res: bytes) -> ParsedThread | ParserError:
 
         score = None
         votes = None
+        # Seems like aggregateRating is no longer provided by F95zone, but check it anyway for now
         for ldjson in html.find_all("script", type="application/ld+json"):
             try:
                 schema = json.loads(ldjson.get_text())
@@ -373,11 +374,16 @@ def thread(res: bytes) -> ParsedThread | ParserError:
 
         if score is None:
             score = 0.0
+            if elem := html.find(is_class("f95rv-banner-ringValue")):
+                try:
+                    score = float(elem.get_text())
+                except Exception:
+                    pass
 
         if votes is None:
             votes = 0
-            if elem := html.find(is_class("tabs")):
-                if match := re.search(r"reviews\s*\(([\d,]+)\)", elem.get_text(), re.M | re.I):
+            if elem := html.find(is_class("f95rv-banner-count")):
+                if match := re.search(r"([\d,]+)\s*reviews", elem.get_text(), re.M | re.I):
                     try:
                         votes = int(match.group(1).replace(",", ""))
                     except Exception:
@@ -577,7 +583,7 @@ def reviews(res: bytes) -> ParsedReviews | ParserError:
                     timestamp=timestamp,
                 )
                 parsed_reviews.append(parsed_review)
-        match = re.search(r"reviews\s*\(([\d,]+)\)", html.find(is_class("tabs")).get_text(), re.M | re.I)
+        match = re.search(r"([\d,]+)\s*reviews", html.find(is_class("f95rv-banner-count")).get_text(), re.M | re.I)
         total = int(match.group(1).replace(",", ""))
     except Exception:
         e = ParserError(
