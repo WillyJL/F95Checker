@@ -415,7 +415,7 @@ def thread(res: bytes) -> ParsedThread | ParserError:
                         tags.append(Tag[tag])
         tags = tuple(sorted(tags, key=lambda tag: tag.name))
 
-        elem = post.find(is_class("bbWrapper")).find(lambda elem: elem.name == "div" and "data-src" in elem.attrs)
+        elem = post.find(is_class("bbWrapper")).find(lambda elem: elem.name == "div" and "data-src" in elem.attrs and len(elem.get("data-src", "")) > len("https://"))
         if elem:
             image_url = attachment(elem.get("data-src"))
         else:

@@ -23,6 +23,7 @@
 - Keep old cookies for login so 2FA just needs the code (by @WillyJL)
 - Fix parsing of forum score and vote counts (by @WillyJL)
 - Fix race conditions with opening/closing popups (by @WillyJL)
+- Skip empty image links (by @WillyJL)
 
 ## 11.2.1
 
