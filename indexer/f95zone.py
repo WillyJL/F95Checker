@@ -33,7 +33,7 @@ RATELIMIT_API_ERRORS = (
     "You have been temporarily blocked because of a large amount of requests, please try again later",
 )
 CLOUDFLARE_CAPTCHA_MESSAGES = (
-    b'(function(){window._cf_chl_opt = {',
+    b"(function(){window._cf_chl_opt = {",
     b"<title>Just a moment...</title>",
 )
 TEMP_ERROR_MESSAGES = (
