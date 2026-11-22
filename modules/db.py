@@ -321,7 +321,7 @@ async def connect():
             "playtime":                    f'REAL    DEFAULT 0',
             "score":                       f'REAL    DEFAULT 0',
             "votes":                       f'INTEGER DEFAULT 0',
-            "rating":                      f'INTEGER DEFAULT 0',
+            "rating":                      f'REAL    DEFAULT 0',
             "finished":                    f'TEXT    DEFAULT ""',
             "installed":                   f'TEXT    DEFAULT ""',
             "updated":                     f'INTEGER DEFAULT NULL',

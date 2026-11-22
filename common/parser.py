@@ -38,7 +38,7 @@ class ParsedThread:
 @dataclasses.dataclass(slots=True)
 class ParsedReview:
     user: str
-    score: int
+    score: float
     message: str
     likes: int
     timestamp: int
@@ -569,7 +569,7 @@ def reviews(res: bytes) -> ParsedReviews | ParserError:
         if reviews_list:
             for review in reviews_list.find_all(is_class("f95rv-card")):
                 user = review.get("data-author")
-                score = int(review.find(is_class("f95rv-stars")).get("aria-label")[0])
+                score = float(review.find(is_class("f95rv-stars")).get("aria-label", "").split(" ")[0])
                 message = review.find(is_class("bbWrapper")).find(is_class("bbWrapper")).get_text()
                 for goofy_unicode in "\u2063\u200c\u200b\u2064":
                     message = message.replace(goofy_unicode, "")

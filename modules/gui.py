@@ -1559,7 +1559,7 @@ class MainGUI():
                     if game.selected:
                         game.rating = 0
             imgui.same_line()
-        changed, value = ratingwidget.ratingwidget("", game.rating if game else 0)
+        changed, value = ratingwidget.ratingwidget("", game.rating if game else 0.0)
         if changed:
             if game:
                 game.rating = value
@@ -3540,7 +3540,7 @@ class MainGUI():
                     case FilterMode.Label.value:
                         key = lambda game, f: (f.match in game.labels)
                     case FilterMode.Rating.value:
-                        key = lambda game, f: (game.rating == f.match)
+                        key = lambda game, f: (game.rating >= f.match)
                     case FilterMode.Score.value:
                         key = lambda game, f: (game.score >= f.match)
                     case FilterMode.Status.value:
@@ -4532,7 +4532,7 @@ class MainGUI():
                         if Label.instances:
                             flt.match = Label.instances[0]
                     case FilterMode.Rating.value:
-                        flt.match = 0
+                        flt.match = 0.0
                     case FilterMode.Score.value:
                         flt.match = 0.0
                     case FilterMode.Status.value:

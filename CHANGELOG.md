@@ -1,9 +1,11 @@
 ## 11.2.2
 
 ### Added:
-
 - Add arrows and a counter to image viewer (#327 by @zerebos)
 - Preview images gallery can be resized by dragging the scroll bar vertically (by @WillyJL)
+
+### Updated:
+- Personal Rating and Forum Score support half stars (by @WillyJL)
 
 ### Fixed:
 - Slow responses from cache api are now handled gracefully (by @WillyJL)

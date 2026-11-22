@@ -1,15 +1,16 @@
 # https://gist.github.com/WillyJL/e9e9dac70b7970b6ee12fcf52b9b8f11
 import imgui
 
-from modules import icons # added
+from modules import icons
 
-filled_icon = icons.star          # changed
-empty_icon  = icons.star_outline  # changed
+filled_icon = icons.star
+half_icon = icons.star_half
+empty_icon  = icons.star_outline
 
 
-def ratingwidget(id: str, current: int, num_stars=5, *args, **kwargs):
+def ratingwidget(id: str, current: float, num_stars=5, *args, **kwargs):
     value = current
-    accent_col = imgui.style.colors[imgui.COLOR_BUTTON_HOVERED]  # added
+    accent_col = imgui.style.colors[imgui.COLOR_BUTTON_HOVERED]
     imgui.push_style_color(imgui.COLOR_BUTTON, 0, 0, 0, 0)
     imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0, 0, 0, 0)
     imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0, 0, 0, 0)
@@ -17,15 +18,26 @@ def ratingwidget(id: str, current: int, num_stars=5, *args, **kwargs):
     imgui.push_style_var(imgui.STYLE_ITEM_SPACING, (0, 0))
     imgui.push_style_var(imgui.STYLE_FRAME_BORDERSIZE, 0)
     for i in range(1, num_stars + 1):
-        if i <= current:
+        if i > current and current > i - 1:
+            pos = imgui.get_cursor_pos()
+            imgui.text(empty_icon)
+            imgui.set_cursor_pos(pos)
+            label = half_icon
+        elif i <= current:
             label = filled_icon
-            imgui.push_style_color(imgui.COLOR_TEXT, *accent_col)  # added
         else:
             label = empty_icon
-        if imgui.small_button(label, *args, **kwargs):  # changed
-            value = i if current != i else 0  # Clicking the current value resets the rating to 0
-        if i <= current:  # added
-            imgui.pop_style_color()  # added
+        if label != empty_icon:
+            imgui.push_style_color(imgui.COLOR_TEXT, *accent_col)
+        if imgui.small_button(label, *args, **kwargs):
+            if imgui.get_mouse_pos().x < imgui.get_item_rect_min().x + imgui.get_item_rect_size().x / 2:
+                value = i - 0.5
+            else:
+                value = float(i)
+            if value == current:
+                value = 0.0  # Clicking the current value resets the rating to 0
+        if label != empty_icon:
+            imgui.pop_style_color()
         imgui.same_line()
     value = min(max(value, 0), num_stars)
     imgui.pop_style_color(3)

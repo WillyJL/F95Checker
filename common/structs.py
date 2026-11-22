@@ -663,7 +663,7 @@ class TimelineEvent:
 @dataclasses.dataclass(slots=True)
 class Review:
     user: str
-    score: int
+    score: float
     message: str
     likes: int
     timestamp: int
@@ -992,7 +992,7 @@ class Game:
     playtime           : float
     score              : float
     votes              : int
-    rating             : int
+    rating             : float
     finished           : str
     installed          : str
     updated            : bool | None
