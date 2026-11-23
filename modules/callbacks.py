@@ -223,10 +223,14 @@ async def _launch_exe(executable: str, wrapper: str = ""):
             exe_path = pathlib.Path(globals.settings.default_exe_dir.get(globals.os)) / exe_path
         exe = str(exe_path)
         cwd = exe_path.parent
-        with exe_path.open("rb") as f:
-            magic = f.read(8)
-            is_windows_exe = magic.startswith((b"MZ", b"ZM", b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"))  # .exe and .msi
-            is_unix_exe = magic.startswith((b"#!", b"\x7FELF"))  # Shebang and ELF
+        if exe_path.is_file():
+            with exe_path.open("rb") as f:
+                magic = f.read(8)
+                is_windows_exe = magic.startswith((b"MZ", b"ZM", b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"))  # .exe and .msi
+                is_unix_exe = magic.startswith((b"#!", b"\x7FELF"))  # Shebang and ELF
+        else:
+            is_windows_exe = False
+            is_unix_exe = False
 
     # Always give precedence to wrappers (if any), since they might open the file/uri/folder in some user-defined way, do no custom handling in this case
     if wrapper:
